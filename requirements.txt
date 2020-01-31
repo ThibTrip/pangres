@@ -1,0 +1,3 @@
+pandas>=0.25.3
+sqlalchemy>=1.3.12
+psycopg2>=2.8.4

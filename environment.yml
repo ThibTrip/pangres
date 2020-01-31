@@ -1,0 +1,6 @@
+name: pangres-dev
+dependencies:
+  - numpy
+  - pytest
+  - pytest-cov
+  - pytest-benchmark
