@@ -15,7 +15,7 @@ temporarily for local testing but **be warned**:
 from sqlalchemy import create_engine
 
 class TestDB:
-    connection_string = "postgresql://circleci_user@localhost:5432/circleci_test?sslmode=disable"
+    connection_string = "postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable"
     schema = 'tests'
     engine = create_engine(connection_string)
 
