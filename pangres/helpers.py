@@ -143,7 +143,6 @@ class PandasSpecialEngine:
         # change bindings of table (we want a sqlalchemy engine
         # not a pandas_sql_engine)
         metadata = MetaData(bind=engine)
-        metadata.reflect(bind=engine)
         table.metadata = metadata
 
         # add PK
