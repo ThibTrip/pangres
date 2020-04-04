@@ -1,21 +1,23 @@
-#!/usr/bin/env python
-# coding: utf-8
+# +
 """
-Functions/classes/variables for interacting between
-a pandas DataFrame and postgres.
+Functions/classes/variables for interacting between a pandas DataFrame
+and postgres/mysql/sqlite (and potentially other databases).
 """
+import json
 import pandas as pd
-import warnings
-import sqlalchemy.dialects.postgresql.base as pg_sql_types
 import logging
-from inspect import cleandoc
-from sqlalchemy import MetaData, Table, select
-from sqlalchemy.exc import DataError
-from sqlalchemy.schema import PrimaryKeyConstraint, CreateColumn, Column
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.sql.sqltypes import (TEXT, Text, Float, FLOAT, BigInteger,
-                                     BIGINT, Integer, INTEGERTYPE, INT, Integer,
-                                     TIMESTAMP, BOOLEAN, Boolean, BOOLEANTYPE)
+import re
+from copy import deepcopy
+from math import floor
+from sqlalchemy import JSON, MetaData, select
+from sqlalchemy.sql import null
+from sqlalchemy.schema import (PrimaryKeyConstraint, CreateColumn, CreateSchema)
+from alembic.runtime.migration import MigrationContext
+from alembic.operations import Operations
+from pangres.upsert import (mysql_upsert,
+                            postgres_upsert,
+                            sqlite_upsert)
+
 # configure logger
 logging_format = ('%(asctime)s | %(levelname)s     '
                   '| pangres     | %(module)s:%(funcName)s:%(lineno)s '
@@ -24,37 +26,17 @@ logging.basicConfig(format=logging_format, datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger('pangres')
 logger.setLevel(logging.INFO)
 
-# dictionnary for comparing sqlalchemy data types and altering data types in
-# databases.
-# IMPORTANT NOTE: perhaps not the most elegant solution but it works.
-# I may have missed some dtypes though.
-# Please tell me if you have a better idea.
-# Also not sure if we need uppercase/camelcase variants and what the
-# difference is e.g. Text and TEXT.
-dtypes_comparator = {
-    BigInteger: "integer",
-    BIGINT: "integer",
-    Integer: "integer",
-    INTEGERTYPE: "integer",
-    INT: "integer",
-    Text: "text",
-    TEXT: "text",
-    TIMESTAMP: "timestamp",
-    Float: "float",
-    FLOAT: "float",
-    Boolean: "boolean",
-    BOOLEAN: "boolean",
-    BOOLEANTYPE: "boolean",
-    # pg specific types
-    pg_sql_types.DOUBLE_PRECISION: "float",
-    pg_sql_types.TIMESTAMP: "timestamp",
-    pg_sql_types.BOOLEAN: "boolean"
-}
+# compile some regexes
+# column names that will cause issues with psycopg2 default parameter style
+# (so we will need to switch to format style when we see such columns)
+RE_BAD_COL_NAME = re.compile('[\(\)\%]')
+# e.g. match "(50)" in "VARCHAR(50)"
+RE_CHARCOUNT_COL_TYPE = re.compile('(?<=.)+\(\d+\)')
 
-# characters that we do not want to see in column names
-forbidden_chars = "()%"
-_translator_forbidden_chars = {ord(char): "" for char in forbidden_chars}
 
+# -
+
+# # Class PandasSpecialEngine
 
 class PandasSpecialEngine:
 
@@ -62,39 +44,74 @@ class PandasSpecialEngine:
                  engine,
                  df,
                  table_name,
-                 schema='public',
-                 clean_column_names=False):
+                 schema=None,
+                 dtype=None):
         """
-        Interact with a postgres table via pandas and SQLalchemy table models.
+        Interacts with SQL tables via pandas and SQLalchemy table models.
+
+        Attributes
+        ----------
+        engine : sqlalchemy.engine.base.Engine
+            Engine provided during class instantiation
+        df : pd.DataFrame
+            DataFrame provided during class instantiation
+        table_name : str
+            Table name provided during class instantiation
+        schema : str or None
+            SQL schema provided during class instantiation
+        table : sqlalchemy.sql.schema.Table
+            Sqlalchemy table model for df
 
         Parameters
         ----------
         engine : sqlalchemy.engine.base.Engine
-            Engine from sqlalchemy (see sqlalchemy.create_engine)
+            Engine from sqlalchemy (see https://docs.sqlalchemy.org/en/13/core/engines.html
+            and examples below)
         df : pd.DataFrame
             A pandas DataFrame
         table_name : str
-            Name of the postgres table
-        schema : str, default 'public'
-            Name of the postgres schema that contains the table
-        clean_column_names : bool, default False
-            If False raises a ValueError if any of the following
-            characters are found in the column names: "(", ")" and "%".
-            If True removes any of the aforementionned characters
-            in the column names before updating the table.
-            Our tests seem to indicate those characters can
-            cause issues with psycopg2 even in parameterized
-            queries (they are not properly escaped).
+            Name of the SQL table
+        schema : str or None, default None
+            Name of the schema that contains/will contain the table
+            For postgres defaults to "public" if not provided.
+        dtype : None or dict {str:SQL_TYPE}, default None
+            Similar to pd.to_sql dtype argument.
+            This is especially useful for MySQL where the length of
+            primary keys with text has to be provided (see Examples)
         
         Examples
         --------
         >>> from sqlalchemy import create_engine
-        >>> pse = PandasSpecialEngine(engine=create_engine("postgresql://user:password@host.com:5432/database"), 
-                                  df=pd.DataFrame({'name':['Albert'],'profileid':[0]}).set_index('profileid'), 
-                                  table_name='example')
-        pse
-        
+        >>> from pangres.helpers import PandasSpecialEngine
+        >>> 
+        >>> engine = create_engine("postgresql://user:password@host.com:5432/database")
+        >>> df = pd.DataFrame({'name':['Albert', 'Toto'],
+        ...                    'profileid':[10, 11]}).set_index('profileid')
+        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
+        PandasSpecialEngine (id 123546, hexid 0x1E29A)
+        * connection: Engine(postgresql://user:***@host.com:5432/database)
+        * schema: public
+        * table: example
+        * SQLalchemy table model:
+        Table('example', MetaData(bind=Engine(postgresql://user:***@host.com:5432/database)),
+              Column('profileid', BigInteger(), table=<example>, primary_key=True, nullable=False),
+              Column('name', Text(), table=<example>), schema='public')
+        * df.head():
+        |   profileid | name   |
+        |------------:|:-------|
+        |          10 | Albert |
+        |          11 | Toto   |
         """
+        self._db_type = self._detect_db_type(engine)
+        if self._db_type == "postgres":
+            schema = 'public' if schema is None else schema
+            # raise if we find columns with "(", ")" or "%"
+            if any((RE_BAD_COL_NAME.search(col) for col in df.columns)):
+                err = ("psycopg2 (Python postgres driver) does not seem to support"
+                       "column names with '%', '(' or ')' "
+                       "(see https://github.com/psycopg/psycopg2/issues/167)")
+                raise ValueError(err)
+
         # VERIFY ARGUMENTS
         # all index levels have names
         index_names = list(df.index.names)
@@ -103,42 +120,36 @@ class PandasSpecialEngine:
 
         # index is unique
         if not df.index.is_unique:
-            err_msg = ("The index must be unique since it is used "
-                       "as primary key.\n"
-                       "Check duplicates using this code (assuming df "
-                       " is the DataFrame you want to upsert):\n"
-                       ">>> df.index[df.index.duplicated(keep=False)]")
-            raise IndexError(err_msg)
-
-        # no forbidden characters are contained in the column names
-        # tests have shown that even within a parameterized query
-        # signs like ")", "(" and "%" may cause errors with psycopg2
-        new_df = df.copy()
-        for col in new_df.columns:
-            new_df.rename(columns={
-                col: self._clean_column_name(col, raise_=not clean_column_names)
-            },
-                          inplace=True)
-        # also do this for index names
-        new_index_names = []
-        for index_name in index_names:
-            new_index_name = self._clean_column_name(
-                index_name, raise_=not clean_column_names)
-            new_index_names.append(new_index_name)
-        new_df.rename_axis(new_index_names, axis='index', inplace=True)
+            err = ("The index must be unique since it is used "
+                   "as primary key.\n"
+                   "Check duplicates using this code (assuming df "
+                   " is the DataFrame you want to upsert):\n"
+                   ">>> df.index[df.index.duplicated(keep=False)]")
+            raise IndexError(err)
 
         # there are no duplicated names
-        # IMPORTANT: verify this after cleaning names
-        fields = new_index_names + new_df.columns.tolist()
+        fields = list(df.index.names) + df.columns.tolist()
         if len(set(fields)) != len(fields):
             raise ValueError(("There cannot be duplicated names amongst "
                               "index levels and/or columns!"))
 
+        # detect json columns
+        def is_json(col):
+            s = df[col].dropna()
+            return (not s.empty and
+                    s.map(lambda x: isinstance(x, (list, dict))).all())
+        json_cols = [col for col in df.columns if is_json(col)]
+        # merge with dtype from user
+        new_dtype = {c:JSON for c in json_cols}
+        if dtype is not None:
+            new_dtype.update(dtype)
+        new_dtype = None if new_dtype == {} else new_dtype
         # create sqlalchemy table model via pandas
         pandas_sql_engine = pd.io.sql.SQLDatabase(engine=engine, schema=schema)
         table = pd.io.sql.SQLTable(name=table_name,
                                    pandas_sql_engine=pandas_sql_engine,
-                                   frame=new_df).table
+                                   frame=df,
+                                   dtype=new_dtype).table
 
         # change bindings of table (we want a sqlalchemy engine
         # not a pandas_sql_engine)
@@ -146,368 +157,338 @@ class PandasSpecialEngine:
         table.metadata = metadata
 
         # add PK
-        constraint = PrimaryKeyConstraint(
-            *[table.columns[name] for name in new_index_names])
+        constraint = PrimaryKeyConstraint(*[table.columns[name]
+                                            for name in df.index.names])
         table.append_constraint(constraint)
+        
 
-        # ADD ATTRIBUTES
+        # add remaining attributes
         self.engine = engine
-        self.df = new_df
+        self.df = df
         self.schema = schema
-        self.table_name = table_name
-        self.namespace = f'{schema}."{table_name}"'
-        # get a list of all fields in the frame (index and columns)
-        self.df_col_names = [col_info.name for col_info in table.columns]
         self.table = table
 
-    @staticmethod
-    def _clean_column_name(column_name: str, raise_: bool = False) -> str:
-        """
-        Renames or raises if a column name contains ")", "(" or "%".
 
-        Parameters
-        ----------
-        column_name : str
-            Name of the column/index name to examine/rename
-        raise_ : bool, default False
-            If True raises an error if a column name
-            contains ")", "(" or "%"
-            else those characters are removed
+    @staticmethod
+    def _detect_db_type(engine) -> str:
+        """
+        Identifies whether the dialect of given sqlalchemy 
+        engine corresponds to postgres, mysql or another sql type.
 
         Returns
         -------
-        str
-            column_name without ")", "(" and "%"
+        sql_type : {'postgres', 'mysql', 'sqlite', 'other'}
         """
-        # ignore integer columns etc
-        if not isinstance(column_name, str):
-            return column_name
-
-        before = column_name
-        column_name = column_name.translate(_translator_forbidden_chars)
-
-        if before != column_name:
-            if raise_:
-                raise ValueError(
-                    (f'The column "{before}" contains at least one '
-                     f"of the forbidden characters: {list(forbidden_chars)}"))
-
-            else:
-                warnings.warn((f'The column "{before}" has been renamed to '
-                               f'"{column_name}"'))
-
-        return column_name
-
+        dialect = engine.dialect.dialect_description
+        if re.search('psycopg|postgres', dialect):
+            return "postgres"
+        elif 'mysql' in dialect:
+            return "mysql"
+        elif 'sqlite' in dialect:
+            return 'sqlite'
+        else:
+            return "other"
+            
     def table_exists(self) -> bool:
         """
-        Returns True if the postgres table defined
-        in the instance of a PandasSpecialEngine exists
-        else returns False.
+        Returns True if the table defined in given instance
+        of PandasSpecialEngine exists else returns False.
 
         Returns
         -------
-        bool
+        exists : bool
             True if table exists else False
         """
-        return self.engine.has_table(self.table_name, schema=self.schema)
+        return self.engine.has_table(self.table.name, schema=self.schema)
 
     def create_schema_if_not_exists(self):
         """
-        Creates the postgres schema defined
-        in the instance of a PandasSpecialEngine
-        if it does not exist.
+        Creates the schema defined in given instance of
+        PandasSpecialEngine if it does not exist.
         """
-        if self.schema is not None:
-            self.engine.execute(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
+        if (self.schema is not None and
+            not self.engine.dialect.has_schema(self.engine, self.schema)):
+            self.engine.execute(CreateSchema(self.schema))
 
     def create_table_if_not_exists(self):
         """
-        Creates the postgres table defined
-        in the instance of a PandasSpecialEngine
-        if it does not exist.
+        Creates the table generated in given instance of
+        PandasSpecialEngine if it does not exist.
         """
         self.table.create(checkfirst=True)
 
     def get_db_columns_names(self) -> list:
         """
-        Gets the column names of the postgres table defined
-        in the instance of a PandasSpecialEngine.
+        Gets the column names of the SQL table defined
+        in given instance of PandasSpecialEngine.
 
         Returns
         -------
-        list
+        db_columns_names : list
             list of column names (str)
         """
-        columns_info = self.engine.dialect.get_columns(
-            connection=self.engine,
-            table_name=self.table_name,
-            schema=self.schema)
+        columns_info = self.engine.dialect.get_columns(connection=self.engine,
+                                                       table_name=self.table.name,            
+                                                       schema=self.schema)
         db_columns_names = [col_info["name"] for col_info in columns_info]
         return db_columns_names
 
-    def get_db_columns_types(self) -> list:
-        """
-        Gets the column data types of the postgres table defined
-        in the instance of a PandasSpecialEngine.
-
-        The data types are sqlalchemy sql types
-        e.g. sqlalchemy.sql.sqltypes.Text.
-
-        Returns
-        -------
-        list
-            list of column types (misc. objects)
-        """
-        columns_info = self.engine.dialect.get_columns(
-            connection=self.engine,
-            table_name=self.table_name,
-            schema=self.schema)
-        db_columns_types = {
-            col_info["name"]: col_info["type"] for col_info in columns_info
-        }
-        return db_columns_types
-
     def add_new_columns(self):
         """
-        Adds columns present in the DataFrame that
-        are not in the postgres table defined
-        in the instance of a PandasSpecialEngine.
+        Adds columns present in df but not in the SQL table
+        for given instance of PandasSpecialEngine.
+
+        Notes
+        -----
+        Sadly, it seems that we cannot create JSON columns.
         """
-        cols_to_add = [
-            col for col in self.df_col_names
-            if col not in self.get_db_columns_names()
-        ]
+        # create deepcopies of the column because we are going to unbound
+        # them for the table model (otherwise alembic would think we add
+        # a column that already exists in the database)
+        cols_to_add = [deepcopy(col) for col in self.table.columns
+                       if col.name not in self.get_db_columns_names()]
+        # check columns are not index levels
+        if any((c.name in self.df.index.names for c in cols_to_add)):
+            raise ValueError(('Cannot add any column that is part of the df index!\n'
+                              "You'll have to update your table primary key or change your "
+                              "df index"))
+        
+        with self.engine.connect() as con:
+            ctx = MigrationContext.configure(con)
+            op = Operations(ctx)
+            for col in cols_to_add:
+                col.table = None # Important! unbound column from table
+                op.add_column(self.table.name, col, schema=self.schema)
+                logger.info((f"Added column {col} (type: {col.type}) in table {self.table.name} "
+                             f'(schema="{self.schema})"'))
 
-        # make ALTER STATEMENTS for each column (it seems it has to be RAW SQL\
-        # (see https://stackoverflow.com/questions/8236647/)
-        for col in cols_to_add:
 
-            # get str for adding column e.g. "name TEXT"
-            escaped_col = str(
-                CreateColumn(self.table.columns[col]).compile(self.engine))
-            alter_statement = f"""ALTER TABLE {self.namespace}
-                                  ADD COLUMN {escaped_col};
-                               """
-
-            self.engine.execute(alter_statement)
-            logger.info((f"Added column {escaped_col} in {self.namespace}"))
-
-    def _get_db_table_schema(self):
+    def get_db_table_schema(self):
         """
-        Gets the sqlalchemy table model of the postgres table
-        defined in the instance of a PandasSpecialEngine.
-        """
-        metadata = MetaData(bind=self.engine, schema=self.schema)
-        metadata.reflect(bind=self.engine)
-        db_table = Table(self.table_name,
-                         metadata,
-                         autoload=True,
-                         autoload_with=self.engine)
-        return db_table
-
-    def _get_empty_columns(self):
-        """
-        Gets a list of the columns that contain no data
-        in the postgres table defined in the instance
-        of a PandasSpecialEngine.
+        Gets the sqlalchemy table model for the SQL table
+        defined in given PandasSpecialEngine (using schema and
+        table_name attributes to find the table in the database).
 
         Returns
         -------
-        list
-            list of column names (str)
+        db_table : sqlalchemy.sql.schema.Table
         """
-        db_table = self._get_db_table_schema()
-        db_column_names = self.get_db_columns_names()
+        table_name = self.table.name
+        schema = self.schema
+        engine = self.engine
+        
+        metadata = MetaData(bind=engine, schema=schema)
+        metadata.reflect(bind=engine, schema=schema, only=[table_name])
+        namespace = table_name if schema is None else f'{schema}.{table_name}'
+        db_table = metadata.tables[namespace]
+        return db_table
+
+    def get_empty_columns(self) -> list:
+        """
+        Gets a list of the columns that contain no data
+        in the SQL table defined in given instance of
+        PandasSpecialEngine.
+        Uses method get_db_table_schema (see its docstring).
+
+        Returns
+        -------
+        empty_columns : list of str
+            List of column names that contain no data
+        """
+        db_table = self.get_db_table_schema()
         empty_columns = []
 
-        for col in db_column_names:
-            not_null = Column(col).isnot(None)
-            stmt = select(columns=["*"],
-                          from_obj=db_table,
-                          whereclause=not_null)
-            results = self.engine.execute(stmt.limit(1)).fetchall()
+        for col in db_table.columns:
+            stmt = select(from_obj=db_table,
+                          columns=[col],
+                          whereclause=col.isnot(None)).limit(1)
+            results = self.engine.execute(stmt).fetchall()
             if results == []:
                 empty_columns.append(col)
-
         return empty_columns
 
     def adapt_dtype_of_empty_db_columns(self):
         """
-        Changes the data types of empty columns in the
-        posgres table defined in the instance of a
-        PandasSpecialEngine.
+        Changes the data types of empty columns in the SQL table defined
+        in given instance of a PandasSpecialEngine.
 
-        This only happens in case of data type
-        mismatches. This means with columns for
-        which the DataFrame in the PandasSpecialEngine
-        instance has a different data type. This is also
-        only applied to columns that are not empty in the
-        DataFrame.
+        This should only happen in case of data type mismatches.
+        This means with columns for which the sqlalchemy table
+        model for df and the model for the SQL table have different data types.
         """
-        empty_db_columns = self._get_empty_columns()
-        db_columns_types = self.get_db_columns_types()
-
-        for col in self.df_col_names:
-
-            if col in self.df.index.names:
-                df_col = self.df.index.get_level_values(col)
+        empty_db_columns = self.get_empty_columns()
+        db_table = self.get_db_table_schema()
+        # if column does not have value in db and there are values
+        # in the frame then change the column type if needed
+        for col in empty_db_columns:
+            # check if the column also exists in df
+            if col.name not in self.df.columns:
+                continue
+            # check same type
+            orig_type = db_table.columns[col.name].type.compile(self.engine.dialect)
+            dest_type = self.table.columns[col.name].type.compile(self.engine.dialect)
+            # remove character count e.g. "VARCHAR(50)" -> "VARCHAR" 
+            orig_type = RE_CHARCOUNT_COL_TYPE.sub('', orig_type)
+            dest_type = RE_CHARCOUNT_COL_TYPE.sub('', dest_type)
+            # if same type or we want to insert TEXT instead of JSON continue
+            # (JSON is not supported on some DBs so it's normal to have TEXT instead)
+            if ((orig_type == dest_type) or
+                ((orig_type == 'JSON') and (dest_type == 'TEXT'))):
+                continue
+            # grab the col/index from the df
+            # so we can check if there are any values
+            if col.name in self.df.index.names:
+                df_col = self.df.index.get_level_values(col.name)
             else:
-                df_col = self.df[col]
-
-            # if column does not have value in db and there are values
-            # in the frame
-            if col in empty_db_columns and df_col.notna().any():
-                dtype_sqla_frame = type(self.table.columns[col].type)
-                dtype_sqla_db = type(db_columns_types[col])
-
-                dtype_pg_frame = dtypes_comparator.get(dtype_sqla_frame)
-                dtype_pg_db = dtypes_comparator.get(dtype_sqla_db)
-
-                if dtype_pg_frame is None:
-                    logger.warning(("encoutered unknown sqlalchemy data type "
-                                    f"in frame: {dtype_sqla_frame}"))
-
-                if dtype_pg_db is None:
-                    logger.warning(("encoutered unknown sqlalchemy data type"
-                                    f"in db: {dtype_sqla_db}"))
-                # adapt dtype in db according to frame
-                if (dtype_pg_frame is not None and dtype_pg_db is not None and
-                        dtype_pg_frame != dtype_pg_db):
-                    alter_stmt = f"""ALTER TABLE {self.namespace}
-                                     ALTER COLUMN "{col}" TYPE {dtype_pg_frame}
-                                         USING "{col}"::{dtype_pg_frame};"""
-                    try:
-                        self.engine.execute(alter_stmt)
-                        logger.info(("Adapted column type in postgres according"
-                                     f' to frame, column "{col}" is now'
-                                     f' of dtype {dtype_pg_frame}'))
-                    except DataError:
-                        logger.warning(("Could not adapt column type in "
-                                        "postgres according to frame "
-                                        f"({dtype_pg_frame})"))
+                df_col = self.df[col.name]
+            if df_col.notna().any():
+                # raise error if we have to modify the dtype but we have a SQlite engine
+                # (SQLite does not support data type alteration)
+                if self._db_type == 'sqlite':
+                    raise ValueError('SQlite does not support column data type alteration!')
+                with self.engine.connect() as con:
+                    ctx = MigrationContext.configure(con)
+                    op = Operations(ctx)
+                    new_col = self.table.columns[col.name]
+                    # check if postgres (in which case we have to use "using" syntax
+                    # to alter columns data types)
+                    if self._db_type == 'postgres':
+                        escaped_col = str(new_col.compile(dialect=self.engine.dialect))
+                        compiled_type = new_col.type.compile(dialect=self.engine.dialect)
+                        alter_kwargs = {'postgresql_using':f'{escaped_col}::{compiled_type}'}
+                    else:
+                        alter_kwargs = {}
+                    op.alter_column(table_name=self.table.name,
+                                    column_name=new_col.name,
+                                    type_=new_col.type,
+                                    schema=self.schema,
+                                    **alter_kwargs)
+                    logger.info((f"Changed type of column {new_col.name} "
+                                 f"from {col.type} to {new_col.type} "
+                                 f'in table {self.table.name} (schema="{self.schema}")'))
 
     @staticmethod
-    def _split_list_in_chunks(l: list, chunksize: int) -> list:
+    def _create_chunks(values, chunksize=10000):
         """
-        Splits a list in chunks of n sized lists.
-
-        The last chunk may have less values.
-
-        Returns
-        -------
-        list
-            list of lists
-        """
-        if not isinstance(chunksize, int) or chunksize <= 0:
-            raise ValueError('chunksize must be an integer strictly above 0')
-
-        return [l[i:i + chunksize] for i in range(0, len(l), chunksize)]
-
-    def _get_values_to_insert(self, chunksize=10000):
-        """
-        Gets the values to be inserted from the pandas
-        DataFrame defined in the instance of a
-        PandasSpecialEngine to the coresponding
-        postgres table.
+        Chunks a list into a list of lists of size
+        :chunksize:.
 
         Parameters
         ----------
-        chunksize : int, default 10000
+        chunksize : int > 0, default 10000
             Number of values to be inserted at once,
             an integer strictly above zero.
+        """
+        if not isinstance(chunksize, int) or chunksize <= 0:
+            raise ValueError('chunksize must be an integer strictly above 0')
+        chunks = [values[i:i + chunksize] for i in range(0, len(values), chunksize)]
+        return chunks
+
+    def _get_values_to_insert(self):
+        """
+        Gets the values to be inserted from the pandas DataFrame 
+        defined in given instance of PandasSpecialEngine
+        to the coresponding SQL table.
 
         Returns
         -------
-        list
-            list of lists
-            each list represents a chunk of size :chunksize:
-            to be inserted
+        values : list
+            Values from the df attribute that may have been converted
+            for SQL compability e.g. pd.Timestamp will be converted
+            to datetime.datetime objects.
         """
+        # this seems to be the most reliable way to unpack
+        # the DataFrame. For instance using df.to_dict(orient='records')
+        # can introduce types such as numpy integer which we'd have to deal with
         values = self.df.reset_index().values.tolist()
-
         for i in range(len(values)):
             row = values[i]
             for j in range(len(row)):
                 val = row[j]
-
                 # replace pd.Timestamp with datetime.datetime
                 if isinstance(val, pd.Timestamp):
                     values[i][j] = val.to_pydatetime()
-
                 # check if na unless it is list like
                 elif not pd.api.types.is_list_like(val) and pd.isna(val):
-                    values[i][j] = None
-
+                    values[i][j] = null()
                 # cast pd.Interval to str
                 elif isinstance(val, pd.Interval):
                     warnings.warn(('found pd.Interval objects, '
                                    'they will be casted to str'))
                     values[i][j] = str(val)
-
-        chunks = self._split_list_in_chunks(values, chunksize=chunksize)
-        return chunks
-
-    def insert(self, if_exists, chunksize=10000):
+        return values
+    
+    def upsert(self, if_row_exists, chunksize=10000):
         """
-        Inserts values from the pandas
-        DataFrame defined in the instance of a
-        PandasSpecialEngine to the coresponding
-        postgres table.
+        Generates and executes an upsert (insert update or 
+        insert ignore depending on :if_row_exists:) statement
+        for given instance of PandasSpecialEngine.
 
-        Values are inserted either using postgres
-        [ON CONFLICT DO UPDATE] mode or
-        [ON CONFLICT DO NOTHING] mode.
+        The values of df will be upserted with different sqlalchemy
+        methods depending on the dialect (e.g. using
+        sqlalchemy.dialects.postgresql.insert for postgres).
+        See more information under pangres.upsert.
 
         Parameters
         ----------
-        if_exists : str
-            One of 'upsert_overwrite' or 'upsert_keep'
-            if 'upsert_overwrite' all the data is updated
-            where the primary key matches,
-            if 'upsert_keep' all the data is kept
-            where the primary key matches.
-
-        chunksize : int, default 10000
+        if_rows_exists : {'ignore', 'update'}
+            If 'ignore' where the primary key matches nothing is
+            updated.
+            If 'update' where the primary key matches the values
+            are updated using what's available in df.
+            In both cases rows are inserted for non primary keys.
+        chunksize : int > 0, default 900
             Number of values to be inserted at once,
             an integer strictly above zero.
         """
-
-        chunks = self._get_values_to_insert(chunksize=chunksize)
-
-        for chunk in chunks:
-            insert_table = insert(self.table).values(chunk)
-
-            # adapt statement depending on value of "if_exists"
-            if if_exists == "upsert_overwrite":
-
-                update_cols = [
-                    c.name
-                    for c in self.table.c
-                    if c not in list(self.table.primary_key.columns)
-                ]
-
-                insert_table_sql = insert_table.on_conflict_do_update(
-                    index_elements=self.table.primary_key.columns,
-                    set_={
-                        k: getattr(insert_table.excluded, k)
-                        for k in update_cols
-                    })
-
-            elif if_exists == "upsert_keep":
-                insert_table_sql = insert_table.on_conflict_do_nothing()
-
-            else:
-                raise ValueError(('if_exists must be either "upsert_overwrite"'
-                                  'or "upsert_keep"'))
-
-            insert_table_sql.execute()
+        # VERIFY ARGUMENTS
+        if if_row_exists not in ('ignore', 'update'):
+            raise ValueError('if_row_exists must be "ignore" or "update"')
+        # convert values if needed
+        values = self._get_values_to_insert()
+        # recalculate chunksize for sqlite
+        if self._db_type == 'sqlite':
+            # to circumvent the max of 999 parameters for sqlite we have to
+            # make sure chunksize is not too high also I don't know how to
+            # deal with tables that have more than 999 columns because even
+            # with single row inserts it's already too many variables.
+            # (you can google "SQLITE_MAX_VARIABLE_NUMBER" for more info)
+            new_chunksize = floor(999 / len(self.table.columns))
+            if new_chunksize < 1:
+                # case > 999 columns
+                err = ('Updating SQlite tables with more than 999 columns is '
+                       'not supported due to max variables restriction (999 max). '
+                       'If you know a way around that please let me know'
+                       '(e.g. post a GitHub issue)!')
+                raise NotImpletementedError(err)
+            if chunksize > new_chunksize:
+                logger.warning((f'Reduced chunksize from {chunksize} to {new_chunksize} due '
+                                'to SQlite max variable restriction (max 999).'))
+            chunksize=new_chunksize
+        # creat chunks
+        chunks = self._create_chunks(values=values, chunksize=chunksize)
+        upsert_funcs = {"postgres":postgres_upsert,
+                        "mysql":mysql_upsert,
+                        "sqlite":sqlite_upsert,
+                        "other":sqlite_upsert}
+        upsert_func = upsert_funcs[self._db_type]
+        with self.engine.connect() as con:
+            for chunk in chunks:
+                upsert = upsert_func(engine=self.engine,
+                                     connection=con,
+                                     table=self.table,
+                                     values=chunk,
+                                     if_row_exists=if_row_exists)
 
     def __repr__(self):
-        text = f"""# PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
-                   ## connection: {self.engine}
-                   ## df.head():\n{self.df.head()}
-                   ## schema: "{self.schema}"
-                   ## table_name: "{self.table_name}"
-                   ## SQLalchemy table model:\n{self.table.__repr__()}"""
+        text = f"""PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
+                   * connection: {self.engine}
+                   * schema: {self.schema}
+                   * table: {self.table.name}
+                   * SQLalchemy table model:\n{self.table.__repr__()}"""
         text = '\n'.join([line.strip() for line in text.splitlines()])
+        
+        df_repr = (str(self.df.head()) if not hasattr(self.df, 'to_markdown')
+                   else str(self.df.head().to_markdown()))
+        text += f'\n* df.head():\n{df_repr}'
         return text

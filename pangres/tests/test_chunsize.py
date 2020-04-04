@@ -1,61 +1,45 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-
-
+"""
+This module tests if uploading data in chunks works as
+expected (we should get the correct DataFrame length back).
+"""
 import pandas as pd
-import numpy as np
-import os
-from sqlalchemy import create_engine
-
-from pangres import pg_upsert
-from pangres.tests.conftest import TestDB
+from sqlalchemy import VARCHAR
+from pangres import upsert
+from pangres.examples import TestsExampleTable
+from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
 
 
-# # Config
+# # Helpers
 
-
-
-testdb = TestDB()
-
+def insert_chunks(engine, schema, chunksize, nb_rows):
+    df = TestsExampleTable.create_example_df(nb_rows=nb_rows)
+    table_name=f'test_insert_chunksize_{chunksize}'
+    drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
+    upsert(schema=schema,
+           table_name=table_name,
+           df=df,
+           chunksize=chunksize,
+           engine=engine,
+           if_row_exists='update',
+           # MySQL does not want flexible text length in indices/PK
+           dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None)
+    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    # sort index (for MySQL...)
+    pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())
 
 
 # # Tests
 
+# ## Insert values one by one
+
+def test_insert_one(engine, schema):
+    insert_chunks(engine, schema, chunksize=1, nb_rows=11)
 
 
-def test_insert_one():
-    df = pd.DataFrame({
-        'test': [1] * 25
-    }).rename_axis(['profileid'], axis='index', inplace=False)
+# ## Insert an odd size of chunks that is not a multiple of df length
 
-    pg_upsert(engine=testdb.engine,
-              df=df,
-              schema=testdb.schema,
-              table_name='test_insert_chunksize_one',
-              if_exists='upsert_overwrite',
-              chunksize=1)
-
-    df_db = pd.read_sql(f'SELECT * FROM {testdb.schema}.test_insert_chunksize_one',
-                        con=testdb.engine,
-                        index_col='profileid')
-    pd.testing.assert_frame_equal(df, df_db)
-
-
-def test_insert_odd_chunksize():
-    df = pd.DataFrame({
-        'test': [1] * 25
-    }).rename_axis(['profileid'], axis='index', inplace=False)
-
-    pg_upsert(engine=testdb.engine,
-              df=df,
-              schema=testdb.schema,
-              table_name='test_insert_chunksize_odd',
-              if_exists='upsert_overwrite',
-              chunksize=3)
-
-    df_db = pd.read_sql(f'SELECT * FROM {testdb.schema}.test_insert_chunksize_odd',
-                        con=testdb.engine,
-                        index_col='profileid')
-    pd.testing.assert_frame_equal(df, df_db)
+def test_insert_odd_chunksize(engine, schema):
+    insert_chunks(engine, schema, chunksize=3, nb_rows=11)
 

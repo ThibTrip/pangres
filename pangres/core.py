@@ -1,138 +1,189 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-Main functions of pangres that
-will be directly exposed to its users.
+Main functions of pangres that will be directly exposed to its users.
 """
+import warnings
 from pangres.helpers import PandasSpecialEngine
 
 
-def pg_upsert(engine,
-              df,
-              table_name,
-              if_exists,
-              schema='public',
-              create_schema=True,
-              add_new_columns=True,
-              adapt_dtype_of_empty_db_columns=True,
-              clean_column_names=False,
-              chunksize=10000):
+# # upsert
+
+def upsert(engine,
+           df,
+           table_name,
+           if_row_exists,
+           schema=None,
+           create_schema=True,
+           add_new_columns=True,
+           adapt_dtype_of_empty_db_columns=False,
+           chunksize=10000,
+           dtype=None):
     """
-    Insert updates/ignores a pandas DataFrame into a postgres table.
-    Will also create a table if it does not exist.
+    Insert updates/ignores a pandas DataFrame into a SQL table (or
+    creates a SQL table from the DataFrame if it does not exist).
 
-    The index is used as primary key (this implies it must be unique).
-    All levels of the index have to be named.
-    The index cannot contain any null value (this is due to a postgres
-    restriction for the primary key).
+    This index of the DataFrame must be the primary key of the
+    SQL table and meet the following conditions:
+    1. The index must be unique.
+    2. All levels of the index have to be named.
+    3. The index cannot contain any null value except for MySQL where
+    rows with null in indices will be skipped and warnings will be raised.
 
-    Important Notes
-    ---------------
-    The characters "(", ")" and "%" are not allowed in column names
-    as testing has shown they may cause issues with psycopg2 (even in
-    parameterized queries). If clean_column_names is True those characters
-    will be removed.
+    **GOTCHAS**:
 
+    Please head over to https://github.com/ThibTrip/pangres/#Gotchas-and-caveats
+    or read pangres/README.md.
+
+    Notes
+    -----
     It is recommanded to use this function with big batches of data
-    as there is quite the overhead.
+    as there is quite the overhead. Setting the arguments create_schema,
+    add_new_columns and adapt_dtype_of_empty_db_columns to False should
+    drastically reduce the overhead if you do not need such features.
 
     Parameters
     ----------
     engine : sqlalchemy.engine.base.Engine
-        Engine from sqlalchemy (see sqlalchemy.create_engine)
+        See https://docs.sqlalchemy.org/en/latest/core/engines.html
     df : pd.DataFrame
-        A pandas DataFrame
+        See https://pandas.pydata.org/pandas-docs/stable/getting_started/10min.html
     table_name : str
-        Name of the postgres table
-    if_exists : str
-        One of 'upsert_overwrite' or 'upsert_keep'
-        if 'upsert_overwrite' all the data is updated
-        where the primary key matches,
-        if 'upsert_keep' all the data is kept
-        where the primary key matches.
-    schema : str, default 'public'
-        Name of the postgres schema that contains the table
+        Name of the SQL table
+    if_row_exists : {'ignore', 'update'}
+        Behavior if a row exists in the SQL table.
+        Irrelevant if the SQL table does not exist already.
+        For both 'ignore' and 'update' rows with new primary
+        key values are inserted.
+
+        * 'ignore': rows for which primary keys exist in the SQL
+        table are skipped
+        * 'update': rows for which primary keys exist in the SQL
+        table are updated (with the columns available in the pandas
+        DataFrame)
+    schema : str or None, default None
+        Name of the SQL schema that contains or will contain the table
+        For postgres if it is None it will default to "public".
+        For MySQL and SQlite the schema should be None since
+        those SQL flavors do not have this system.
     create_schema : bool, default True
         If True the schema is created if it does not exist
     add_new_columns : bool, default True
         If True adds columns present in the DataFrame that
-        are not in the postgres table.
-    adapt_dtype_of_empty_db_columns : bool, default True
+        are not in the SQL table.
+    adapt_dtype_of_empty_db_columns : bool, default False
         If True looks for columns that have no data in the
-        postgres table but have data in the DataFrame;
+        SQL table but have data in the DataFrame;
         if those columns have datatypes that do not match
-        (e.g. "TEXT" in postgres and "int64" in the DataFrame)
-        then they are altered in the postgres table.
-    clean_column_names : bool, default False
-            If False raises a ValueError if any of the following
-            characters are found in the column/index names: "(", ")" and "%".
-            If True removes any of the aforementionned characters
-            in the column/index names before updating the table.
-            Our tests seem to indicate those characters can
-            cause issues with psycopg2 even in parameterized
-            queries (they are not properly escaped).
+        (e.g. "TEXT" in the SQL table and "int64" in the DataFrame)
+        then they are altered in the SQL table.
+        Data type conversion must be supported by the SQL flavor!
+        E.g. for Postgres converting from BOOLEAN to TIMESTAMP
+        will not work even if the column is empty.
+    chunksize : int
+        Number of rows to insert at once.
+        Please note that for SQlite a maximum of 999 parameters
+        per queries means that the chunksize will be automatically
+        reduced to math.floor(999/nb_columns) where nb_columns is
+        the number of columns + index levels in the DataFrame.
+    dtype : None or dict {str:SQL_TYPE}, default None
+        Similar to pd.to_sql dtype argument.
+        This is especially useful for MySQL where the length of
+        primary keys with text has to be provided (see Examples)
 
     Examples
     --------
+    #### 1. Workflow example
+
+    ##### 1.1. Creating a SQL table
     >>> import pandas as pd
-    >>> from sqlalchemy import create_engine
-    >>> # configure schema, table_name and engine
-    >>> schema = 'tests'
-    >>> table_name = 'pg_upsert_doctest'
-    >>> engine = create_engine('postgresql://user:password@localhost:5432/mydatabase')
-    >>> df = pd.DataFrame({'profileid':[0,1],
-    ...                    'favorite_fruit':['banana','apple']})
-    >>> df.set_index('profileid', inplace = True)
+    >>> from pangres import upsert, DocsExampleTable
+    >>> from sqlalchemy import create_engine, VARCHAR
+    >>> 
+    >>> # create a SQLalchemy engine
+    >>> engine = create_engine("sqlite:///:memory:")
+    >>> 
+    >>> # this is necessary if you want to test with MySQL
+    >>> # instead of SQlite or Postgres because MySQL needs
+    >>> # to have a definite limit for text primary keys/indices
+    >>> dtype = {'full_name':VARCHAR(50)}
+    >>> 
+    >>> # get or create a pandas DataFrame
+    >>> # for our example full_name is the index
+    >>> # and will thus be used as primary key
+    >>> df = DocsExampleTable.df
+    >>> df
+    | full_name     | likes_sport   | updated             |   size_in_meters |
+    |:--------------|:--------------|:--------------------|-----------------:|
+    | John Rambo    | True          | 2020-02-01 00:00:00 |             1.77 |
+    | The Rock      | True          | 2020-04-01 00:00:00 |             1.96 |
+    | John Travolta | False         | NaT                 |              NaN |
 
-    **pg_upsert will create the table if it does not exist**
+    >>> # create SQL table
+    >>> # it does not matter if if_row_exists is set
+    >>> # to "update" or "ignore" for table creation
+    >>> upsert(engine=engine,
+    ...        df=df,
+    ...        table_name='example',
+    ...        if_row_exists='update',
+    ...        dtype=dtype)
 
-    >>> pg_upsert(engine = engine,
-    ...           df = df,
-    ...           schema = schema,
-    ...           table_name = table_name,
-    ...           if_exists = 'upsert_overwrite') # no difference for table creation
+    ##### 1.2. Updating the SQL table we created with if_row_exists='update'
+    >>> new_df = DocsExampleTable.new_df
+    >>> new_df
+    | full_name             | likes_sport   | updated                   |   size_in_meters |
+    |:----------------------|:--------------|:--------------------------|-----------------:|
+    | John Travolta         | True          | 2020-04-04 00:00:00+00:00 |             1.88 |
+    | Arnold Schwarzenegger | True          | NaT                       |             1.88 |
 
-    **Update existing records and add new ones**
+    >>> # insert update using our new data
+    >>> upsert(engine=engine,
+    ...        df=new_df,
+    ...        table_name='example',
+    ...        if_row_exists='update',
+    ...        dtype=dtype)
+    >>> 
+    >>> # Now we read from the database to check what we got and as you can see
+    >>> # John Travolta was updated and Arnold Schwarzenegger was added!
+    >>> (pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
+    ...  .astype({'likes_sport':bool}))
+    | full_name             | likes_sport   | updated                    |   size_in_meters |
+    |:----------------------|:--------------|:---------------------------|-----------------:|
+    | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
+    | The Rock              | True          | 2020-04-01 00:00:00.000000 |             1.96 |
+    | John Travolta         | True          | 2020-04-04 00:00:00.000000 |             1.88 |
+    | Arnold Schwarzenegger | True          |                            |             1.88 |
 
-    >>> # update profile id 1 and add profile id 2
-    >>> new_df = pd.DataFrame({'profileid':[1,2],
-    ...                        'favorite_fruit':['pear','orange']})
-    >>> new_df.set_index('profileid', inplace = True)
-    >>> pg_upsert(engine = engine,
-    ...           df = new_df,
-    ...           schema = schema,
-    ...           table_name = table_name,
-    ...           if_exists = 'upsert_overwrite')
+    ##### 1.3. Updating the SQL table with if_row_exists='ignore'
+    >>> new_df2 = DocsExampleTable.new_df2
+    >>> new_df2
+    | full_name     | likes_sport   | updated   |   size_in_meters |
+    |:--------------|:--------------|:----------|-----------------:|
+    | John Travolta | False         | NaT       |             2.5  |
+    | John Cena     | True          | NaT       |             1.84 |
 
-    **Keep existing records and add new ones**
-
-    >>> # don't update profile id 2 and add profile id 3
-    >>> new_df = pd.DataFrame({'profileid':[2,3],
-    ...                        'favorite_fruit':['pineapple','lemon']})
-    >>> new_df.set_index('profileid', inplace = True)
-    >>> pg_upsert(engine = engine,
-    ...           df = new_df,
-    ...           schema = schema,
-    ...           table_name = table_name,
-    ...           if_exists = 'upsert_keep')
-
-    **If you ran the whole example you should get the DataFrame below**
-
-    >>> pd.read_sql(f'SELECT * FROM {schema}."{table_name}"',
-    ...             con = engine, index_col = 'profileid')
-              favorite_fruit
-    profileid
-    0                 banana
-    1                   pear
-    2                 orange
-    3                  lemon
+    >>> upsert(engine=engine,
+    ...        df=new_df2,
+    ...        table_name='example',
+    ...        if_row_exists='ignore',
+    ...        dtype=dtype)
+    >>> # Now we read from the database to check what we got and as you can see
+    >>> # John Travolta was NOT updated and John Cena was added!
+    >>> (pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
+    ...  .astype({'likes_sport':bool}))
+    | full_name             | likes_sport   | updated                    |   size_in_meters |
+    |:----------------------|:--------------|:---------------------------|-----------------:|
+    | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
+    | The Rock              | True          | 2020-04-01 00:00:00.000000 |             1.96 |
+    | John Travolta         | True          | 2020-04-04 00:00:00.000000 |             1.88 |
+    | Arnold Schwarzenegger | True          |                            |             1.88 |
+    | John Cena             | True          |                            |             1.84 |
     """
-
     pse = PandasSpecialEngine(engine=engine,
                               df=df,
                               table_name=table_name,
                               schema=schema,
-                              clean_column_names=clean_column_names)
+                              dtype=dtype)
 
     # add new columns from frame
     if add_new_columns and pse.table_exists():
@@ -143,11 +194,51 @@ def pg_upsert(engine,
         pse.adapt_dtype_of_empty_db_columns()
 
     # create schema and table if not exists then insert values
-    if create_schema:
+    if create_schema and schema is not None:
         pse.create_schema_if_not_exists()
     pse.create_table_if_not_exists()
     
     # stop if no rows
     if df.empty:
         return
-    pse.insert(if_exists=if_exists, chunksize=chunksize)
+    pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize)
+
+
+# # pg_upsert - DEPRECATED
+
+def pg_upsert(**kwargs):
+    """
+    **DEPRECATED**
+    
+    Kept for compatibility with the previous version.
+    Will be deleted in the next version.
+    """
+    # issue deprecation
+    warnings.warn(("pangres.pg_upsert is deprecated and will be deleted in the "
+                   "next version of pangres, please use pangres.upsert instead!!"),
+                  DeprecationWarning)
+    # check arguments
+    required = set(('engine', 'df', 'table_name', 'if_exists'))
+    optional = set(('schema', 'create_schema', 'add_new_columns',
+                    'adapt_dtype_of_empty_db_columns', 'chunksize',
+                    'clean_column_names'))
+    missing = required - set(kwargs.keys())
+    if missing != set():
+        raise ValueError(f'Some required arguments are missing: {missing}')
+    # disgard any additional kwarg
+    kwargs = {k:v for k, v in kwargs.items() if k in required or k in optional}
+    # clean column names for postgres like we used to
+    clean_column_names = kwargs.pop('clean_column_names', False)
+    if clean_column_names:
+        from pangres import fix_psycopg2_bad_cols
+        kwargs['df'] = fix_psycopg2_bad_cols(kwargs['df'])
+    # convert argument if_exists we used in the previous version
+    kwargs['if_row_exists'] = kwargs.pop('if_exists')
+    if kwargs['if_row_exists'] == 'upsert_overwrite':
+        kwargs['if_row_exists'] = 'update'
+    elif kwargs['if_row_exists'] == 'upsert_keep':
+        kwargs['if_row_exists'] = 'ignore'
+    else:
+        raise ValueError('if_exists must be either "upsert_overwrite" or "upsert_keep"')
+    # upsert
+    upsert(**kwargs)
