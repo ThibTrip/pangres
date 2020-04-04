@@ -42,7 +42,7 @@ jobs:
           pip install psycopg2 pymysql
           pytest -s -v pangres --cov=pangres --conn_string=sqlite:///:memory:
           pytest -s -v pangres --cov=pangres --conn_string=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable
-          pytest -s -v pangres --cov=pangres --conn_string=mysql://circleci_user:password@127.0.0.1:3306/circleci_test
+          pytest -s -v pangres --cov=pangres --conn_string=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test
           codecov
 workflows:
   version: 2
