@@ -80,22 +80,25 @@ def test_upsert_ignore(engine, schema):
 # # Add colums with crappy names and insert crappy text values
 
 def test_crappy_text_insert(engine, schema):
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
+    is_mysql = 'mysql' in engine.dialect.dialect_description
+    dtype = {'profileid':VARCHAR(10)} if is_mysql else None
     
     # mix crappy letters with a few normal ones
     crap_char_seq = """/_- ?§$&"',:;*()%[]{}|<>=!+#""" + "\\" + "sknalji"  
 
     # add columns with crappy names
-    for i in range(5):
-        random_crappy_col_name = ''.join([random.choice(crap_char_seq)
-                                          for i in range(50)])
+    # don't do this for MySQL which has more strict rules for column names 
+    if not is_mysql:
+        for i in range(5):
+            random_crappy_col_name = ''.join([random.choice(crap_char_seq)
+                                              for i in range(50)])
 
-        df_test = (pd.DataFrame({random_crappy_col_name: ['test', None]})
-                   .rename_axis(['profileid'], axis='index', inplace=False))
+            df_test = (pd.DataFrame({random_crappy_col_name: ['test', None]})
+                       .rename_axis(['profileid'], axis='index', inplace=False))
 
-        # psycopg2 can't process columns with "%" or "(" or ")"
-        df_test = fix_psycopg2_bad_cols(df_test)
-        upsert(engine=engine, schema=schema, df=df_test, if_row_exists='update', dtype=dtype, **default_args)
+            # psycopg2 can't process columns with "%" or "(" or ")"
+            df_test = fix_psycopg2_bad_cols(df_test)
+            upsert(engine=engine, schema=schema, df=df_test, if_row_exists='update', dtype=dtype, **default_args)
 
     # add crappy text in a column named 'text'
     create_random_text = lambda: ''.join([random.choice(crap_char_seq)
