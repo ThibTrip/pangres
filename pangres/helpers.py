@@ -397,22 +397,25 @@ class PandasSpecialEngine:
             for SQL compability e.g. pd.Timestamp will be converted
             to datetime.datetime objects.
         """
-        df_temp = self.df.reset_index()
-        keys = df_temp.columns.to_list()
-        values = df_temp.to_dict(orient='records')
-        for record in values:
-            for key in keys:
-                val = record[key]
+        # this seems to be the most reliable way to unpack
+        # the DataFrame. For instance using df.to_dict(orient='records')
+        # can introduce types such as numpy integer which we'd have to deal with
+        values = self.df.reset_index().values.tolist()
+        for i in range(len(values)):
+            row = values[i]
+            for j in range(len(row)):
+                val = row[j]
                 # replace pd.Timestamp with datetime.datetime
                 if isinstance(val, pd.Timestamp):
-                    record[key] = val.to_pydatetime()
+                    values[i][j] = val.to_pydatetime()
                 # check if na unless it is list like
                 elif not pd.api.types.is_list_like(val) and pd.isna(val):
-                    record[key] = null()
+                    values[i][j] = null()
                 # cast pd.Interval to str
                 elif isinstance(val, pd.Interval):
-                    logger.warning('found pd.Interval objects, they will be casted to str')
-                    record[key] = str(val)
+                    warnings.warn(('found pd.Interval objects, '
+                                   'they will be casted to str'))
+                    values[i][j] = str(val)
         return values
     
     def upsert(self, if_row_exists, chunksize=10000):
