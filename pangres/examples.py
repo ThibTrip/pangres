@@ -2,7 +2,8 @@
 import random
 import datetime
 import pandas as pd
-from sqlalchemy import Column, TEXT, FLOAT, BOOLEAN, JSON, VARCHAR
+from sqlalchemy import (Column, TEXT, FLOAT, BOOLEAN,
+                        JSON, VARCHAR, DATETIME)
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -32,7 +33,9 @@ class TestsExampleTable(Base):
             email = random.choice(emails)
             domain = random.choice(domains)
             email_choices.append(f'{email}@{domain}')
-        timestamps = [datetime.datetime.fromtimestamp(random.randint(1000000000,1300000000)).astimezone(datetime.timezone.utc)
+        timestamps = [(datetime.datetime
+                       .fromtimestamp(random.randint(1000000000,1300000000))
+                       .astimezone(datetime.timezone.utc))
                       for i in range(nb_rows)]
         colors = ['yellow', 'blue', 'pink', 'red', 'orange', 'brown']
         favorite_colors = []
@@ -58,7 +61,8 @@ class DocsExampleTable():
     # create some test data
     _data = {'full_name':['John Rambo', 'The Rock', 'John Travolta'],
              'likes_sport':[True, True, False],
-             'updated':[pd.Timestamp('2020-02-01', tz='UTC'), pd.Timestamp('2020-04-01', tz='UTC'), pd.NaT],
+             'updated':[pd.Timestamp('2020-02-01', tz='UTC'),
+                        pd.Timestamp('2020-04-01', tz='UTC'), pd.NaT],
              'size_in_meters':[1.77, 1.96, None]}
     # create DataFrame using this test data
     df = pd.DataFrame(_data).set_index('full_name')
