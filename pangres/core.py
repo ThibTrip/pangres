@@ -236,9 +236,9 @@ def pg_upsert(**kwargs):
     kwargs['if_row_exists'] = kwargs.pop('if_exists')
     if kwargs['if_row_exists'] == 'upsert_overwrite':
         kwargs['if_row_exists'] = 'update'
-    elif kwargs['if_row_exists'] == 'upsert_ignore':
+    elif kwargs['if_row_exists'] == 'upsert_keep':
         kwargs['if_row_exists'] = 'ignore'
     else:
-        raise ValueError('if_exists must be either "upsert_overwrite" or "upsert_ignore"')
+        raise ValueError('if_exists must be either "upsert_overwrite" or "upsert_keep"')
     # upsert
     upsert(**kwargs)
