@@ -34,9 +34,7 @@ def postgres_upsert(engine, connection, table, values, if_row_exists):
                        if c not in list(table.primary_key.columns)]
         upsert = insert_stmt.on_conflict_do_update(index_elements=table.primary_key.columns,
                                                    set_={k: getattr(insert_stmt.excluded, k)
-                                                         for k in update_cols})
-    else:
-        raise ValueError('if_row_exists must be "ignore" or "update"')
+                                                         for k in update_cols})        
     # execute upsert
     connection.execute(upsert)
 
@@ -72,8 +70,6 @@ def mysql_upsert(engine, connection, table, values, if_row_exists):
             if col_name not in table.primary_key:
                 update_cols.update({col_name:getattr(insert_stmt.inserted, col_name)})
         upsert = insert_stmt.on_duplicate_key_update(**update_cols)
-    else:
-        raise ValueError('if_row_exists must be "ignore" or "update"')
     # execute upsert
     connection.execute(upsert)
 

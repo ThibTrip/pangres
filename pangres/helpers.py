@@ -441,6 +441,10 @@ class PandasSpecialEngine:
             Number of values to be inserted at once,
             an integer strictly above zero.
         """
+        # VERIFY ARGUMENTS
+        if if_row_exists not in ('ignore', 'update'):
+            raise ValueError('if_row_exists must be "ignore" or "update"')
+        # convert values if needed
         values = self._get_values_to_insert()
         # recalculate chunksize for sqlite
         if self._db_type == 'sqlite':
