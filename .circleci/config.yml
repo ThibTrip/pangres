@@ -28,8 +28,7 @@ jobs:
           python3 -m venv venv
           . venv/bin/activate
           pip install -r requirements.txt
-          sudo apt-get remove sqlite
-          sudo apt-get update && sudo apt-get install sqlite3
+          sudo pip install --upgrade pysqlite
     - save_cache:
         paths:
         - ./venv
