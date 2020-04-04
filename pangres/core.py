@@ -227,7 +227,9 @@ def pg_upsert(**kwargs):
         raise ValueError(f'Some required arguments are missing: {missing}')
     # disgard any additional kwarg
     kwargs = {k:v for k, v in kwargs.items() if k in required or k in optional}
-    if kwargs.get('clean_column_names'):
+    # clean column names for postgres like we used to
+    clean_column_names = kwargs.pop('clean_column_names', False)
+    if clean_column_names:
         from pangres import fix_psycopg2_bad_cols
         kwargs['df'] = fix_psycopg2_bad_cols(kwargs['df'])
     # convert argument if_exists we used in the previous version
