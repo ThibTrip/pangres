@@ -19,6 +19,12 @@ Also handles the creation of non existing SQL tables and schemas.
 7. Will work even if not all columns defined in the SQL table are there.
 8. SQL injection safe (schema, table and column names are escaped and values are given as parameters).
 
+# Tested with
+* Python 3.7.3 and Python 3.8.0
+* MySQL 5.7.29 using pymysql 0.9.3
+* PostgreSQL 9.6.17 using psycopg2 2.8.4
+* SQlite 3.28.0 using sqlite3 2.6.0
+
 # Gotchas and caveats
 
 ## All flavors
@@ -30,10 +36,10 @@ Also handles the creation of non existing SQL tables and schemas.
 2. Even though we only do data type alteration on empty columns, since we don't want to lose column information (e.g. constraints) we use true column alteration (instead of drop+create) so the old data type must be castable to the new data type. Postgres seems a bit restrictive in this regard even when the columns are empty (e.g. BOOLEAN to TIMESTAMP is impossible).
 
 ## SQlite
-
-1. Column type alteration is not possible for SQlite.
-2. SQlite inserts can be at worst 5 times slower than pd.to_sql for some reasons. If you can help please contact me!
-3. Inserts with 1000 columns or more are not supported due to a restriction of 999 parameters per queries. One way to fix this would inserting the columns progressively but this seems quite tricky. If you know a better way please contact me.
+1. **SQlite must be version 3.24.4 or higher**! UPSERT syntax did not exist before. 
+2. Column type alteration is not possible for SQlite.
+3. SQlite inserts can be at worst 5 times slower than pd.to_sql for some reasons. If you can help please contact me!
+4. Inserts with 1000 columns or more are not supported due to a restriction of 999 parameters per queries. One way to fix this would inserting the columns progressively but this seems quite tricky. If you know a better way please contact me.
 
 ## MySQL
 
@@ -66,7 +72,7 @@ Pull requests/issues are welcome.
 
 You will need a SQlite, MySQL and Postgres database available for testing.
 
-Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. In those commands replace SQLITE_CONNECTION_STRING with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db"), replace POSTGRES_CONNECTION_STRING with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database") and replace MYSQL_CONNECTION_STRING with a MySQL sqlalchemy connection string (e.g. "mysql:///user:password@localhost:3306/database"). Specifying schema is optional for postgres (will default to public).
+Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. In those commands replace SQLITE_CONNECTION_STRING with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db"), replace POSTGRES_CONNECTION_STRING with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database") and replace MYSQL_CONNECTION_STRING with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database"). Specifying schema is optional for postgres (will default to public).
 
 ```shell
 # 1. Create and activate the build environment
