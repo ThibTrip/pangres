@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-    - image: circleci/python:3.7.3
+    - image: circleci/python:3.8
     - image: circleci/postgres:12
       environment:
         POSTGRES_USER: circleci_user
@@ -28,7 +28,6 @@ jobs:
           python3 -m venv venv
           . venv/bin/activate
           pip install -r requirements.txt
-          sudo pip install --upgrade pysqlite
     - save_cache:
         paths:
         - ./venv
