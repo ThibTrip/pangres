@@ -14,7 +14,7 @@ Also handles the creation of non existing SQL tables and schemas.
 2. <i>(optional)</i> Automatical column type alteration for columns that are empty in the SQL table (except for SQlite where alteration is limited).
 3. Creates the table if it is missing.
 4. Creates missing schemas in Postgres (and potentially other databases that have a schema system).
-5. JSON is supported (with pd.to_sql it does not work) with some exceptions (see [Caveats](#Caveats)).
+5. JSON is supported (with pd.to_sql it does not work) with some exceptions (see [Gotchas and caveats](#Gotchas-and-caveats)).
 6. Fast (except for SQlite where some help is needed).
 7. Will work even if not all columns defined in the SQL table are there.
 8. SQL injection safe (schema, table and column names are escaped and values are given as parameters).
