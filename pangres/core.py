@@ -93,9 +93,9 @@ def upsert(engine,
 
     Examples
     --------
-    ## Workflow example
+    #### 1. Workflow example
 
-    ### 1. Creating a SQL table
+    ##### 1.1. Creating a SQL table
     >>> import pandas as pd
     >>> from pangres import upsert, DocsExampleTable
     >>> from sqlalchemy import create_engine, VARCHAR
@@ -128,7 +128,7 @@ def upsert(engine,
     ...        if_row_exists='update',
     ...        dtype=dtype)
 
-    ### 2. Updating the SQL table we created with if_row_exists='update'
+    ##### 1.2. Updating the SQL table we created with if_row_exists='update'
     >>> new_df = DocsExampleTable.new_df
     >>> new_df
     | full_name             | likes_sport   | updated                   |   size_in_meters |
@@ -145,8 +145,8 @@ def upsert(engine,
     >>> 
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was updated and Arnold Schwarzenegger was added!
-    >>> pd.read_sql('SELECT * FROM example',
-    ...             con=engine, index_col='full_name').astype({'likes_sport':bool})
+    >>> (pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
+    ...  .astype({'likes_sport':bool}))
     | full_name             | likes_sport   | updated                    |   size_in_meters |
     |:----------------------|:--------------|:---------------------------|-----------------:|
     | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
@@ -154,7 +154,7 @@ def upsert(engine,
     | John Travolta         | True          | 2020-04-04 00:00:00.000000 |             1.88 |
     | Arnold Schwarzenegger | True          |                            |             1.88 |
 
-    ### 3. Updating the SQL table with if_row_exists='ignore'
+    ##### 1.3. Updating the SQL table with if_row_exists='ignore'
     >>> new_df2 = DocsExampleTable.new_df2
     >>> new_df2
     | full_name     | likes_sport   | updated   |   size_in_meters |
@@ -169,8 +169,8 @@ def upsert(engine,
     ...        dtype=dtype)
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was NOT updated and John Cena was added!
-    >>> pd.read_sql('SELECT * FROM example',
-    ...             con=engine, index_col='full_name').astype({'likes_sport':bool})
+    >>> (pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
+    ...  .astype({'likes_sport':bool}))
     | full_name             | likes_sport   | updated                    |   size_in_meters |
     |:----------------------|:--------------|:---------------------------|-----------------:|
     | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
