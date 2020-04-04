@@ -1,34 +1,53 @@
 [![CircleCI](https://circleci.com/gh/ThibTrip/pangres.svg?style=svg&circle-token=3e39be6b969ed02b41d259c279da0d9e63751506)](https://circleci.com/gh/ThibTrip/pangres) [![codecov](https://codecov.io/gh/ThibTrip/pangres/branch/master/graph/badge.svg)](https://codecov.io/gh/ThibTrip/pangres) [![PyPI version](https://img.shields.io/pypi/v/pangres)](https://img.shields.io/pypi/v/pangres)
 
 # pangres
-Postgres upsert with pandas DataFrames (<code>ON CONFLICT DO NOTHING</code> or <code>ON CONFLICT DO UPDATE</code>)
-with some additional optional features:
+![pangres logo](logo.png)
 
-1. Create columns in DataFrame to upsert that do not yet exist in the postgres database
-2. Alter column data types in postgres for empty columns that do not match the data types of the DataFrame to upsert.
+_Thanks to [freesvg.org](https://freesvg.org/) for the logo assets_
 
-**IMPORTANT**
+Upsert with pandas DataFrames (<code>ON CONFLICT DO NOTHING</code> or <code>ON CONFLICT DO UPDATE</code>) for PostgreSQL, MySQL, SQlite and potentially other databases behaving like SQlite (untested) with some additional optional features (see features).
+Also handles the creation of non existing SQL tables and schemas.
 
-Characters "(", ")" and "%" may cause issues in column names. The issue
-seems to be directly related to [psycopg2](https://pypi.org/project/psycopg2/) (Python library for interacting with PostgreSQL databases).
-There is an option in the main function pangres.pg_upsert to remove those characters automatically
-(set clean_column_names to True), see [Usage](#Usage).
+# Features
+
+1. <i>(optional)</i> Automatical column creation (when a column exists in the DataFrame but not in the SQL table).
+2. <i>(optional)</i> Automatical column type alteration for columns that are empty in the SQL table (except for SQlite where alteration is limited).
+3. Creates the table if it is missing.
+4. Creates missing schemas in Postgres (and potentially other databases that have a schema system).
+5. JSON is supported (with pd.to_sql it does not work) with some exceptions (see [Caveats](#Caveats)).
+6. Fast (except for SQlite where some help is needed).
+7. Will work even if not all columns defined in the SQL table are there.
+8. SQL injection safe (schema, table and column names are escaped and values are given as parameters).
+
+# Gotchas and caveats
+
+## All flavors
+1. We can't create JSON columns automatically but we can insert JSON like objects (list, dict) in existing JSON columns.
+
+## Postgres
+
+1. "%", ")" and "(" in column names will most likely cause errors with PostgreSQL (this is due to psycopg2 and also affect pd.to_sql). Use the function pangres.fix_psycopg2_bad_cols to "clean" the columns in the DataFrame. You'll also have to rename columns in the SQL table accordingly (if the table already exists).
+2. Even though we only do data type alteration on empty columns, since we don't want to lose column information (e.g. constraints) we use true column alteration (instead of drop+create) so the old data type must be castable to the new data type. Postgres seems a bit restrictive in this regard even when the columns are empty (e.g. BOOLEAN to TIMESTAMP is impossible).
+
+## SQlite
+
+1. Column type alteration is not possible for SQlite.
+2. SQlite inserts can be at worst 5 times slower than pd.to_sql for some reasons. If you can help please contact me!
+3. Inserts with 1000 columns or more are not supported due to a restriction of 999 parameters per queries. One way to fix this would inserting the columns progressively but this seems quite tricky. If you know a better way please contact me.
+
+## MySQL
+
+1. MySQL will often change the order of the primary keys in the SQL table when using INSERT... ON CONFLICT.. DO NOTHING/UPDATE. This seems to be the expected behavior so nothing we can do about it but please mind that!
+2. You may need to provide SQL dtypes e.g. if you have a primary key with text you will need to provide a character length (e.g. VARCHAR(50)) because MySQL does not support indices/primary keys with flexible text length. pd.to_sql has the same issue.
+
 
 # Notes
 
-This is a library I was using in production in private with very good results
-and decided to publish.
+This is a library I was using in production in private with very good results and decided to publish.
 
-Ideally such features will be integrated into pandas since there is
-already a [PR on the way](https://github.com/pandas-dev/pandas/pull/29636))
-and I would like to give the option to add columns via another PR.
+Ideally such features will be integrated into pandas since there is already a [PR on the way](https://github.com/pandas-dev/pandas/pull/29636)) and I would like to give the option to add columns via another PR.
 
-In the meantime pangres is here and I think the data type alteration for empty
-columns is probably not something for pandas.
-
-There is also [pandabase](https://github.com/notsambeck/pandabase) which does almost
-the same thing but my implementation is different.
-
+There is also [pandabase](https://github.com/notsambeck/pandabase) which does almost the same thing (plus lots of extra features) but my implementation is different.
 Btw big thanks to pandabase and the sql part of pandas which helped a lot.
 
 # Installation
@@ -37,45 +56,7 @@ pip install pangres
 ```
 
 # Usage
-The index of the given DataFrame is used as primary key when creating a table using pandas_pg_upsert.
-Further details in the docstring of the function pg_upsert.
-
-```python
-import pandas as pd
-from sqlalchemy import create_engine
-from pangres import pg_upsert
-
-# configure schema, table_name and engine
-schema = 'tests'
-table_name = 'pg_upsert_test'
-engine = create_engine('postgresql://user:password@localhost:5432/mydatabase')
-
-# create/get data
-df = pd.DataFrame({'profileid':[0,1],
-                    'favorite_fruit':['banana','apple']})
-df.set_index('profileid', inplace = True)
-
-# create or update table
-# if_exists = 'upsert_overwrite' makes a ON CONFLICT DO UPDATE
-# if_exists = 'upsert_keep' makes a ON CONFLICT DO NOTHING
-# this option does not matter for table creation
-pg_upsert(engine=engine,
-          df=df,
-          schema=schema,
-          table_name=table_name,
-          if_exists='upsert_overwrite',
-          create_schema=True, # default, creates schema if it does not exist
-          add_new_columns=True, # default, adds any columns that are not in the postgres table
-          adapt_dtype_of_empty_db_columns=True, # converts data type in postgres for empty columns
-                                                # (if we finally have data and it is necessary)
-          # next option will remove ")", "(" and "%"
-          # if those characters are present in the column names
-          # as those characters may cause issues with psycopg2
-          # if it is False (default) the aforementionned characters will raise an Exception!
-          clean_column_names=True,
-          chunksize=10000) # default, inserts 10000 rows at once
-```
-
+Head over to [pangres' wiki](https://github.com/ThibTrip/pangres/wiki)!
 
 # Contributing
 
@@ -83,22 +64,21 @@ Pull requests/issues are welcome.
 
 # Testing
 
-Clone pangres then set your curent working directory to the root of the cloned repository folder.
+You will need a SQlite, MySQL and Postgres database available for testing.
 
-Then use these commands:
+Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. In those commands replace SQLITE_CONNECTION_STRING with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db"), replace POSTGRES_CONNECTION_STRING with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database") and replace MYSQL_CONNECTION_STRING with a MySQL sqlalchemy connection string (e.g. "mysql:///user:password@localhost:3306/database"). Specifying schema is optional for postgres (will default to public).
 
-```
-# 1) Create and activate the build environment
+```shell
+# 1. Create and activate the build environment
 conda env create -f environment.yml
 conda activate pangres-dev
-# 2) Install pangres in editable mode (changes are reflected upon reimporting)
+# 2. Install pangres in editable mode (changes are reflected upon reimporting)
 pip install -e .
-# 3) Replace sqlalchemy postgreSQL connection string (and schema if necessary) in ./pangres/tests/conftest.py
-# More info on connection strings here: https://docs.sqlalchemy.org/en/13/core/engines.html
-# **WARNING**: everything in the test schema will be deleted in cascade before tests!
-# **WARNING2**: please use a local database with dummy username and password
-# or fetch your credentials from os.env or a file so that in case you accidentaly
-# push your connection string no confidential  information is leaked!
-# 4) Run pytest (--cov=./pangres shows coverage only for pangres)
-pytest pangres --cov=./pangres
+# 3. Run pytest
+# -s prints stdout
+# -v prints test parameters
+# --cov=./pangres shows coverage only for pangres
+pytest -s -v pangres --cov=./pangres --conn_string=$SQLITE_CONNECTION_STRING
+pytest -s -v pangres --cov=./pangres --conn_string=$POSTGRES_CONNECTION_STRING --schema=tests
+pytest -s -v pangres --cov=./pangres --conn_string=$MYSQL_CONNECTION_STRING
 ```
