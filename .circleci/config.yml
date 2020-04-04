@@ -13,7 +13,7 @@ jobs:
         MYSQL_HOST: 127.0.0.1
         MYSQL_ROOT_HOST: "%"
         MYSQL_USER: circleci_user
-        MYSQL_PASSWORD: password
+        MYSQL_ROOT_PASSWORD: password
         MYSQL_DATABASE: circleci_test
     working_directory: ~/pangres
     steps:
