@@ -60,6 +60,17 @@ Btw big thanks to pandabase and the sql part of pandas which helped a lot.
 ```
 pip install pangres
 ```
+Additionally depending on which database you want to work with you will need to install the corresponding library (note that SQlite is included in the standard library):
+
+* Postgres
+```
+pip install psycopg2
+```
+
+* MySQL
+```
+pip install pymysql
+```
 
 # Usage
 Head over to [pangres' wiki](https://github.com/ThibTrip/pangres/wiki)!
@@ -72,7 +83,11 @@ Pull requests/issues are welcome.
 
 You will need a SQlite, MySQL and Postgres database available for testing.
 
-Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. In those commands replace SQLITE_CONNECTION_STRING with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db"), replace POSTGRES_CONNECTION_STRING with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database") and replace MYSQL_CONNECTION_STRING with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database"). Specifying schema is optional for postgres (will default to public).
+Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. You will have to replace the following variables in those commands:
+* SQLITE_CONNECTION_STRING: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
+* POSTGRES_CONNECTION_STRING: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public).
+* MYSQL_CONNECTION_STRING: replace with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database")
+
 
 ```shell
 # 1. Create and activate the build environment
