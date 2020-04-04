@@ -1,6 +1,7 @@
 name: pangres-dev
 dependencies:
-  - numpy
   - pytest
   - pytest-cov
   - pytest-benchmark
+  - psycopg2
+  - pymysql
