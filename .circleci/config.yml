@@ -44,12 +44,9 @@ jobs:
           pip install pytest
           pip install pytest-benchmark
           pip install pytest-cov
-          # somehow the commented line below does not do coverage of non tests files
-          # pytest pangres --cov=./
-          # use this instead
-          coverage run -m pytest --conn_string=sqlite:///:memory:
-          coverage run -m pytest --conn_string=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable
-          coverage run -m pytest --conn_string=mysql://circleci_user:password@127.0.0.1:3306/circleci_test
+          pytest pangres --cov=./ --conn_string=sqlite:///:memory:
+          pytest pangres --cov=./ --conn_string=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable
+          pytest pangres --cov=./ --conn_string=mysql://circleci_user:password@127.0.0.1:3306/circleci_test
           codecov
 workflows:
   version: 2
