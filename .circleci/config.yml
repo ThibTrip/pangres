@@ -38,8 +38,9 @@ jobs:
           . venv/bin/activate
           # install package (fetches setup.py in current directory)
           pip install .
+          # we need cryptography for MySQL
           pip install codecov coverage numpy pytest pytest-benchmark pytest-cov
-          pip install psycopg2 pymysql
+          pip install psycopg2 pymysql cryptography
           pytest -s -v pangres --cov=pangres --conn_string=sqlite:///:memory:
           pytest -s -v pangres --cov=pangres --conn_string=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable
           pytest -s -v pangres --cov=pangres --conn_string=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test
