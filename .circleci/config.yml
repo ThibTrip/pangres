@@ -28,6 +28,8 @@ jobs:
           python3 -m venv venv
           . venv/bin/activate
           pip install -r requirements.txt
+          sudo apt-get remove sqlite
+          sudo apt-get update && sudo apt-get install sqlite3
     - save_cache:
         paths:
         - ./venv
@@ -44,9 +46,9 @@ jobs:
           pip install pytest
           pip install pytest-benchmark
           pip install pytest-cov
-          pytest pangres --cov=./ --conn_string=sqlite:///:memory:
-          pytest pangres --cov=./ --conn_string=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable
-          pytest pangres --cov=./ --conn_string=mysql://circleci_user:password@127.0.0.1:3306/circleci_test
+          pytest -s -v pangres --cov=./ --conn_string=sqlite:///:memory:
+          pytest -s -v pangres --cov=./ --conn_string=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable
+          pytest -s -v pangres --cov=./ --conn_string=mysql://circleci_user:password@127.0.0.1:3306/circleci_test
           codecov
 workflows:
   version: 2
