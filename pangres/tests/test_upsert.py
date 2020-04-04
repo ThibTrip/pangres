@@ -31,10 +31,10 @@ df = TestsExampleTable.create_example_df(nb_rows=5)
 df.iloc[0,[ix for ix, col in enumerate(df.columns) if col != 'likes_pizza']] = None
 
 # test for update
-df_2 = TestsExampleTable.create_example_df(nb_rows=6)
+df2 = TestsExampleTable.create_example_df(nb_rows=6)
 
 # test for ignore
-df_3 = TestsExampleTable.create_example_df(nb_rows=7)
+df3 = TestsExampleTable.create_example_df(nb_rows=6)
 
 
 # -
@@ -59,20 +59,21 @@ def test_create_table(engine, schema):
 def test_upsert_update(engine, schema):
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
-    upsert(engine=engine, schema=schema, df=df_2, if_row_exists='update', dtype=dtype, **default_args)
+    upsert(engine=engine, schema=schema, df=df2, if_row_exists='update', dtype=dtype, **default_args)
     df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
-    pd.testing.assert_frame_equal(df_2, df_db)
+    pd.testing.assert_frame_equal(df2, df_db)
 
 
 # ## INSERT IGNORE
 
 def test_upsert_ignore(engine, schema):
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-
     
-    upsert(engine=engine, schema=schema, df=df_3, if_row_exists='ignore', dtype=dtype, **default_args)
+    drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
+    for _df in (df, df3):
+        upsert(engine=engine, schema=schema, df=_df, if_row_exists='ignore', dtype=dtype, **default_args)
     df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
-    expected = pd.concat((df_2, df_3.tail(1)), axis=0)
+    expected = pd.concat((df, df3.tail(1)), axis=0)
     pd.testing.assert_frame_equal(expected, df_db)
 
 
