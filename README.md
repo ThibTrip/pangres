@@ -99,5 +99,6 @@ pip install -e .
 # -s prints stdout
 # -v prints test parameters
 # --cov=./pangres shows coverage only for pangres
-pytest -s -v pangres --cov=pangres --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests
+# --doctest-modules tests with doctest in all modules
+pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests
 ```
