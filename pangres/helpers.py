@@ -88,6 +88,7 @@ class PandasSpecialEngine:
         >>> df = pd.DataFrame({'name':['Albert', 'Toto'],
         ...                    'profileid':[10, 11]}).set_index('profileid')
         >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
+        >>> pse # doctest: +SKIP
         PandasSpecialEngine (id 123546, hexid 0x1E29A)
         * connection: Engine(postgresql://user:***@host.com:5432/database)
         * schema: public

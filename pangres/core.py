@@ -112,12 +112,12 @@ def upsert(engine,
     >>> # for our example full_name is the index
     >>> # and will thus be used as primary key
     >>> df = DocsExampleTable.df
-    >>> df
-    | full_name     | likes_sport   | updated             |   size_in_meters |
-    |:--------------|:--------------|:--------------------|-----------------:|
-    | John Rambo    | True          | 2020-02-01 00:00:00 |             1.77 |
-    | The Rock      | True          | 2020-04-01 00:00:00 |             1.96 |
-    | John Travolta | False         | NaT                 |              NaN |
+    >>> print(df.to_markdown()) # to_markdown exists since pandas v1
+    | full_name     | likes_sport   | updated                   |   size_in_meters |
+    |:--------------|:--------------|:--------------------------|-----------------:|
+    | John Rambo    | True          | 2020-02-01 00:00:00+00:00 |             1.77 |
+    | The Rock      | True          | 2020-04-01 00:00:00+00:00 |             1.96 |
+    | John Travolta | False         | NaT                       |           nan    |
 
     >>> # create SQL table
     >>> # it does not matter if if_row_exists is set
@@ -130,7 +130,7 @@ def upsert(engine,
 
     ##### 1.2. Updating the SQL table we created with if_row_exists='update'
     >>> new_df = DocsExampleTable.new_df
-    >>> new_df
+    >>> print(new_df.to_markdown())
     | full_name             | likes_sport   | updated                   |   size_in_meters |
     |:----------------------|:--------------|:--------------------------|-----------------:|
     | John Travolta         | True          | 2020-04-04 00:00:00+00:00 |             1.88 |
@@ -145,8 +145,8 @@ def upsert(engine,
     >>> 
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was updated and Arnold Schwarzenegger was added!
-    >>> (pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
-    ...  .astype({'likes_sport':bool}))
+    >>> print(pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
+    ...  .astype({'likes_sport':bool}).to_markdown())
     | full_name             | likes_sport   | updated                    |   size_in_meters |
     |:----------------------|:--------------|:---------------------------|-----------------:|
     | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
@@ -156,10 +156,10 @@ def upsert(engine,
 
     ##### 1.3. Updating the SQL table with if_row_exists='ignore'
     >>> new_df2 = DocsExampleTable.new_df2
-    >>> new_df2
+    >>> print(new_df2.to_markdown())
     | full_name     | likes_sport   | updated   |   size_in_meters |
     |:--------------|:--------------|:----------|-----------------:|
-    | John Travolta | False         | NaT       |             2.5  |
+    | John Travolta | True          | NaT       |             2.5  |
     | John Cena     | True          | NaT       |             1.84 |
 
     >>> upsert(engine=engine,
@@ -169,8 +169,8 @@ def upsert(engine,
     ...        dtype=dtype)
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was NOT updated and John Cena was added!
-    >>> (pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
-    ...  .astype({'likes_sport':bool}))
+    >>> print(pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
+    ...  .astype({'likes_sport':bool}).to_markdown())
     | full_name             | likes_sport   | updated                    |   size_in_meters |
     |:----------------------|:--------------|:---------------------------|-----------------:|
     | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
@@ -216,7 +216,7 @@ def pg_upsert(**kwargs):
     # issue deprecation
     warnings.warn(("pangres.pg_upsert is deprecated and will be deleted in the "
                    "next version of pangres, please use pangres.upsert instead!!"),
-                  DeprecationWarning)
+                  FutureWarning)
     # check arguments
     required = set(('engine', 'df', 'table_name', 'if_exists'))
     optional = set(('schema', 'create_schema', 'add_new_columns',
