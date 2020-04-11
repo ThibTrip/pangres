@@ -86,8 +86,8 @@ You will need a SQlite, MySQL and Postgres database available for testing.
 Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. You will have to replace the following variables in those commands:
 * SQLITE_CONNECTION_STRING: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
 * POSTGRES_CONNECTION_STRING: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public).
+* PG_SCHEMA (optional): schema for postgres (defaults to public)
 * MYSQL_CONNECTION_STRING: replace with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database")
-
 
 ```shell
 # 1. Create and activate the build environment
@@ -99,7 +99,5 @@ pip install -e .
 # -s prints stdout
 # -v prints test parameters
 # --cov=./pangres shows coverage only for pangres
-pytest -s -v pangres --cov=./pangres --conn_string=$SQLITE_CONNECTION_STRING
-pytest -s -v pangres --cov=./pangres --conn_string=$POSTGRES_CONNECTION_STRING --schema=tests
-pytest -s -v pangres --cov=./pangres --conn_string=$MYSQL_CONNECTION_STRING
+pytest -s -v pangres --cov=pangres --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests
 ```
