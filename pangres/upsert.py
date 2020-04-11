@@ -3,10 +3,9 @@ Functions for preparing/compiling and executing upsert statements
 in different SQL flavors.
 """
 from copy import deepcopy
-from sqlalchemy.sql.expression import insert
+from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
-from sqlalchemy.ext.compiler import compiles, deregister
 
 # # Postgres
 
@@ -91,11 +90,34 @@ def sqlite_upsert(engine, connection, table, values, if_row_exists):
         * If 'update' issues a ON CONFLICT...DO UPDATE statement
         * If 'ignore' issues a ON CONFLICT...DO NOTHING statement
 
-    Notes
-    -----
-    Compiling the SQL statement does not offer any significant
-    performance improvement but allows for conversion of types such
-    as dicts or lists to JSON sql type.
+    Examples
+    --------
+    >>> import datetime
+    >>> from sqlalchemy import create_engine
+    >>> from pangres.examples import _TestsExampleTable
+    >>> from pangres.helpers import PandasSpecialEngine
+    >>> 
+    >>> engine = create_engine('sqlite:///:memory:')
+    >>> df = _TestsExampleTable.create_example_df(nb_rows=5)
+    >>> df # doctest: +SKIP
+    | profileid   | email             | timestamp                 |   size_in_meters | likes_pizza   | favorite_colors              |
+    |:------------|:------------------|:--------------------------|-----------------:|:--------------|:-----------------------------|
+    | abc0        | foobaz@gmail.com  | 2007-10-11 23:15:06+00:00 |          1.93994 | False         | ['yellow', 'blue']           |
+    | abc1        | foobar@yahoo.com  | 2007-11-21 07:18:20+00:00 |          1.98637 | True          | ['blue', 'pink']             |
+    | abc2        | foobaz@outlook.fr | 2002-09-30 17:55:09+00:00 |          1.55945 | True          | ['blue']                     |
+    | abc3        | abc@yahoo.fr      | 2007-06-13 22:08:36+00:00 |          2.2495  | True          | ['orange', 'blue']           |
+    | abc4        | baz@yahoo.com     | 2004-11-22 04:54:09+00:00 |          2.2019  | False         | ['orange', 'yellow', 'blue'] |
+
+    >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='test_upsert_sqlite')
+    >>> 
+    >>> insert_values = {'profileid':'abc5', 'email': 'toto@gmail.com',
+    ...                  'timestamp': datetime.datetime(2019, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc),
+    ...                  'size_in_meters':1.9,
+    ...                  'likes_pizza':True,
+    ...                  'favorite_colors':['red', 'pink']}
+    >>> 
+    >>> sqlite_upsert(engine=engine, connection=engine.connect(), table=pse.table,
+    ...               values=list(insert_values.values()), if_row_exists='update')  # doctest: +SKIP
     """
     def escape_col(col):
         # unbound column from its table
@@ -105,26 +127,21 @@ def sqlite_upsert(engine, connection, table, values, if_row_exists):
         unbound_col.table = None
         return str(unbound_col.compile(dialect=engine.dialect))
 
-    # create custom SQL statement compiling
-    from sqlalchemy.sql.expression import Insert
-    @compiles(Insert)
-    def compile_general_upsert(insert_stmt, compiler, **kwargs):
-        # prepare start of insert (INSERT VALUES (...) ON CONFLICT)
-        pk = [escape_col(c) for c in table.primary_key]
-        insert = compiler.visit_insert(insert_stmt, **kwargs)
-        ondup = f'ON CONFLICT ({",".join(pk)})'
-        if if_row_exists == 'ignore':
-            ondup_action = 'DO NOTHING'
-            upsert = ' '.join((insert, ondup, ondup_action))
-        elif if_row_exists == 'update':
-            ondup_action = 'DO UPDATE SET'
-            non_pks = [escape_col(c) for c in table.columns
-                       if c not in list(table.primary_key)]
-            updates = ', '.join(f'{c}=EXCLUDED.{c}' for c in non_pks)
-            upsert = ' '.join((insert, ondup, ondup_action, updates))
-        return upsert
-    # use custom SQL statement compiling
-    upsert = table.insert().values(values)
-    connection.execute(upsert)
-    # reset Insert to "normal"
-    deregister(Insert)
+    # prepare start of insert (INSERT VALUES (...) ON CONFLICT)
+    pk = [escape_col(c) for c in table.primary_key]
+    insert = SQLCompiler(dialect=engine.dialect,
+                         statement=table.insert().values(values))
+
+    # append on conflict clause
+    pk = [escape_col(c) for c in table.primary_key]
+    ondup = f'ON CONFLICT ({",".join(pk)})'
+    if if_row_exists == 'ignore':
+        ondup_action = 'DO NOTHING'
+        insert.string = ' '.join((insert.string, ondup, ondup_action))
+    elif if_row_exists == 'update':
+        ondup_action = 'DO UPDATE SET'
+        non_pks = [escape_col(c) for c in table.columns
+                   if c not in list(table.primary_key)]
+        updates = ', '.join(f'{c}=EXCLUDED.{c}' for c in non_pks)
+        insert.string = ' '.join((insert.string, ondup, ondup_action, updates))
+    connection.execute(insert)
