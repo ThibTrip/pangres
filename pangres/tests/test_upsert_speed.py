@@ -4,7 +4,7 @@ import json
 from math import floor
 from sqlalchemy import VARCHAR
 from pangres import upsert
-from pangres.examples import TestsExampleTable
+from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import drop_table_if_exists
 
 
@@ -12,7 +12,7 @@ from pangres.tests.conftest import drop_table_if_exists
 
 
 # +
-df = TestsExampleTable.create_example_df(nb_rows=20000)
+df = _TestsExampleTable.create_example_df(nb_rows=20000)
 
 # pandas can't handle JSON
 # so for testing the speed of pd.to_sql we need to cast list and dicts to str

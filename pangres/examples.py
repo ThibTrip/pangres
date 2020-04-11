@@ -8,7 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-class TestsExampleTable(Base):
+class _TestsExampleTable(Base):
     """
     Example table compatible with Postgres, SQLite and MySQL for testing.
     """
