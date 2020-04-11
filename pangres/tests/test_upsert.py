@@ -10,7 +10,7 @@ import pandas as pd
 import random
 from sqlalchemy import VARCHAR
 from pangres import upsert, fix_psycopg2_bad_cols
-from pangres.examples import TestsExampleTable
+from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
 
 
@@ -26,15 +26,15 @@ default_args = {'table_name':table_name,
 # # Test data
 
 # +
-df = TestsExampleTable.create_example_df(nb_rows=5)
+df = _TestsExampleTable.create_example_df(nb_rows=5)
 # test for NULL values except for boolean column
 df.iloc[0,[ix for ix, col in enumerate(df.columns) if col != 'likes_pizza']] = None
 
 # test for update
-df2 = TestsExampleTable.create_example_df(nb_rows=6)
+df2 = _TestsExampleTable.create_example_df(nb_rows=6)
 
 # test for ignore
-df3 = TestsExampleTable.create_example_df(nb_rows=6)
+df3 = _TestsExampleTable.create_example_df(nb_rows=6)
 
 
 # -

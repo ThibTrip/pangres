@@ -7,14 +7,14 @@ expected (we should get the correct DataFrame length back).
 import pandas as pd
 from sqlalchemy import VARCHAR
 from pangres import upsert
-from pangres.examples import TestsExampleTable
+from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
 
 
 # # Helpers
 
 def insert_chunks(engine, schema, chunksize, nb_rows):
-    df = TestsExampleTable.create_example_df(nb_rows=nb_rows)
+    df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
     table_name=f'test_insert_chunksize_{chunksize}'
     drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
     upsert(schema=schema,

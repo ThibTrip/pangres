@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 from sqlalchemy import VARCHAR
-from pangres.examples import TestsExampleTable
+from pangres.examples import _TestsExampleTable
 from pangres.helpers import PandasSpecialEngine
 from pangres.tests.conftest import drop_table_if_exists
 
@@ -25,7 +25,7 @@ def test_methods_and_attributes(engine, schema):
                     'table_name':table_name}
     drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
     # TEST INIT
-    df = TestsExampleTable.create_example_df(nb_rows=10)
+    df = _TestsExampleTable.create_example_df(nb_rows=10)
     pse = PandasSpecialEngine(df=df, **default_args)
     # TEST ATTRIBUTE pse.table
     expected_cols = list(df.index.names) + df.columns.tolist()
