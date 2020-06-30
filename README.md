@@ -5,8 +5,8 @@
 
 _Thanks to [freesvg.org](https://freesvg.org/) for the logo assets_
 
-Upsert with pandas DataFrames (<code>ON CONFLICT DO NOTHING</code> or <code>ON CONFLICT DO UPDATE</code>) for PostgreSQL, MySQL, SQlite and potentially other databases behaving like SQlite (untested) with some additional optional features (see features).
-Also handles the creation of non existing SQL tables and schemas.
+Upsert with pandas DataFrames (<code>ON CONFLICT DO NOTHING</code> or <code>ON CONFLICT DO UPDATE</code>) for PostgreSQL, MySQL, SQlite and potentially other databases behaving like SQlite (untested) with some additional optional features (see features). Upserting can be done with **primary keys** or **unique keys**.
+Pangres also handles the creation of non existing SQL tables and schemas.
 
 # Features
 
