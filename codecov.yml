@@ -8,5 +8,7 @@ coverage:
   status:
     project: # settings affecting project coverage
       enabled: yes
-      target: 90% # auto % coverage target
-      threshold: 5%  # allow for 5% reduction of coverage without failing
+      tests:
+      	target: 90% # auto % coverage target
+      	threshold: 3%  # allow for n% reduction of coverage without failing
+
