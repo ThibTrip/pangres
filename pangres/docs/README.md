@@ -10,6 +10,6 @@ Each Markdown file in this folder corresponds to a page in the wiki except for t
 
 3. Modify unrendered markdown files if needed (e.g. Upsert.md)
 
-4. Run the script **generate_documentation.py**. It must be launched from the folder it is located in and it takes one argument which is the path to the folder where you cloned pangres' wiki: <code>python generate_documentation.py $wiki_path</code> e.g. <code>python generate_documentation.py "/home/thibtrip/pangres.wiki"</code>. This script requires the library npdoc_to_md which you should have installed by now. Note that npdoc_to_md has itself only a single dependency which is numpydoc.
+4. Run the script **generate_documentation.py**. It must be launched from the folder it is located in and it takes one argument which is the path to the folder where you cloned pangres' wiki: <code>python generate_documentation.py $wiki_path</code> e.g. <code>python generate_documentation.py "/home/thibtrip/pangres.wiki"</code>. This script requires the library npdoc_to_md which you should have installed by now.
 
 5. Commit changes (if there are any) in the folder of the cloned pangres wiki.
