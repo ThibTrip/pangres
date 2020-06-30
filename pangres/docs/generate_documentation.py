@@ -36,6 +36,14 @@ def generate_doc(wiki_path):
     # so it is not a page for the Wiki
     files_and_names = {k:v for k,v in files_and_names.items() if v != 'README.md'}
 
+    # simple verification that the page "Home" is present
+    has_home_md = any(['home.md' in v.lower() for v in files_and_names.values()])
+    if not has_home_md:
+        raise AssertionError('Expected a Home.md page (case insensitive match) '
+                             'and did not find any. The script searched for '
+                             f'markdown files in the path "{script_dir}"')
+
+    # render Markdowns
     for file, name in files_and_names.items():
         # render the file and put it a given destination
         destination = os.path.join(wiki_path, name)
