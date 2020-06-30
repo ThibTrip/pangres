@@ -5,3 +5,4 @@ dependencies:
   - pytest-benchmark
   - psycopg2
   - pymysql
+  - tabulate
