@@ -6,3 +6,4 @@ dependencies:
   - psycopg2
   - pymysql
   - tabulate
+  - npdoc_to_md
