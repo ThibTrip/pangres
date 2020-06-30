@@ -6,8 +6,9 @@ coverage:
   round: down
   range: "85..90"
   status:
-    project: # settings affecting project coverage
-      enabled: yes
-      target: 90 # auto % coverage target
-      threshold: 3%  # allow for n% reduction of coverage without failing
+    project:
+      default: # This can be anything, but it needs to exist as the name
+        target: 90
+        threshold: 5%
+        base: auto
 
