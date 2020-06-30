@@ -1,6 +1,7 @@
 # +
 import os
 import argparse
+from pkg_resources import resource_filename
 
 script_description = """
 This script generates the documentation of pangres using the library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md)
@@ -29,7 +30,8 @@ def parse_arguments():
 def generate_doc(wiki_path):
     from npdoc_to_md import render_md_file, get_markdown_files_in_dir
 
-    files_and_names = get_markdown_files_in_dir('.')
+    script_dir = resource_filename('pangres.docs.generate_documentation', '')
+    files_and_names = get_markdown_files_in_dir(script_dir)
     # do not render README.md this is the README for the docs folder on GitHub
     # so it is not a page for the Wiki
     files_and_names = {k:v for k,v in files_and_names.items() if v != 'README.md'}
