@@ -45,7 +45,7 @@ jobs:
           # create a folder for testing wiki generation
           mkdir pangres/tests/wikitest
           # use pytest
-          pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:///:memory: --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test --wiki_path=pangres/tests/wikitest
+          pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:///:memory: --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test
           codecov
 workflows:
   version: 2
