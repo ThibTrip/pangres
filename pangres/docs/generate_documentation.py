@@ -4,7 +4,7 @@ import argparse
 from pkg_resources import resource_filename
 
 script_description = """
-This script generates the documentation of pangres using the library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md)
+This script generates the documentation of pangres using the library npdoc_to_md (https://github.com/ThibTrip/npdoc_to_md)
 to render markdown files (located in the same folder as this notebook) with Jinja like placeholders (docstrings of functions,
 methods or classes are pulled and converted to pretty markdown).
 """
