@@ -22,7 +22,7 @@ def pytest_addoption(parser):
     parser.addoption('--pg_conn', action="store")
     parser.addoption('--mysql_conn', action="store")
     parser.addoption('--pg_schema', action='store', default=None)
-    parser.addoption('--wiki_path', action='store', default=None)
+
 
 def pytest_generate_tests(metafunc):
     # This is called for every test. Only get/set command line arguments
