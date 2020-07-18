@@ -4,4 +4,18 @@ codecov:
 coverage:
   precision: 2
   round: down
-  range: "85...100"
+  range: "85..90"
+  status:
+    project:
+      default: # This can be anything, but it needs to exist as the name
+        target: 90
+        threshold: 5%
+        base: auto
+    patch:
+      default:
+        target: 20
+        threshold: 5%
+        base: auto
+
+ignore:
+  - "pangres/docs/*"  # ignore script to generate the documentation

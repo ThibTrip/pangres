@@ -8,4 +8,4 @@ Welcome to the pangres wiki!
 
 # Notes
 
-Parts of the documentation was automatically generated using the docstrings of pangres' functions/classes/methods via my library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md).
+Parts of the documentation were automatically generated using the docstrings of pangres' functions/classes/methods via my library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md).

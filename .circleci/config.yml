@@ -41,7 +41,8 @@ jobs:
           pip install .
           # we need cryptography for MySQL
           pip install codecov coverage numpy pytest pytest-benchmark pytest-cov
-          pip install psycopg2 pymysql cryptography tabulate
+          pip install psycopg2 pymysql cryptography tabulate npdoc_to_md
+          # use pytest
           pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:///:memory: --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test
           codecov
 workflows:

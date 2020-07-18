@@ -23,8 +23,9 @@ def upsert(engine,
     Insert updates/ignores a pandas DataFrame into a SQL table (or
     creates a SQL table from the DataFrame if it does not exist).
 
-    This index of the DataFrame must be the primary key of the
-    SQL table and meet the following conditions:
+    This index of the DataFrame must be the primary key or a unique key
+    (can be a unique constraint with multiple columns too) of the SQL
+    table and meet the following conditions:
     1. The index must be unique.
     2. All levels of the index have to be named.
     3. The index cannot contain any null value except for MySQL where
@@ -53,12 +54,12 @@ def upsert(engine,
     if_row_exists : {'ignore', 'update'}
         Behavior if a row exists in the SQL table.
         Irrelevant if the SQL table does not exist already.
-        For both 'ignore' and 'update' rows with new primary
+        For both 'ignore' and 'update' rows with new primary/unique
         key values are inserted.
 
-        * 'ignore': rows for which primary keys exist in the SQL
+        * 'ignore': rows for which primary/unique keys exist in the SQL
         table are skipped
-        * 'update': rows for which primary keys exist in the SQL
+        * 'update': rows for which primary/unique keys exist in the SQL
         table are updated (with the columns available in the pandas
         DataFrame)
     schema : str or None, default None

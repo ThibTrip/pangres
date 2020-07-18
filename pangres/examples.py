@@ -15,8 +15,6 @@ class _TestsExampleTable(Base):
     __tablename__ = 'pangres_example'
     # use VARCHAR for the pk so MySQL doesn't complain...
     # MySQL does not want variable length text as index
-    # also don't use integer for a pk otherwise we need to specify
-    # we don't want autoincremented PK -_-"...
     profileid = Column(VARCHAR(10), primary_key=True)
     email = Column(TEXT)
     timestamp = Column(DATETIME(timezone=True))
