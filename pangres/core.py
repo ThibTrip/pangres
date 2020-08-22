@@ -14,8 +14,8 @@ def upsert(engine,
            table_name,
            if_row_exists,
            schema=None,
-           create_schema=True,
-           add_new_columns=True,
+           create_schema=False,
+           add_new_columns=False,
            adapt_dtype_of_empty_db_columns=False,
            chunksize=10000,
            dtype=None):
@@ -67,9 +67,9 @@ def upsert(engine,
         For postgres if it is None it will default to "public".
         For MySQL and SQlite the schema should be None since
         those SQL flavors do not have this system.
-    create_schema : bool, default True
+    create_schema : bool, default False
         If True the schema is created if it does not exist
-    add_new_columns : bool, default True
+    add_new_columns : bool, default False
         If True adds columns present in the DataFrame that
         are not in the SQL table.
     adapt_dtype_of_empty_db_columns : bool, default False
