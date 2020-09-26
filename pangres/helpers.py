@@ -19,12 +19,19 @@ from pangres.upsert import (mysql_upsert,
                             sqlite_upsert)
 
 # configure logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+## get rid of the root handler (see https://stackoverflow.com/a/19561320)
+logger.propagate = False
+## create a console handler and customize its format
+ch = logging.StreamHandler()
 logging_format = ('%(asctime)s | %(levelname)s     '
                   '| pangres     | %(module)s:%(funcName)s:%(lineno)s '
                   '- %(message)s')
-logging.basicConfig(format=logging_format, datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger('pangres')
-logger.setLevel(logging.INFO)
+formatter = logging.Formatter(logging_format)
+ch.setFormatter(formatter)
+## add the console handler
+logger.addHandler(ch)
 
 # compile some regexes
 # column names that will cause issues with psycopg2 default parameter style
