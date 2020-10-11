@@ -14,24 +14,10 @@ from sqlalchemy.sql import null
 from sqlalchemy.schema import (PrimaryKeyConstraint, CreateColumn, CreateSchema)
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
+from pangres.logger import log
 from pangres.upsert import (mysql_upsert,
                             postgres_upsert,
                             sqlite_upsert)
-
-# configure logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-## get rid of the root handler (see https://stackoverflow.com/a/19561320)
-logger.propagate = False
-## create a console handler and customize its format
-ch = logging.StreamHandler()
-logging_format = ('%(asctime)s | %(levelname)s     '
-                  '| pangres     | %(module)s:%(funcName)s:%(lineno)s '
-                  '- %(message)s')
-formatter = logging.Formatter(logging_format)
-ch.setFormatter(formatter)
-## add the console handler
-logger.addHandler(ch)
 
 # compile some regexes
 # column names that will cause issues with psycopg2 default parameter style
@@ -267,8 +253,8 @@ class PandasSpecialEngine:
             for col in cols_to_add:
                 col.table = None # Important! unbound column from table
                 op.add_column(self.table.name, col, schema=self.schema)
-                logger.info((f"Added column {col} (type: {col.type}) in table {self.table.name} "
-                             f'(schema="{self.schema})"'))
+                log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
+                    f'(schema="{self.schema})"')
 
 
     def get_db_table_schema(self):
@@ -371,9 +357,9 @@ class PandasSpecialEngine:
                                     type_=new_col.type,
                                     schema=self.schema,
                                     **alter_kwargs)
-                    logger.info((f"Changed type of column {new_col.name} "
-                                 f"from {col.type} to {new_col.type} "
-                                 f'in table {self.table.name} (schema="{self.schema}")'))
+                    log(f"Changed type of column {new_col.name} "
+                        f"from {col.type} to {new_col.type} "
+                        f'in table {self.table.name} (schema="{self.schema}")')
 
     @staticmethod
     def _create_chunks(values, chunksize=10000):
@@ -470,8 +456,9 @@ class PandasSpecialEngine:
                        '(e.g. post a GitHub issue)!')
                 raise NotImpletementedError(err)
             if chunksize > new_chunksize:
-                logger.warning((f'Reduced chunksize from {chunksize} to {new_chunksize} due '
-                                'to SQlite max variable restriction (max 999).'))
+                log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
+                    'to SQlite max variable restriction (max 999).',
+                    level=logging.WARNING)
             chunksize=new_chunksize
         # creat chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)

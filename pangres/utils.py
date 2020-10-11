@@ -1,22 +1,6 @@
 # +
 import pandas as pd
-import logging
-
-# configure logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-## get rid of the root handler (see https://stackoverflow.com/a/19561320)
-logger.propagate = False
-## create a console handler and customize its format
-ch = logging.StreamHandler()
-logging_format = ('%(asctime)s | %(levelname)s     '
-                  '| pangres     | %(module)s:%(funcName)s:%(lineno)s '
-                  '- %(message)s')
-formatter = logging.Formatter(logging_format)
-ch.setFormatter(formatter)
-## add the console handler
-logger.addHandler(ch)
-
+from pangres.logger import log
 
 # -
 
@@ -111,7 +95,7 @@ def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements={'%':'', '(':'', ')':''}
     for i, j in zip(before, after):
         if (isinstance(i, str) and isinstance(j, str)
             and i!=j):
-            logger.info(f'Renamed column/index "{i}" to "{j}s"')
+            log(f'Renamed column/index "{i}" to "{j}s"')
     return new_df
 
 
