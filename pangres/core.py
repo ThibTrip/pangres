@@ -185,7 +185,6 @@ def upsert(engine,
                               table_name=table_name,
                               schema=schema,
                               dtype=dtype)
-
     # add new columns from frame
     if add_new_columns and pse.table_exists():
         pse.add_new_columns()
@@ -200,6 +199,7 @@ def upsert(engine,
     pse.create_table_if_not_exists()
     
     # stop if no rows
-    if df.empty:
+    ## note: use simple check with len() as df.empty returns True if there are index values but no columns
+    if len(df) == 0:
         return
     pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize)
