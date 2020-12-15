@@ -254,7 +254,7 @@ class PandasSpecialEngine:
                 col.table = None # Important! unbound column from table
                 op.add_column(self.table.name, col, schema=self.schema)
                 log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
-                    f'(schema="{self.schema})"')
+                    f'(schema="{self.schema}")')
 
 
     def get_db_table_schema(self):
@@ -460,7 +460,7 @@ class PandasSpecialEngine:
                     'to SQlite max variable restriction (max 999).',
                     level=logging.WARNING)
             chunksize=new_chunksize
-        # creat chunks
+        # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
         upsert_funcs = {"postgres":postgres_upsert,
                         "mysql":mysql_upsert,
