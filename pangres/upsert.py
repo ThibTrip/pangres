@@ -117,7 +117,7 @@ def sqlite_upsert(engine, connection, table, values, if_row_exists):
     ...                  'favorite_colors':['red', 'pink']}
     >>> 
     >>> sqlite_upsert(engine=engine, connection=engine.connect(), table=pse.table,
-    ...               values=list(insert_values.values()), if_row_exists='update')  # doctest: +SKIP
+    ...               values=list(insert_values.values()), if_row_exists='update') # doctest: +SKIP
     """
     def escape_col(col):
         # unbound column from its table
