@@ -58,6 +58,36 @@ def mysql_upsert(engine, connection, table, values, if_row_exists):
     if_row_exists : {'update', 'ignore'}
         * If 'update' issues a ON DUPLICATE KEY UPDATE statement
         * If 'ignore' issues a INSERT IGNORE statement
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from sqlalchemy import create_engine, VARCHAR
+    >>> from pangres.examples import _TestsExampleTable
+    >>> from pangres.helpers import PandasSpecialEngine
+    >>> 
+    >>> engine = create_engine('mysql+pymysql://username:password@localhost:3306/db')  # doctest: +SKIP
+    >>> df = _TestsExampleTable.create_example_df(nb_rows=5)
+    >>> df # doctest: +SKIP
+    | profileid   | email             | timestamp                 |   size_in_meters | likes_pizza   | favorite_colors              |
+    |:------------|:------------------|:--------------------------|-----------------:|:--------------|:-----------------------------|
+    | abc0        | foobaz@gmail.com  | 2007-10-11 23:15:06+00:00 |          1.93994 | False         | ['yellow', 'blue']           |
+    | abc1        | foobar@yahoo.com  | 2007-11-21 07:18:20+00:00 |          1.98637 | True          | ['blue', 'pink']             |
+    | abc2        | foobaz@outlook.fr | 2002-09-30 17:55:09+00:00 |          1.55945 | True          | ['blue']                     |
+    | abc3        | abc@yahoo.fr      | 2007-06-13 22:08:36+00:00 |          2.2495  | True          | ['orange', 'blue']           |
+    | abc4        | baz@yahoo.com     | 2004-11-22 04:54:09+00:00 |          2.2019  | False         | ['orange', 'yellow', 'blue'] |
+
+    >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='test_upsert_mysql') # doctest: +SKIP
+    >>> 
+    >>> insert_values = {'profileid':'abc5', 'email': 'toto@gmail.com',
+    ...                  'timestamp': datetime.datetime(2019, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc),
+    ...                  'size_in_meters':1.9,
+    ...                  'likes_pizza':True,
+    ...                  'favorite_colors':['red', 'pink']}
+    >>> 
+    >>> df.head(0).to_sql('test_upsert_mysql', con=engine, if_exists='replace', dtype={'profileid':VARCHAR(10)}) # doctest: +SKIP
+    >>> mysql_upsert(engine=engine, connection=engine.connect(), table=pse.table,
+    ...              values=list(insert_values.values()), if_row_exists='update') # doctest: +SKIP
     """
     insert_stmt = mysql_insert(table).values(values)
     if if_row_exists == 'update':
