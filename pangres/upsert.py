@@ -25,15 +25,19 @@ def postgres_upsert(engine, connection, table, values, if_row_exists):
         * If 'ignore' issues a ON CONFLICT...DO NOTHING statement
     """
     insert_stmt = pg_insert(table).values(values)
-    if if_row_exists == 'ignore':
-        upsert = insert_stmt.on_conflict_do_nothing()
-    elif if_row_exists == 'update':
+    if if_row_exists == 'update':
         update_cols = [c.name
                        for c in table.c
                        if c not in list(table.primary_key.columns)]
-        upsert = insert_stmt.on_conflict_do_update(index_elements=table.primary_key.columns,
-                                                   set_={k: getattr(insert_stmt.excluded, k)
-                                                         for k in update_cols})        
+        # case when there is only an index in the DataFrame i.e. no columns to update
+        if len(update_cols) == 0:
+            if_row_exists = 'ignore'
+        else:
+            upsert = insert_stmt.on_conflict_do_update(index_elements=table.primary_key.columns,
+                                                       set_={k: getattr(insert_stmt.excluded, k)
+                                                             for k in update_cols})
+    if if_row_exists == 'ignore':
+        upsert = insert_stmt.on_conflict_do_nothing()
     # execute upsert
     connection.execute(upsert)
 
@@ -56,10 +60,7 @@ def mysql_upsert(engine, connection, table, values, if_row_exists):
         * If 'ignore' issues a INSERT IGNORE statement
     """
     insert_stmt = mysql_insert(table).values(values)
-    if if_row_exists == 'ignore':
-        # thanks to: https://stackoverflow.com/a/50870348/10551772
-        upsert = insert_stmt.prefix_with('IGNORE')
-    elif if_row_exists == 'update':
+    if if_row_exists == 'update':
         # thanks to: https://stackoverflow.com/a/58180407/10551772
         # prepare kwargs for on_duplicated_key_update (with kwargs and getattr
         # even "bad" column names will resolve e.g. columns with spaces)
@@ -68,7 +69,15 @@ def mysql_upsert(engine, connection, table, values, if_row_exists):
             col_name = col.name
             if col_name not in table.primary_key:
                 update_cols.update({col_name:getattr(insert_stmt.inserted, col_name)})
-        upsert = insert_stmt.on_duplicate_key_update(**update_cols)
+        # case when there is only an index in the DataFrame i.e. no columns to update
+        if len(update_cols) == 0:
+            if_row_exists = 'ignore'
+        else:
+            upsert = insert_stmt.on_duplicate_key_update(**update_cols)
+    if if_row_exists == 'ignore':
+        # thanks to: https://stackoverflow.com/a/50870348/10551772
+        upsert = insert_stmt.prefix_with('IGNORE')
+
     # execute upsert
     connection.execute(upsert)
 
@@ -128,20 +137,19 @@ def sqlite_upsert(engine, connection, table, values, if_row_exists):
         return str(unbound_col.compile(dialect=engine.dialect))
 
     # prepare start of insert (INSERT VALUES (...) ON CONFLICT)
-    pk = [escape_col(c) for c in table.primary_key]
     insert = SQLCompiler(dialect=engine.dialect,
                          statement=table.insert().values(values))
 
     # append on conflict clause
     pk = [escape_col(c) for c in table.primary_key]
+    non_pks = [escape_col(c) for c in table.columns if c not in list(table.primary_key)]
     ondup = f'ON CONFLICT ({",".join(pk)})'
-    if if_row_exists == 'ignore':
+    # always use "DO NOTHING" if there are no primary keys
+    if (not non_pks) or (if_row_exists == 'ignore'):
         ondup_action = 'DO NOTHING'
         insert.string = ' '.join((insert.string, ondup, ondup_action))
     elif if_row_exists == 'update':
         ondup_action = 'DO UPDATE SET'
-        non_pks = [escape_col(c) for c in table.columns
-                   if c not in list(table.primary_key)]
         updates = ', '.join(f'{c}=EXCLUDED.{c}' for c in non_pks)
         insert.string = ' '.join((insert.string, ondup, ondup_action, updates))
     connection.execute(insert)
