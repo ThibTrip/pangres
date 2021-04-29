@@ -18,12 +18,12 @@ with open(os.path.join(here, "requirements.txt"),"r") as f:
 
 setuptools.setup(
     name="pangres",
-    version="2.2.3",
+    version="2.2.4",
     license = 'The Unlicense',
     author="Thibault Bétrémieux",
     author_email="thibault.betremieux@gmail.com",
     url = 'https://github.com/ThibTrip/pangres',
-    download_url = 'https://github.com/ThibTrip/pangres/archive/v2.2.3.tar.gz',
+    download_url = 'https://github.com/ThibTrip/pangres/archive/v2.2.4.tar.gz',
     keywords = ['pandas','postgres', 'mysql', 'sqlite'],
     description=description,
     long_description=long_description,
