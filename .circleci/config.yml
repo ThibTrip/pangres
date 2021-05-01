@@ -43,6 +43,10 @@ jobs:
           pip install codecov coverage numpy pytest pytest-benchmark pytest-cov
           pip install psycopg2 pymysql cryptography tabulate npdoc_to_md
           # use pytest
+          ## first test with sqlalchemy latest i.e. sqlalchemy>=1.4 (after API changes, notably engine.has_table being deprecated)
+          pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:///:memory: --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test
+          ## second test with sqlalchemy<1.4 (before API changes)
+          pip install sqlalchemy==1.3.24
           pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:///:memory: --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test
           codecov
 workflows:
