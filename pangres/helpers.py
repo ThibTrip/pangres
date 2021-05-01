@@ -206,7 +206,12 @@ class PandasSpecialEngine:
         exists : bool
             True if table exists else False
         """
-        return self.engine.has_table(self.table.name, schema=self.schema)
+        if _sqla_gt14():
+            import sqlalchemy as sa
+            insp = sa.inspect(self.engine)
+            return insp.has_table(schema=self.schema, table_name=self.table.name)
+        else:
+            return self.engine.has_table(schema=self.schema, table_name=self.table.name) 
 
     def create_schema_if_not_exists(self):
         """
