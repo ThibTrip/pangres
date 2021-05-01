@@ -3,7 +3,6 @@
 """
 Main functions of pangres that will be directly exposed to its users.
 """
-import warnings
 from pangres.helpers import PandasSpecialEngine
 
 
