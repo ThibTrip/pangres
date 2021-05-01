@@ -1,4 +1,3 @@
-# +
 """
 Functions/classes/variables for interacting between a pandas DataFrame
 and postgres/mysql/sqlite (and potentially other databases).
@@ -8,6 +7,7 @@ import pandas as pd
 import logging
 import re
 from copy import deepcopy
+from distutils.version import LooseVersion
 from math import floor
 from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.sql import null
@@ -19,6 +19,8 @@ from pangres.upsert import (mysql_upsert,
                             postgres_upsert,
                             sqlite_upsert)
 
+# # Regexes
+
 # compile some regexes
 # column names that will cause issues with psycopg2 default parameter style
 # (so we will need to switch to format style when we see such columns)
@@ -27,7 +29,19 @@ RE_BAD_COL_NAME = re.compile('[\(\)\%]')
 RE_CHARCOUNT_COL_TYPE = re.compile('(?<=.)+\(\d+\)')
 
 
-# -
+# # "Adapter" for sqlalchemy (handle pre and post version 1.4)
+
+def _sqla_gt14() -> bool:
+    """
+    Checks if sqlalchemy.__version__ is at least 1.4.0, when several
+    deprecations were made.
+
+    Stolen from pandas.io.sql (we don't import it as it's private
+    and has just 2 lines of code).
+    """
+    import sqlalchemy
+    return LooseVersion(sqlalchemy.__version__) >= LooseVersion("1.4.0")
+
 
 # # Class PandasSpecialEngine
 
@@ -182,7 +196,7 @@ class PandasSpecialEngine:
             return 'sqlite'
         else:
             return "other"
-            
+
     def table_exists(self) -> bool:
         """
         Returns True if the table defined in given instance
@@ -193,7 +207,12 @@ class PandasSpecialEngine:
         exists : bool
             True if table exists else False
         """
-        return self.engine.has_table(self.table.name, schema=self.schema)
+        if _sqla_gt14():
+            import sqlalchemy as sa
+            insp = sa.inspect(self.engine)
+            return insp.has_table(schema=self.schema, table_name=self.table.name)
+        else:
+            return self.engine.has_table(schema=self.schema, table_name=self.table.name) 
 
     def create_schema_if_not_exists(self):
         """
@@ -221,9 +240,14 @@ class PandasSpecialEngine:
         db_columns_names : list
             list of column names (str)
         """
-        columns_info = self.engine.dialect.get_columns(connection=self.engine,
-                                                       table_name=self.table.name,            
-                                                       schema=self.schema)
+        if _sqla_gt14():
+            import sqlalchemy as sa
+            insp = sa.inspect(self.engine)
+            columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)
+        else:
+            columns_info = self.engine.dialect.get_columns(connection=self.engine,
+                                                           schema=self.schema,
+                                                           table_name=self.table.name) 
         db_columns_names = [col_info["name"] for col_info in columns_info]
         return db_columns_names
 
@@ -246,7 +270,7 @@ class PandasSpecialEngine:
             raise ValueError(('Cannot add any column that is part of the df index!\n'
                               "You'll have to update your table primary key or change your "
                               "df index"))
-        
+
         with self.engine.connect() as con:
             ctx = MigrationContext.configure(con)
             op = Operations(ctx)
