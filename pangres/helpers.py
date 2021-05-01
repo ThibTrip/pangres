@@ -8,6 +8,7 @@ import pandas as pd
 import logging
 import re
 from copy import deepcopy
+from distutils.version import LooseVersion
 from math import floor
 from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.sql import null
@@ -27,7 +28,19 @@ RE_BAD_COL_NAME = re.compile('[\(\)\%]')
 RE_CHARCOUNT_COL_TYPE = re.compile('(?<=.)+\(\d+\)')
 
 
-# -
+# # "Adapter" for sqlalchemy (handle pre and post version 1.4)
+
+def _sqla_gt14() -> bool:
+    """
+    Checks if sqlalchemy.__version__ is at least 1.4.0, when several
+    deprecations were made.
+
+    Stolen from pandas.io.sql (we don't import it as it's private
+    and has just 2 lines of code).
+    """
+    import sqlalchemy
+    return LooseVersion(sqlalchemy.__version__) >= LooseVersion("1.4.0")
+
 
 # # Class PandasSpecialEngine
 
