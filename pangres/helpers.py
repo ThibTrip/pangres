@@ -24,9 +24,9 @@ from pangres.upsert import (mysql_upsert,
 # compile some regexes
 # column names that will cause issues with psycopg2 default parameter style
 # (so we will need to switch to format style when we see such columns)
-RE_BAD_COL_NAME = re.compile('[\(\)\%]')
+RE_BAD_COL_NAME = re.compile(r'[\(\)\%]')
 # e.g. match "(50)" in "VARCHAR(50)"
-RE_CHARCOUNT_COL_TYPE = re.compile('(?<=.)+\(\d+\)')
+RE_CHARCOUNT_COL_TYPE = re.compile(r'(?<=.)+\(\d+\)')
 
 
 # # "Adapter" for sqlalchemy (handle pre and post version 1.4)
