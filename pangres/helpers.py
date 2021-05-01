@@ -1,4 +1,3 @@
-# +
 """
 Functions/classes/variables for interacting between a pandas DataFrame
 and postgres/mysql/sqlite (and potentially other databases).
@@ -19,6 +18,8 @@ from pangres.logger import log
 from pangres.upsert import (mysql_upsert,
                             postgres_upsert,
                             sqlite_upsert)
+
+# # Regexes
 
 # compile some regexes
 # column names that will cause issues with psycopg2 default parameter style
@@ -195,7 +196,7 @@ class PandasSpecialEngine:
             return 'sqlite'
         else:
             return "other"
-            
+
     def table_exists(self) -> bool:
         """
         Returns True if the table defined in given instance
@@ -269,7 +270,7 @@ class PandasSpecialEngine:
             raise ValueError(('Cannot add any column that is part of the df index!\n'
                               "You'll have to update your table primary key or change your "
                               "df index"))
-        
+
         with self.engine.connect() as con:
             ctx = MigrationContext.configure(con)
             op = Operations(ctx)
