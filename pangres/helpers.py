@@ -239,9 +239,14 @@ class PandasSpecialEngine:
         db_columns_names : list
             list of column names (str)
         """
-        columns_info = self.engine.dialect.get_columns(connection=self.engine,
-                                                       table_name=self.table.name,            
-                                                       schema=self.schema)
+        if _sqla_gt14():
+            import sqlalchemy as sa
+            insp = sa.inspect(self.engine)
+            columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)
+        else:
+            columns_info = self.engine.dialect.get_columns(connection=self.engine,
+                                                           schema=self.schema,
+                                                           table_name=self.table.name) 
         db_columns_names = [col_info["name"] for col_info in columns_info]
         return db_columns_names
 
