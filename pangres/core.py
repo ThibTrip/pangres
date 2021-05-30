@@ -92,8 +92,9 @@ def upsert(engine,
         This is especially useful for MySQL where the length of
         primary keys with text has to be provided (see Examples)
     yield_chunks : bool, default False
-        If True gives back an sqlalchemy object at each chunk
-        with which you can for instance count rows.
+        If True gives back an sqlalchemy object
+        (sqlalchemy.engine.cursor.LegacyCursorResult)
+        at each chunk with which you can for instance count rows.
 
     Examples
     --------

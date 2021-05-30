@@ -459,8 +459,9 @@ class PandasSpecialEngine:
             Number of values to be inserted at once,
             an integer strictly above zero.
         yield_chunks : bool, default False
-            If True gives back an sqlalchemy object at each chunk
-            with which you can for instance count rows.
+            If True gives back an sqlalchemy object
+            (sqlalchemy.engine.cursor.LegacyCursorResult)
+            at each chunk with which you can for instance count rows.
         """
         # VERIFY ARGUMENTS
         if if_row_exists not in ('ignore', 'update'):
