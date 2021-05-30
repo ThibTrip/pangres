@@ -17,7 +17,8 @@ def upsert(engine,
            add_new_columns=False,
            adapt_dtype_of_empty_db_columns=False,
            chunksize=10000,
-           dtype=None):
+           dtype=None,
+           yield_chunks=False):
     """
     Insert updates/ignores a pandas DataFrame into a SQL table (or
     creates a SQL table from the DataFrame if it does not exist).
@@ -90,6 +91,9 @@ def upsert(engine,
         Similar to pd.to_sql dtype argument.
         This is especially useful for MySQL where the length of
         primary keys with text has to be provided (see Examples)
+    yield_chunks : bool, default False
+        If True gives back an sqlalchemy object at each chunk
+        with which you can for instance count rows.
 
     Examples
     --------
@@ -196,9 +200,11 @@ def upsert(engine,
     if create_schema and schema is not None:
         pse.create_schema_if_not_exists()
     pse.create_table_if_not_exists()
-    
+
     # stop if no rows
     ## note: use simple check with len() as df.empty returns True if there are index values but no columns
     if len(df) == 0:
         return
-    pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize)
+
+    # returns an iterator when we yield chunks otherwise None
+    return pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize, yield_chunks=yield_chunks)

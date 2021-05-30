@@ -436,7 +436,7 @@ class PandasSpecialEngine:
                     values[i][j] = str(val)
         return values
     
-    def upsert(self, if_row_exists, chunksize=10000):
+    def upsert(self, if_row_exists, chunksize=10000, yield_chunks=False):
         """
         Generates and executes an upsert (insert update or 
         insert ignore depending on :if_row_exists:) statement
@@ -458,6 +458,9 @@ class PandasSpecialEngine:
         chunksize : int > 0, default 900
             Number of values to be inserted at once,
             an integer strictly above zero.
+        yield_chunks : bool, default False
+            If True gives back an sqlalchemy object at each chunk
+            with which you can for instance count rows.
         """
         # VERIFY ARGUMENTS
         if if_row_exists not in ('ignore', 'update'):
@@ -491,11 +494,26 @@ class PandasSpecialEngine:
                         "sqlite":sqlite_upsert,
                         "other":sqlite_upsert}
         upsert_func = upsert_funcs[self._db_type]
-        for chunk in chunks:
-            upsert = upsert_func(engine=self.engine,
-                                 table=self.table,
-                                 values=chunk,
-                                 if_row_exists=if_row_exists)
+        # when yield is present in a function it always returns a generator
+        # even if the yield is at a place where the code is not supposed to execute
+        # but one can circumvent this by using a subfunction
+        # which is what we do for when we want to yield results of chunks
+        if not yield_chunks:
+            for chunk in chunks:
+                upsert_func(engine=self.engine,
+                            table=self.table,
+                            values=chunk,
+                            if_row_exists=if_row_exists)
+        else:
+            def yield_chunks_func():
+                for chunk in chunks:
+                    yield upsert_func(engine=self.engine,
+                                      table=self.table,
+                                      values=chunk,
+                                      if_row_exists=if_row_exists)
+            # we'll have to execute this iterator in the main function
+            # otherwise this will not work
+            return yield_chunks_func()
 
     def __repr__(self):
         text = f"""PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
