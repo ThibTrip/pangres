@@ -183,6 +183,35 @@ def upsert(engine,
     | John Travolta         | True          | 2020-04-04 00:00:00.000000 |             1.88 |
     | Arnold Schwarzenegger | True          |                            |             1.88 |
     | John Cena             | True          |                            |             1.84 |
+
+    #### 2. Example for getting information on upserted chunks (parameter `yield_chunks` == True)
+    >>> import pandas as pd
+    >>> from pangres import upsert, DocsExampleTable
+    >>> from sqlalchemy import create_engine, VARCHAR
+    >>>
+    >>> # config
+    >>> engine = create_engine("sqlite:///:memory:")
+    >>> chunksize = 2
+    >>>
+    >>> # get a DataFrame from somwhere
+    >>> df = DocsExampleTable.df
+    >>> print(df.to_markdown())
+    | full_name     | likes_sport   | updated                   |   size_in_meters |
+    |:--------------|:--------------|:--------------------------|-----------------:|
+    | John Rambo    | True          | 2020-02-01 00:00:00+00:00 |             1.77 |
+    | The Rock      | True          | 2020-04-01 00:00:00+00:00 |             1.96 |
+    | John Travolta | False         | NaT                       |           nan    |
+
+    >>>
+    >>> # upsert in chunks of size `chunksize` and get
+    >>> # back the number of rows updated for each chunk
+    >>> iterator = upsert(engine=engine, df=df, table_name='test_row_count',
+    ...                   chunksize=chunksize, if_row_exists='update',
+    ...                   yield_chunks=True)
+    >>> for result in iterator:
+    ...     print(f'{result.rowcount} row(s) updated')
+    2 row(s) updated
+    1 row(s) updated
     """
     pse = PandasSpecialEngine(engine=engine,
                               df=df,
