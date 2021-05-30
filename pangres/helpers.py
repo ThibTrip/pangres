@@ -486,7 +486,7 @@ class PandasSpecialEngine:
                 log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
                     'to SQlite max variable restriction (max 999).',
                     level=logging.WARNING)
-            chunksize=new_chunksize
+                chunksize = new_chunksize
         # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
         upsert_funcs = {"postgres":postgres_upsert,
