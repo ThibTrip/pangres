@@ -491,13 +491,11 @@ class PandasSpecialEngine:
                         "sqlite":sqlite_upsert,
                         "other":sqlite_upsert}
         upsert_func = upsert_funcs[self._db_type]
-        with self.engine.connect() as con:
-            for chunk in chunks:
-                upsert = upsert_func(engine=self.engine,
-                                     connection=con,
-                                     table=self.table,
-                                     values=chunk,
-                                     if_row_exists=if_row_exists)
+        for chunk in chunks:
+            upsert = upsert_func(engine=self.engine,
+                                 table=self.table,
+                                 values=chunk,
+                                 if_row_exists=if_row_exists)
 
     def __repr__(self):
         text = f"""PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
