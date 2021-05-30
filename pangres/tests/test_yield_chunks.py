@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-This module tests if uploading data in chunks works as
-expected (we should get the correct DataFrame length back).
+This module tests we can get information back from
+the upserted chunks when the parameter `yield_chunks`
+is True. It also check the integrity of the data.
 """
 import math
 import pandas as pd
