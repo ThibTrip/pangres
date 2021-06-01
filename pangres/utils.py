@@ -1,8 +1,6 @@
-# +
 import pandas as pd
 from pangres.logger import log
 
-# -
 
 # # Function to fix bad column names for psycopg2
 
@@ -97,10 +95,3 @@ def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements={'%':'', '(':'', ')':''}
             and i!=j):
             log(f'Renamed column/index "{i}" to "{j}s"')
     return new_df
-
-
-# # Test with doctest
-
-if __name__ == '__main__':
-    import doctest
-    doctest.testmod()

@@ -512,8 +512,6 @@ class PandasSpecialEngine:
                                       table=self.table,
                                       values=chunk,
                                       if_row_exists=if_row_exists)
-            # we'll have to execute this iterator in the main function
-            # otherwise this will not work
             return yield_chunks_func()
 
     def __repr__(self):
