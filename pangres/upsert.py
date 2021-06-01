@@ -9,7 +9,7 @@ from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
 
 # # Postgres
 
-def postgres_upsert(engine, connection, table, values, if_row_exists):
+def postgres_upsert(engine, table, values, if_row_exists):
     """
     Prepares and executes a PostgreSQL INSERT ON CONFLICT...DO NOTHING
     or DO UPDATE statement via sqlalchemy.dialects.postgresql.insert
@@ -17,7 +17,6 @@ def postgres_upsert(engine, connection, table, values, if_row_exists):
     Parameters
     ----------
     engine : sqlalchemy.engine.base.Engine
-    connection : sqlalchemy.engine.base.Connection
     table : sqlalchemy.sql.schema.Table
     values : list of dict
     if_row_exists : {'update', 'ignore'}
@@ -39,11 +38,12 @@ def postgres_upsert(engine, connection, table, values, if_row_exists):
     if if_row_exists == 'ignore':
         upsert = insert_stmt.on_conflict_do_nothing()
     # execute upsert
-    connection.execute(upsert)
+    with engine.connect() as connection:
+        return connection.execute(upsert)
 
 # # MySQL
 
-def mysql_upsert(engine, connection, table, values, if_row_exists):
+def mysql_upsert(engine, table, values, if_row_exists):
     """
     Prepares and executes a MySQL INSERT IGNORE or
     INSERT...ON DUPLICATE KEY UPDATE
@@ -52,7 +52,6 @@ def mysql_upsert(engine, connection, table, values, if_row_exists):
     Parameters
     ----------
     engine : sqlalchemy.engine.base.Engine
-    connection : sqlalchemy.engine.base.Connection
     table : sqlalchemy.sql.schema.Table
     values : list of dict
     if_row_exists : {'update', 'ignore'}
@@ -86,7 +85,7 @@ def mysql_upsert(engine, connection, table, values, if_row_exists):
     ...                  'favorite_colors':['red', 'pink']}
     >>> 
     >>> df.head(0).to_sql('test_upsert_mysql', con=engine, if_exists='replace', dtype={'profileid':VARCHAR(10)}) # doctest: +SKIP
-    >>> mysql_upsert(engine=engine, connection=engine.connect(), table=pse.table,
+    >>> mysql_upsert(engine=engine, table=pse.table,
     ...              values=list(insert_values.values()), if_row_exists='update') # doctest: +SKIP
     """
     insert_stmt = mysql_insert(table).values(values)
@@ -109,12 +108,13 @@ def mysql_upsert(engine, connection, table, values, if_row_exists):
         upsert = insert_stmt.prefix_with('IGNORE')
 
     # execute upsert
-    connection.execute(upsert)
+    with engine.connect() as connection:
+        return connection.execute(upsert)
 
 # # Sqlite 
 # (or other databases where ON CONFLICT...DO UPDATE SET/DO NOTHING is supported)
 
-def sqlite_upsert(engine, connection, table, values, if_row_exists):
+def sqlite_upsert(engine, table, values, if_row_exists):
     """
     Compiles and executes a SQlite ON CONFLICT...DO NOTHING or DO UPDATE
     statement.
@@ -122,7 +122,6 @@ def sqlite_upsert(engine, connection, table, values, if_row_exists):
     Parameters
     ----------
     engine : sqlalchemy.engine.base.Engine
-    connection : sqlalchemy.engine.base.Connection
     table : sqlalchemy.sql.schema.Table
     values : list of dict
     if_row_exists : {'update', 'ignore'}
@@ -155,7 +154,7 @@ def sqlite_upsert(engine, connection, table, values, if_row_exists):
     ...                  'likes_pizza':True,
     ...                  'favorite_colors':['red', 'pink']}
     >>> 
-    >>> sqlite_upsert(engine=engine, connection=engine.connect(), table=pse.table,
+    >>> sqlite_upsert(engine=engine, table=pse.table,
     ...               values=list(insert_values.values()), if_row_exists='update') # doctest: +SKIP
     """
     def escape_col(col):
@@ -182,4 +181,5 @@ def sqlite_upsert(engine, connection, table, values, if_row_exists):
         ondup_action = 'DO UPDATE SET'
         updates = ', '.join(f'{c}=EXCLUDED.{c}' for c in non_pks)
         insert.string = ' '.join((insert.string, ondup, ondup_action, updates))
-    connection.execute(insert)
+    with engine.connect() as connection:
+        return connection.execute(insert)
