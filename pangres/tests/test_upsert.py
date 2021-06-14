@@ -107,3 +107,10 @@ def test_crappy_text_insert(engine, schema):
     df_test = (pd.DataFrame({'text': [create_random_text() for i in range(10)]})
                .rename_axis(['profileid'], axis='index', inplace=False))
     upsert(engine=engine, schema=schema, df=df_test, if_row_exists='update', dtype=dtype, **default_args)
+
+
+# # Another test with the column name `values` (see issue #34 of pangres)
+
+def test_colum_named_values(engine, schema):
+    df = pd.DataFrame({'values': range(5, 9)}, index=pd.Index(range(1, 5), name='idx'))
+    upsert(engine=engine, schema=schema, df=df, if_row_exists='update', table_name='test_column_values')
