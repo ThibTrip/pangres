@@ -19,3 +19,4 @@ coverage:
 
 ignore:
   - "pangres/docs/*"  # ignore script to generate the documentation
+  - "pangres/pangres/tests/test_upsert_speed.py" # the pytest benchmarking extension has problems with coverage

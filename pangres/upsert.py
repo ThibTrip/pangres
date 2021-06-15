@@ -33,8 +33,7 @@ def postgres_upsert(engine, table, values, if_row_exists):
             if_row_exists = 'ignore'
         else:
             upsert = insert_stmt.on_conflict_do_update(index_elements=table.primary_key.columns,
-                                                       set_={k: getattr(insert_stmt.excluded, k)
-                                                             for k in update_cols})
+                                                       set_={k:insert_stmt.excluded[k] for k in update_cols})
     if if_row_exists == 'ignore':
         upsert = insert_stmt.on_conflict_do_nothing()
     # execute upsert
@@ -97,7 +96,7 @@ def mysql_upsert(engine, table, values, if_row_exists):
         for col in insert_stmt.table.columns:
             col_name = col.name
             if col_name not in table.primary_key:
-                update_cols.update({col_name:getattr(insert_stmt.inserted, col_name)})
+                update_cols.update({col_name:insert_stmt.inserted[col_name]})
         # case when there is only an index in the DataFrame i.e. no columns to update
         if len(update_cols) == 0:
             if_row_exists = 'ignore'
