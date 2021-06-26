@@ -133,28 +133,28 @@ def sqlite_upsert(engine, table, values, if_row_exists):
     >>> from sqlalchemy import create_engine
     >>> from pangres.examples import _TestsExampleTable
     >>> from pangres.helpers import PandasSpecialEngine
-    >>> 
+    >>>
+    >>> # config
     >>> engine = create_engine('sqlite:///:memory:')
+    >>>
+    >>> # generate a test df
     >>> df = _TestsExampleTable.create_example_df(nb_rows=5)
-    >>> df # doctest: +SKIP
-    | profileid   | email             | timestamp                 |   size_in_meters | likes_pizza   | favorite_colors              |
-    |:------------|:------------------|:--------------------------|-----------------:|:--------------|:-----------------------------|
-    | abc0        | foobaz@gmail.com  | 2007-10-11 23:15:06+00:00 |          1.93994 | False         | ['yellow', 'blue']           |
-    | abc1        | foobar@yahoo.com  | 2007-11-21 07:18:20+00:00 |          1.98637 | True          | ['blue', 'pink']             |
-    | abc2        | foobaz@outlook.fr | 2002-09-30 17:55:09+00:00 |          1.55945 | True          | ['blue']                     |
-    | abc3        | abc@yahoo.fr      | 2007-06-13 22:08:36+00:00 |          2.2495  | True          | ['orange', 'blue']           |
-    | abc4        | baz@yahoo.com     | 2004-11-22 04:54:09+00:00 |          2.2019  | False         | ['orange', 'yellow', 'blue'] |
+    >>> print(df.to_markdown()) # doctest: +SKIP
+    | profileid   | email           | timestamp                 |   size_in_meters | likes_pizza   | favorite_colors             |
+    |:------------|:----------------|:--------------------------|-----------------:|:--------------|:----------------------------|
+    | abc0        | foobaz@yahoo.fr | 2003-07-27 20:15:11+00:00 |          1.7343  | True          | ['orange', 'yellow', 'red'] |
+    | abc1        | test@yahoo.com  | 2010-05-15 13:42:46+00:00 |          2.22995 | False         | ['yellow', 'orange']        |
+    | abc2        | foo@gmail.com   | 2003-09-03 09:49:10+00:00 |          2.22216 | False         | ['orange']                  |
+    | abc3        | foo@yahoo.fr    | 2010-11-28 19:22:02+00:00 |          2.06378 | True          | ['pink']                    |
+    | abc4        | foobar@yahoo.fr | 2008-04-26 00:46:36+00:00 |          2.00341 | False         | ['brown']                   |
 
+    >>> # create the SQL table
     >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='test_upsert_sqlite')
-    >>> 
-    >>> insert_values = {'profileid':'abc5', 'email': 'toto@gmail.com',
-    ...                  'timestamp': datetime.datetime(2019, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc),
-    ...                  'size_in_meters':1.9,
-    ...                  'likes_pizza':True,
-    ...                  'favorite_colors':['red', 'pink']}
-    >>> 
-    >>> sqlite_upsert(engine=engine, table=pse.table,
-    ...               values=list(insert_values.values()), if_row_exists='update') # doctest: +SKIP
+    >>> pse.table.create()
+    >>>
+    >>> # insert values
+    >>> insert_values = df.reset_index().to_dict(orient='records')
+    >>> result = sqlite_upsert(engine=engine, table=pse.table, values=insert_values, if_row_exists='update')
     """
     def escape_col(col):
         # unbound column from its table
