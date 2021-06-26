@@ -48,7 +48,7 @@ def upsert(engine,
     engine : sqlalchemy.engine.base.Engine
         See https://docs.sqlalchemy.org/en/latest/core/engines.html
     df : pd.DataFrame
-        See https://pandas.pydata.org/pandas-docs/stable/getting_started/10min.html
+        See https://pandas.pydata.org/pandas-docs/stable/user_guide/10min.html
     table_name : str
         Name of the SQL table
     if_row_exists : {'ignore', 'update'}
