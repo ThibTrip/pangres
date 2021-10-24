@@ -264,7 +264,7 @@ class PandasSpecialEngine:
 
     def add_new_columns(self):
         """
-        Adds columns present in df but not in the SQL tableclear
+        Adds columns present in df but not in the SQL table
         for given instance of PandasSpecialEngine.
 
         Notes
