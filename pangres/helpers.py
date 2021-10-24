@@ -15,9 +15,7 @@ from sqlalchemy.schema import (PrimaryKeyConstraint, CreateColumn, CreateSchema)
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
 from pangres.logger import log
-from pangres.upsert import (mysql_upsert,
-                            postgres_upsert,
-                            sqlite_upsert)
+from pangres.upsert import UpsertQuery
 
 # # Regexes
 
@@ -490,28 +488,19 @@ class PandasSpecialEngine:
                 chunksize = new_chunksize
         # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
-        upsert_funcs = {"postgres":postgres_upsert,
-                        "mysql":mysql_upsert,
-                        "sqlite":sqlite_upsert,
-                        "other":sqlite_upsert}
-        upsert_func = upsert_funcs[self._db_type]
+        upq = UpsertQuery(engine=self.engine, table=self.table)
+
         # when yield is present in a function it always returns a generator
         # even if the yield is at a place where the code is not supposed to execute
         # but one can circumvent this by using a subfunction
         # which is what we do for when we want to yield results of chunks
         if not yield_chunks:
             for chunk in chunks:
-                upsert_func(engine=self.engine,
-                            table=self.table,
-                            values=chunk,
-                            if_row_exists=if_row_exists)
+                upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
         else:
             def yield_chunks_func():
                 for chunk in chunks:
-                    yield upsert_func(engine=self.engine,
-                                      table=self.table,
-                                      values=chunk,
-                                      if_row_exists=if_row_exists)
+                    yield upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
             return yield_chunks_func()
 
     def __repr__(self):

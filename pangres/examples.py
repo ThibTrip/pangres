@@ -76,3 +76,11 @@ class DocsExampleTable():
                   'updated':[pd.NaT, pd.NaT],
                   'size_in_meters':[2.50, 1.84]}
     new_df2 =  pd.DataFrame(_new_data2).set_index('full_name')
+
+    # test DataFrame for the methods of upsert.UpsertQuery
+    df_upsert = pd.DataFrame(index=pd.Index(data=['foo', 'bar', 'baz'], name='ix'))
+    df_upsert['email'] = ['abc@outlook.fr', 'baz@yahoo.fr', 'foobar@gmail.com']
+    df_upsert['ts'] = [pd.Timestamp('2021-01-01', tz='UTC')]*3
+    df_upsert['float'] = [1.1, 1.2, 1.3]
+    df_upsert['bool'] = [True, False, False]
+    df_upsert['json'] = [['red', 'yellow'], ['yellow'], ['yellow', 'red']]    

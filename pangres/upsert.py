@@ -7,178 +7,157 @@ from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
 
-# # Postgres
+# # Main class `UpsertQuery`
 
-def postgres_upsert(engine, table, values, if_row_exists):
+class UpsertQuery:
     """
-    Prepares and executes a PostgreSQL INSERT ON CONFLICT...DO NOTHING
-    or DO UPDATE statement via sqlalchemy.dialects.postgresql.insert
-
-    Parameters
-    ----------
-    engine : sqlalchemy.engine.base.Engine
-    table : sqlalchemy.sql.schema.Table
-    values : list of dict
-    if_row_exists : {'update', 'ignore'}
-        * If 'update' issues a ON CONFLICT...DO UPDATE statement
-        * If 'ignore' issues a ON CONFLICT...DO NOTHING statement
-    """
-    insert_stmt = pg_insert(table).values(values)
-    if if_row_exists == 'update':
-        update_cols = [c.name
-                       for c in table.c
-                       if c not in list(table.primary_key.columns)]
-        # case when there is only an index in the DataFrame i.e. no columns to update
-        if len(update_cols) == 0:
-            if_row_exists = 'ignore'
-        else:
-            upsert = insert_stmt.on_conflict_do_update(index_elements=table.primary_key.columns,
-                                                       set_={k:insert_stmt.excluded[k] for k in update_cols})
-    if if_row_exists == 'ignore':
-        upsert = insert_stmt.on_conflict_do_nothing()
-    # execute upsert
-    with engine.connect() as connection:
-        return connection.execute(upsert)
-
-# # MySQL
-
-def mysql_upsert(engine, table, values, if_row_exists):
-    """
-    Prepares and executes a MySQL INSERT IGNORE or
-    INSERT...ON DUPLICATE KEY UPDATE
-    via sqlalchemy.dialects.mysql.dml.insert
-
-    Parameters
-    ----------
-    engine : sqlalchemy.engine.base.Engine
-    table : sqlalchemy.sql.schema.Table
-    values : list of dict
-    if_row_exists : {'update', 'ignore'}
-        * If 'update' issues a ON DUPLICATE KEY UPDATE statement
-        * If 'ignore' issues a INSERT IGNORE statement
+    Helper for creating and executing UPSERT queries in various SQL flavors
 
     Examples
     --------
-    >>> import datetime
-    >>> from sqlalchemy import create_engine, VARCHAR
-    >>> from pangres.examples import _TestsExampleTable
     >>> from pangres.helpers import PandasSpecialEngine
-    >>> 
-    >>> engine = create_engine('mysql+pymysql://username:password@localhost:3306/db')  # doctest: +SKIP
-    >>> df = _TestsExampleTable.create_example_df(nb_rows=5)
-    >>> df # doctest: +SKIP
-    | profileid   | email             | timestamp                 |   size_in_meters | likes_pizza   | favorite_colors              |
-    |:------------|:------------------|:--------------------------|-----------------:|:--------------|:-----------------------------|
-    | abc0        | foobaz@gmail.com  | 2007-10-11 23:15:06+00:00 |          1.93994 | False         | ['yellow', 'blue']           |
-    | abc1        | foobar@yahoo.com  | 2007-11-21 07:18:20+00:00 |          1.98637 | True          | ['blue', 'pink']             |
-    | abc2        | foobaz@outlook.fr | 2002-09-30 17:55:09+00:00 |          1.55945 | True          | ['blue']                     |
-    | abc3        | abc@yahoo.fr      | 2007-06-13 22:08:36+00:00 |          2.2495  | True          | ['orange', 'blue']           |
-    | abc4        | baz@yahoo.com     | 2004-11-22 04:54:09+00:00 |          2.2019  | False         | ['orange', 'yellow', 'blue'] |
-
-    >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='test_upsert_mysql') # doctest: +SKIP
-    >>> 
-    >>> insert_values = {'profileid':'abc5', 'email': 'toto@gmail.com',
-    ...                  'timestamp': datetime.datetime(2019, 1, 1, 0, 0, 0, tzinfo=datetime.timezone.utc),
-    ...                  'size_in_meters':1.9,
-    ...                  'likes_pizza':True,
-    ...                  'favorite_colors':['red', 'pink']}
-    >>> 
-    >>> df.head(0).to_sql('test_upsert_mysql', con=engine, if_exists='replace', dtype={'profileid':VARCHAR(10)}) # doctest: +SKIP
-    >>> mysql_upsert(engine=engine, table=pse.table,
-    ...              values=list(insert_values.values()), if_row_exists='update') # doctest: +SKIP
-    """
-    insert_stmt = mysql_insert(table).values(values)
-    if if_row_exists == 'update':
-        # thanks to: https://stackoverflow.com/a/58180407/10551772
-        # prepare kwargs for on_duplicated_key_update (with kwargs and getattr
-        # even "bad" column names will resolve e.g. columns with spaces)
-        update_cols = {}
-        for col in insert_stmt.table.columns:
-            col_name = col.name
-            if col_name not in table.primary_key:
-                update_cols.update({col_name:insert_stmt.inserted[col_name]})
-        # case when there is only an index in the DataFrame i.e. no columns to update
-        if len(update_cols) == 0:
-            if_row_exists = 'ignore'
-        else:
-            upsert = insert_stmt.on_duplicate_key_update(**update_cols)
-    if if_row_exists == 'ignore':
-        # thanks to: https://stackoverflow.com/a/50870348/10551772
-        upsert = insert_stmt.prefix_with('IGNORE')
-
-    # execute upsert
-    with engine.connect() as connection:
-        return connection.execute(upsert)
-
-# # Sqlite 
-# (or other databases where ON CONFLICT...DO UPDATE SET/DO NOTHING is supported)
-
-def sqlite_upsert(engine, table, values, if_row_exists):
-    """
-    Compiles and executes a SQlite ON CONFLICT...DO NOTHING or DO UPDATE
-    statement.
-
-    Parameters
-    ----------
-    engine : sqlalchemy.engine.base.Engine
-    table : sqlalchemy.sql.schema.Table
-    values : list of dict
-    if_row_exists : {'update', 'ignore'}
-        * If 'update' issues a ON CONFLICT...DO UPDATE statement
-        * If 'ignore' issues a ON CONFLICT...DO NOTHING statement
-
-    Examples
-    --------
-    >>> import datetime
+    >>> from pangres.examples import DocsExampleTable
     >>> from sqlalchemy import create_engine
-    >>> from pangres.examples import _TestsExampleTable
-    >>> from pangres.helpers import PandasSpecialEngine
-    >>>
-    >>> # config
+    >>> 
     >>> engine = create_engine('sqlite:///:memory:')
-    >>>
-    >>> # generate a test df
-    >>> df = _TestsExampleTable.create_example_df(nb_rows=5)
-    >>> print(df.to_markdown()) # doctest: +SKIP
-    | profileid   | email           | timestamp                 |   size_in_meters | likes_pizza   | favorite_colors             |
-    |:------------|:----------------|:--------------------------|-----------------:|:--------------|:----------------------------|
-    | abc0        | foobaz@yahoo.fr | 2003-07-27 20:15:11+00:00 |          1.7343  | True          | ['orange', 'yellow', 'red'] |
-    | abc1        | test@yahoo.com  | 2010-05-15 13:42:46+00:00 |          2.22995 | False         | ['yellow', 'orange']        |
-    | abc2        | foo@gmail.com   | 2003-09-03 09:49:10+00:00 |          2.22216 | False         | ['orange']                  |
-    | abc3        | foo@yahoo.fr    | 2010-11-28 19:22:02+00:00 |          2.06378 | True          | ['pink']                    |
-    | abc4        | foobar@yahoo.fr | 2008-04-26 00:46:36+00:00 |          2.00341 | False         | ['brown']                   |
-
-    >>> # create the SQL table
-    >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='test_upsert_sqlite')
-    >>> pse.table.create()
-    >>>
-    >>> # insert values
-    >>> insert_values = df.reset_index().to_dict(orient='records')
-    >>> result = sqlite_upsert(engine=engine, table=pse.table, values=insert_values, if_row_exists='update')
+    >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+    >>> upq = UpsertQuery(engine=engine, table=table)
     """
-    def escape_col(col):
-        # unbound column from its table
-        # otherwise the column would compile as "table.col_name"
-        # which we could not use in e.g. SQlite
-        unbound_col = deepcopy(col)
-        unbound_col.table = None
-        return str(unbound_col.compile(dialect=engine.dialect))
+    def __init__(self, engine, table):
+        self.engine = engine
+        self.table = table
 
-    # prepare start of insert (INSERT VALUES (...) ON CONFLICT)
-    insert = SQLCompiler(dialect=engine.dialect,
-                         statement=table.insert().values(values))
+    def _create_pg_query(self, values, if_row_exists):
+        insert_stmt = pg_insert(self.table).values(values)
+        if if_row_exists == 'update':
+            update_cols = [c.name
+                           for c in self.table.c
+                           if c not in list(self.table.primary_key.columns)]
+            # case when there is only an index in the DataFrame i.e. no columns to update
+            if len(update_cols) == 0:
+                if_row_exists = 'ignore'
+            else:
+                upsert = insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
+                                                           set_={k:insert_stmt.excluded[k] for k in update_cols})
+        if if_row_exists == 'ignore':
+            upsert = insert_stmt.on_conflict_do_nothing()
+        return upsert
 
-    # append on conflict clause
-    pk = [escape_col(c) for c in table.primary_key]
-    non_pks = [escape_col(c) for c in table.columns if c not in list(table.primary_key)]
-    ondup = f'ON CONFLICT ({",".join(pk)})'
-    # always use "DO NOTHING" if there are no primary keys
-    if (not non_pks) or (if_row_exists == 'ignore'):
-        ondup_action = 'DO NOTHING'
-        insert.string = ' '.join((insert.string, ondup, ondup_action))
-    elif if_row_exists == 'update':
-        ondup_action = 'DO UPDATE SET'
-        updates = ', '.join(f'{c}=EXCLUDED.{c}' for c in non_pks)
-        insert.string = ' '.join((insert.string, ondup, ondup_action, updates))
-    with engine.connect() as connection:
-        return connection.execute(insert)
+    def _create_mysql_query(self, values, if_row_exists):
+        insert_stmt = mysql_insert(self.table).values(values)
+        if if_row_exists == 'update':
+            # thanks to: https://stackoverflow.com/a/58180407/10551772
+            # prepare kwargs for on_duplicated_key_update (with kwargs and getattr
+            # even "bad" column names will resolve e.g. columns with spaces)
+            update_cols = {}
+            for col in insert_stmt.table.columns:
+                col_name = col.name
+                if col_name not in self.table.primary_key:
+                    update_cols.update({col_name:insert_stmt.inserted[col_name]})
+            # case when there is only an index in the DataFrame i.e. no columns to update
+            if len(update_cols) == 0:
+                if_row_exists = 'ignore'
+            else:
+                upsert = insert_stmt.on_duplicate_key_update(**update_cols)
+        if if_row_exists == 'ignore':
+            # thanks to: https://stackoverflow.com/a/50870348/10551772
+            upsert = insert_stmt.prefix_with('IGNORE')
+        return upsert
+
+    def _create_sqlite_query(self, values, if_row_exists):
+        def escape_col(col):
+            # unbound column from its table
+            # otherwise the column would compile as "table.col_name"
+            # which we could not use in e.g. SQlite
+            unbound_col = deepcopy(col)
+            unbound_col.table = None
+            return str(unbound_col.compile(dialect=self.engine.dialect))
+
+        # prepare start of upsert (INSERT VALUES (...) ON CONFLICT)
+        upsert = SQLCompiler(dialect=self.engine.dialect,
+                             statement=self.table.insert().values(values))
+
+        # append on conflict clause
+        pk = [escape_col(c) for c in self.table.primary_key]
+        non_pks = [escape_col(c) for c in self.table.columns if c not in list(self.table.primary_key)]
+        ondup = f'ON CONFLICT ({",".join(pk)})'
+        # always use "DO NOTHING" if there are no primary keys
+        if (not non_pks) or (if_row_exists == 'ignore'):
+            ondup_action = 'DO NOTHING'
+            upsert.string = ' '.join((upsert.string, ondup, ondup_action))
+        elif if_row_exists == 'update':
+            ondup_action = 'DO UPDATE SET'
+            updates = ', '.join(f'{c}=EXCLUDED.{c}' for c in non_pks)
+            upsert.string = ' '.join((upsert.string, ondup, ondup_action, updates))
+        return upsert
+
+    def create_query(self, db_type, values, if_row_exists):
+        r"""
+        Helper for creating and executing UPSERT queries in various SQL flavors
+
+        Parameters
+        ----------
+        db_type : str
+            One of "postgres", "mysql", "sqlite" or "other"
+        values : list
+            The structure for the values must match the table defined
+            at instantiation (e.g. same order for the columns)
+        if_row_exists : {'ignore', 'update'}
+
+        Examples
+        --------
+        >>> import pandas as pd
+        >>> from pangres.helpers import PandasSpecialEngine
+        >>> from pangres.examples import DocsExampleTable
+        >>> from sqlalchemy import create_engine
+        >>>
+        >>> test_values = [['foo', 'foo@test.com', pd.Timestamp('2021-01-01', tz='UTC'), 1.4, True, ['blue']]]
+        >>> pprint_query = lambda query: print(str(query).replace('ON CONFLICT', '\nON CONFLICT')
+        ...                                    .replace('SET', '\nSET').replace('ON DUPLICATE', '\nON DUPLICATE'))
+        >>>
+        >>> # sqlite
+        >>> engine = create_engine('sqlite:///:memory:')
+        >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+        >>> upq = UpsertQuery(engine=engine, table=table)
+        >>> query = upq.create_query(db_type='sqlite', values=test_values, if_row_exists='update')
+        >>> pprint_query(query)
+        INSERT INTO doc_upsert (ix, email, ts, float, bool, json) VALUES (?, ?, ?, ?, ?, ?) 
+        ON CONFLICT (ix) DO UPDATE 
+        SET email=EXCLUDED.email, ts=EXCLUDED.ts, float=EXCLUDED.float, bool=EXCLUDED.bool, json=EXCLUDED.json
+
+        >>> # postgres (note: the connection does not need to be valid)
+        >>> engine = create_engine('postgresql+psycopg2://user:password@localhost:5432/postgres')
+        >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+        >>> upq = UpsertQuery(engine=engine, table=table)
+        >>> query = upq.create_query(db_type='postgres',values=test_values, if_row_exists='update')
+        >>> pprint_query(query)
+        INSERT INTO public.doc_upsert (ix, email, ts, float, bool, json) VALUES (%(ix_m0)s, %(email_m0)s, %(ts_m0)s, %(float_m0)s, %(bool_m0)s, %(json_m0)s) 
+        ON CONFLICT (ix) DO UPDATE 
+        SET email = excluded.email, ts = excluded.ts, float = excluded.float, bool = excluded.bool, json = excluded.json
+
+        >>> # mysql (note: the connection does not need to be valid)
+        >>> engine = create_engine('mysql+pymysql://user:password@host:3306/db')
+        >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+        >>> upq = UpsertQuery(engine=engine, table=table)
+        >>> query = upq.create_query(db_type='mysql',values=test_values, if_row_exists='update')
+        >>> pprint_query(query)
+        INSERT INTO doc_upsert (ix, email, ts, `float`, bool, json) VALUES (%(ix_m0)s, %(email_m0)s, %(ts_m0)s, %(float_m0)s, %(bool_m0)s, %(json_m0)s) 
+        ON DUPLICATE KEY UPDATE email = VALUES(email), ts = VALUES(ts), `float` = VALUES(`float`), bool = VALUES(bool), json = VALUES(json)
+        """
+        query_creation_methods = {"postgres":self._create_pg_query,
+                                  "mysql":self._create_mysql_query,
+                                  "sqlite":self._create_sqlite_query,
+                                  "other":self._create_sqlite_query}
+        try:
+            return query_creation_methods[db_type](values=values, if_row_exists=if_row_exists)
+        except KeyError as e:
+            raise NotImplementedError(f'No query creation method for {db_type}. '
+                                      f'Expected one of {query_creation_methods.keys()}')
+
+    def execute(self, db_type, values, if_row_exists):
+        query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
+        with self.engine.connect() as connection:
+            result = connection.execute(query)
+            if hasattr(connection, 'commit'):
+                connection.commit()
+        return result
