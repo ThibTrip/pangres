@@ -6,6 +6,7 @@ import json
 import pandas as pd
 import logging
 import re
+import sqlalchemy as sa
 from copy import deepcopy
 from distutils.version import LooseVersion
 from math import floor
@@ -15,9 +16,8 @@ from sqlalchemy.schema import (PrimaryKeyConstraint, CreateColumn, CreateSchema)
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
 from pangres.logger import log
-from pangres.upsert import (mysql_upsert,
-                            postgres_upsert,
-                            sqlite_upsert)
+from pangres.exceptions import HasNoSchemaSystemException
+from pangres.upsert import UpsertQuery
 
 # # Regexes
 
@@ -219,9 +219,21 @@ class PandasSpecialEngine:
         Creates the schema defined in given instance of
         PandasSpecialEngine if it does not exist.
         """
-        if (self.schema is not None and
-            not self.engine.dialect.has_schema(self.engine, self.schema)):
-            self.engine.execute(CreateSchema(self.schema))
+        # Should I just do self.db_type != 'postgres'? (not sure if any other DBs use schemas)
+        if self._db_type not in ('postgres', 'other'):
+            raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
+                                             '(AFAIK only PostgreSQL has this feature)')
+ 
+        with self.engine.connect() as connection:
+            if _sqla_gt14():
+                insp = sa.inspect(connection)
+                exists = self.schema in insp.get_schema_names()
+            else:
+                exists = self.engine.dialect.has_schema(connection, self.schema)
+            if self.schema is not None and not exists:
+                connection.execute(CreateSchema(self.schema))
+                if hasattr(connection, 'commit'):
+                    connection.commit()
 
     def create_table_if_not_exists(self):
         """
@@ -241,7 +253,6 @@ class PandasSpecialEngine:
             list of column names (str)
         """
         if _sqla_gt14():
-            import sqlalchemy as sa
             insp = sa.inspect(self.engine)
             columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)
         else:
@@ -435,6 +446,53 @@ class PandasSpecialEngine:
                                    'they will be casted to str'))
                     values[i][j] = str(val)
         return values
+
+    def _sqlite_chunsize_fix(self, chunksize):
+        """
+        Changes the chunksize given by the user to circumvent the max of 999 parameters
+        for sqlite.
+
+        Raises
+        ------
+        NotImpletementedError
+            When tables have more than 999 columns.
+            In such a case even single row inserts have already too many variables.
+            (you can google "SQLITE_MAX_VARIABLE_NUMBER" for more info)
+
+        Examples
+        --------
+        >>> from sqlalchemy import create_engine
+        >>> 
+        >>> engine = create_engine("sqlite:///:memory:)")
+        >>> df = pd.DataFrame({'name':['Albert']}).rename_axis(index='profileid')
+        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
+        >>> pse._sqlite_chunsize_fix(chunksize=1000)
+        499
+
+        >>> df = pd.DataFrame({i:[0] for i in range (1000)}).rename_axis(index='profileid')
+        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
+        >>> try:
+        ...     pse._sqlite_chunsize_fix(chunksize=1000)
+        ... except Exception as e:
+        ...     print(e)
+        Updating SQlite tables with more than 999 columns is not supported due to max variables restriction (999 max).
+        If you know a way around that please let me know (e.g. post a GitHub issue)!
+        """
+        new_chunksize = floor(999 / len(self.table.columns))
+        if new_chunksize < 1:
+            # case > 999 columns
+            err = ('Updating SQlite tables with more than 999 columns is '
+                   'not supported due to max variables restriction (999 max).\n'
+                   'If you know a way around that please let me know '
+                   '(e.g. post a GitHub issue)!')
+            raise NotImplementedError(err)
+        if chunksize > new_chunksize:
+            log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
+                'to SQlite max variable restriction (max 999).',
+                level=logging.WARNING)
+            chunksize = new_chunksize
+        return chunksize
+
     
     def upsert(self, if_row_exists, chunksize=10000, yield_chunks=False):
         """
@@ -470,48 +528,22 @@ class PandasSpecialEngine:
         values = self._get_values_to_insert()
         # recalculate chunksize for sqlite
         if self._db_type == 'sqlite':
-            # to circumvent the max of 999 parameters for sqlite we have to
-            # make sure chunksize is not too high also I don't know how to
-            # deal with tables that have more than 999 columns because even
-            # with single row inserts it's already too many variables.
-            # (you can google "SQLITE_MAX_VARIABLE_NUMBER" for more info)
-            new_chunksize = floor(999 / len(self.table.columns))
-            if new_chunksize < 1:
-                # case > 999 columns
-                err = ('Updating SQlite tables with more than 999 columns is '
-                       'not supported due to max variables restriction (999 max). '
-                       'If you know a way around that please let me know'
-                       '(e.g. post a GitHub issue)!')
-                raise NotImpletementedError(err)
-            if chunksize > new_chunksize:
-                log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
-                    'to SQlite max variable restriction (max 999).',
-                    level=logging.WARNING)
-                chunksize = new_chunksize
+            chunksize = self._sqlite_chunsize_fix(chunksize=chunksize)
         # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
-        upsert_funcs = {"postgres":postgres_upsert,
-                        "mysql":mysql_upsert,
-                        "sqlite":sqlite_upsert,
-                        "other":sqlite_upsert}
-        upsert_func = upsert_funcs[self._db_type]
+        upq = UpsertQuery(engine=self.engine, table=self.table)
+
         # when yield is present in a function it always returns a generator
         # even if the yield is at a place where the code is not supposed to execute
         # but one can circumvent this by using a subfunction
         # which is what we do for when we want to yield results of chunks
         if not yield_chunks:
             for chunk in chunks:
-                upsert_func(engine=self.engine,
-                            table=self.table,
-                            values=chunk,
-                            if_row_exists=if_row_exists)
+                upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
         else:
             def yield_chunks_func():
                 for chunk in chunks:
-                    yield upsert_func(engine=self.engine,
-                                      table=self.table,
-                                      values=chunk,
-                                      if_row_exists=if_row_exists)
+                    yield upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
             return yield_chunks_func()
 
     def __repr__(self):
