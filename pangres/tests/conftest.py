@@ -18,9 +18,9 @@ def drop_table_if_exists(engine, schema, table_name):
 
 # +
 def pytest_addoption(parser):
-    parser.addoption('--sqlite_conn', action="store")
-    parser.addoption('--pg_conn', action="store")
-    parser.addoption('--mysql_conn', action="store")
+    parser.addoption('--sqlite_conn', action="store", default=None)
+    parser.addoption('--pg_conn', action="store", default=None)
+    parser.addoption('--mysql_conn', action="store", default=None)
     parser.addoption('--pg_schema', action='store', default=None)
 
 def pytest_generate_tests(metafunc):
@@ -33,12 +33,14 @@ def pytest_generate_tests(metafunc):
     schemas = []
     for db_type, conn_string in conn_strings.items():
         if conn_string is None:
-            raise ValueError(f'Missing connection string for database type: {db_type}')
+            continue
         schema = metafunc.config.option.pg_schema if db_type == 'pg' else None
-        engine = create_engine(conn_string)
+        engine = create_engine(conn_string, future=True)
         schemas.append(schema)
         engines.append(engine)
     assert len(engines) == len(schemas)
+    if len(engines) == 0:
+        raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
     metafunc.parametrize("engine, schema", list(zip(engines, schemas)), scope='module')
 
 

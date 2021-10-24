@@ -85,7 +85,7 @@ If you wish you can also use the provided environment (see `environment.yml` fil
 
 # Testing
 
-You will need a SQlite, MySQL and Postgres database available for testing.
+You can test one or multiple of the following SQL flavors (you will of course need a live database for this): PostgreSQL, SQlite or MySQL.
 
 Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. You will have to replace the following variables in those commands:
 * SQLITE_CONNECTION_STRING: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
