@@ -14,6 +14,7 @@ def upsert(engine,
            if_row_exists,
            schema=None,
            create_schema=False,
+           create_table=True,
            add_new_columns=False,
            adapt_dtype_of_empty_db_columns=False,
            chunksize=10000,
@@ -69,6 +70,8 @@ def upsert(engine,
         those SQL flavors do not have this system.
     create_schema : bool, default False
         If True the schema is created if it does not exist
+    create_table : bool, default True
+        If True the table is created if it does not exist
     add_new_columns : bool, default False
         If True adds columns present in the DataFrame that
         are not in the SQL table.
@@ -229,7 +232,8 @@ def upsert(engine,
     # create schema and table if not exists then insert values
     if create_schema and schema is not None:
         pse.create_schema_if_not_exists()
-    pse.create_table_if_not_exists()
+    if create_table:
+        pse.create_table_if_not_exists()
 
     # stop if no rows
     ## note: use simple check with len() as df.empty returns True if there are index values but no columns
