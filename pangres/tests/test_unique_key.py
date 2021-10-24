@@ -9,7 +9,7 @@ import pandas as pd
 import datetime
 from pangres import upsert
 from pangres.tests.conftest import drop_table_if_exists
-from sqlalchemy import INTEGER, VARCHAR, MetaData, Column, UniqueConstraint
+from sqlalchemy import INTEGER, VARCHAR, MetaData, Column, text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
 # # Helpers
@@ -61,7 +61,9 @@ def test_upsert_with_unique_keys(engine, schema):
 
     # helpers
     namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    read_from_db = lambda: pd.read_sql(f'SELECT * FROM {namespace}', con=engine, index_col='row_id')
+    def read_from_db():
+        with engine.connect() as connection:
+            return pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='row_id')
 
     # create our test table
     drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)

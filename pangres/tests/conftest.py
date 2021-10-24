@@ -5,13 +5,16 @@ Configuration and helpers for the tests of pangres with pytest.
 """
 import pandas as pd
 import json
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 # # Helpers
 
 def drop_table_if_exists(engine, schema, table_name):
     namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    engine.execute(f'DROP TABLE IF EXISTS {namespace};')
+    with engine.connect() as connection:
+        connection.execute(text(f'DROP TABLE IF EXISTS {namespace};'))
+        if hasattr(connection, 'commit'):
+            connection.commit()
 
 
 # ## Class TestDB
@@ -35,9 +38,10 @@ def pytest_generate_tests(metafunc):
         if conn_string is None:
             continue
         schema = metafunc.config.option.pg_schema if db_type == 'pg' else None
-        engine = create_engine(conn_string, future=True)
-        schemas.append(schema)
-        engines.append(engine)
+        engine = create_engine(conn_string)
+        future_engine = create_engine(conn_string, future=True)
+        schemas.extend([schema]*2)
+        engines.extend([engine, future_engine])
     assert len(engines) == len(schemas)
     if len(engines) == 0:
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
@@ -59,8 +63,9 @@ def read_example_table_from_db(engine, schema, table_name):
             return json.loads(obj)
         return obj
     namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    df_db = (pd.read_sql(f'SELECT * FROM {namespace}', con=engine, index_col='profileid')
-             .astype({'likes_pizza':bool})
-             .assign(timestamp=lambda df: pd.to_datetime(df['timestamp'], utc=True))
-             .assign(favorite_colors= lambda df: df['favorite_colors'].map(load_json_if_needed)))
+    with engine.connect() as connection:
+        df_db = (pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='profileid')
+                 .astype({'likes_pizza':bool})
+                 .assign(timestamp=lambda df: pd.to_datetime(df['timestamp'], utc=True))
+                 .assign(favorite_colors= lambda df: df['favorite_colors'].map(load_json_if_needed)))
     return df_db

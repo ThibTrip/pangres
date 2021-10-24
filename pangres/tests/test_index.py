@@ -10,7 +10,7 @@ Other problems with indices such as duplicated values are handled by pangres.hel
 """
 import pandas as pd
 import pytest
-from sqlalchemy import VARCHAR
+from sqlalchemy import VARCHAR, text
 from sqlalchemy.exc import IntegrityError
 from pangres import upsert
 from pangres.tests.conftest import drop_table_if_exists
@@ -46,13 +46,18 @@ def test_create_and_insert_table_multiindex(engine, schema):
     # dtype for index for MySQL... (can't have flexible text length)
     dtype = {'ix2':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
+    # local helper
+    def read_from_db():
+        with engine.connect() as connection:
+            df_db = pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col=index_col)
+
     # create
     upsert(engine=engine, schema=schema, df=df_multiindex, table_name=table_name, dtype=dtype, **default_args)
-    df_db = pd.read_sql(f'SELECT * FROM {namespace}', con=engine, index_col=index_col)
+    db_db = read_from_db()
 
     # insert
     upsert(engine=engine, schema=schema, df=df_multiindex2, table_name=table_name, dtype=dtype, **default_args)
-    df_db = pd.read_sql(f'SELECT * FROM {namespace}', con=engine, index_col=index_col)
+    db_db = read_from_db()
 
 
 # ## Test index with null value
@@ -82,7 +87,8 @@ def test_only_index(engine, schema, if_row_exists):
 
     # check data integrity
     namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    df_db = pd.read_sql(f'SELECT * FROM {namespace}', con=engine)
+    with engine.connect() as connection:
+        df_db = pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection)
     assert 'ix' in df_db.columns
     assert len(df_db) > 0
     assert df_db['ix'].iloc[0] == 1
