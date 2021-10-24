@@ -13,7 +13,7 @@ from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
 
 
-# ## Insert values one by one
+# # Insert values one by one
 
 def test_get_nb_rows(engine, schema):
     # params
