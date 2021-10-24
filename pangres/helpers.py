@@ -440,6 +440,53 @@ class PandasSpecialEngine:
                                    'they will be casted to str'))
                     values[i][j] = str(val)
         return values
+
+    def _sqlite_chunsize_fix(self, chunksize):
+        """
+        Changes the chunksize given by the user to circumvent the max of 999 parameters
+        for sqlite.
+
+        Raises
+        ------
+        NotImpletementedError
+            When tables have more than 999 columns.
+            In such a case even single row inserts have already too many variables.
+            (you can google "SQLITE_MAX_VARIABLE_NUMBER" for more info)
+
+        Examples
+        --------
+        >>> from sqlalchemy import create_engine
+        >>> 
+        >>> engine = create_engine("sqlite:///:memory:)")
+        >>> df = pd.DataFrame({'name':['Albert']}).rename_axis(index='profileid')
+        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
+        >>> pse._sqlite_chunsize_fix(chunksize=1000)
+        499
+
+        >>> df = pd.DataFrame({i:[0] for i in range (1000)}).rename_axis(index='profileid')
+        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
+        >>> try:
+        ...     pse._sqlite_chunsize_fix(chunksize=1000)
+        ... except Exception as e:
+        ...     print(e)
+        Updating SQlite tables with more than 999 columns is not supported due to max variables restriction (999 max).
+        If you know a way around that please let me know (e.g. post a GitHub issue)!
+        """
+        new_chunksize = floor(999 / len(self.table.columns))
+        if new_chunksize < 1:
+            # case > 999 columns
+            err = ('Updating SQlite tables with more than 999 columns is '
+                   'not supported due to max variables restriction (999 max).\n'
+                   'If you know a way around that please let me know '
+                   '(e.g. post a GitHub issue)!')
+            raise NotImplementedError(err)
+        if chunksize > new_chunksize:
+            log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
+                'to SQlite max variable restriction (max 999).',
+                level=logging.WARNING)
+            chunksize = new_chunksize
+        return chunksize
+
     
     def upsert(self, if_row_exists, chunksize=10000, yield_chunks=False):
         """
@@ -475,24 +522,7 @@ class PandasSpecialEngine:
         values = self._get_values_to_insert()
         # recalculate chunksize for sqlite
         if self._db_type == 'sqlite':
-            # to circumvent the max of 999 parameters for sqlite we have to
-            # make sure chunksize is not too high also I don't know how to
-            # deal with tables that have more than 999 columns because even
-            # with single row inserts it's already too many variables.
-            # (you can google "SQLITE_MAX_VARIABLE_NUMBER" for more info)
-            new_chunksize = floor(999 / len(self.table.columns))
-            if new_chunksize < 1:
-                # case > 999 columns
-                err = ('Updating SQlite tables with more than 999 columns is '
-                       'not supported due to max variables restriction (999 max). '
-                       'If you know a way around that please let me know'
-                       '(e.g. post a GitHub issue)!')
-                raise NotImpletementedError(err)
-            if chunksize > new_chunksize:
-                log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
-                    'to SQlite max variable restriction (max 999).',
-                    level=logging.WARNING)
-                chunksize = new_chunksize
+            chunksize = self._sqlite_chunsize_fix(chunksize=chunksize)
         # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
         upq = UpsertQuery(engine=self.engine, table=self.table)
