@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 from sqlalchemy import VARCHAR
 from pangres.examples import _TestsExampleTable
+from pangres.exceptions import HasNoSchemaSystemException
 from pangres.helpers import PandasSpecialEngine
 from pangres.tests.conftest import drop_table_if_exists
 
@@ -31,7 +32,14 @@ def test_methods_and_attributes(engine, schema):
     expected_cols = list(df.index.names) + df.columns.tolist()
     assert all((col in pse.table.columns for col in expected_cols))  
     # TEST TABLE AND SCHEMA CREATION
-    pse.create_schema_if_not_exists()
+    if pse._db_type == 'postgres':
+        pse.create_schema_if_not_exists()
+    else:
+        try:
+            pse.create_schema_if_not_exists()
+            raise AssertionError('Schema creation for anything else than postgres/other should have failed')
+        except Exception as e:
+            assert isinstance(e, HasNoSchemaSystemException)
     pse.create_table_if_not_exists()
 
     # TEST ADD NEW COLUMNS

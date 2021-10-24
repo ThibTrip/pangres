@@ -16,6 +16,7 @@ from sqlalchemy.schema import (PrimaryKeyConstraint, CreateColumn, CreateSchema)
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
 from pangres.logger import log
+from pangres.exceptions import HasNoSchemaSystemException
 from pangres.upsert import UpsertQuery
 
 # # Regexes
@@ -218,6 +219,11 @@ class PandasSpecialEngine:
         Creates the schema defined in given instance of
         PandasSpecialEngine if it does not exist.
         """
+        # Should I just do self.db_type != 'postgres'? (not sure if any other DBs use schemas)
+        if self._db_type not in ('postgres', 'other'):
+            raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
+                                             '(AFAIK only PostgreSQL has this feature)')
+ 
         with self.engine.connect() as connection:
             if _sqla_gt14():
                 insp = sa.inspect(connection)

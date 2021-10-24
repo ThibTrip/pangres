@@ -99,6 +99,13 @@ def upsert(engine,
         (sqlalchemy.engine.cursor.LegacyCursorResult)
         at each chunk with which you can for instance count rows.
 
+    Raises
+    ------
+    pangres.HasNoSchemaSystemException
+        When `create_schema` is True but the SQL flavor of given
+        engine has no schema system (AFAIK only PostgreSQL has a
+        schema system)
+
     Examples
     --------
     #### 1. Workflow example

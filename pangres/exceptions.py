@@ -1,0 +1,2 @@
+class HasNoSchemaSystemException(Exception):
+    pass
