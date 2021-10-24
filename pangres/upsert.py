@@ -93,7 +93,7 @@ class UpsertQuery:
 
     def create_query(self, db_type, values, if_row_exists):
         r"""
-        Helper for creating and executing UPSERT queries in various SQL flavors
+        Helper for creating UPSERT queries in various SQL flavors
 
         Parameters
         ----------
