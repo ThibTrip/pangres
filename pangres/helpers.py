@@ -6,6 +6,7 @@ import json
 import pandas as pd
 import logging
 import re
+import sqlalchemy as sa
 from copy import deepcopy
 from distutils.version import LooseVersion
 from math import floor
@@ -217,9 +218,16 @@ class PandasSpecialEngine:
         Creates the schema defined in given instance of
         PandasSpecialEngine if it does not exist.
         """
-        if (self.schema is not None and
-            not self.engine.dialect.has_schema(self.engine, self.schema)):
-            self.engine.execute(CreateSchema(self.schema))
+        with self.engine.connect() as connection:
+            if _sqla_gt14():
+                insp = sa.inspect(connection)
+                exists = self.schema in insp.get_schema_names()
+            else:
+                exists = self.engine.dialect.has_schema(connection, self.schema)
+            if self.schema is not None and not exists:
+                connection.execute(CreateSchema(self.schema))
+                if hasattr(connection, 'commit'):
+                    connection.commit()
 
     def create_table_if_not_exists(self):
         """
@@ -239,7 +247,6 @@ class PandasSpecialEngine:
             list of column names (str)
         """
         if _sqla_gt14():
-            import sqlalchemy as sa
             insp = sa.inspect(self.engine)
             columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)
         else:
