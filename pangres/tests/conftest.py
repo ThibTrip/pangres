@@ -35,7 +35,7 @@ def pytest_generate_tests(metafunc):
         if conn_string is None:
             continue
         schema = metafunc.config.option.pg_schema if db_type == 'pg' else None
-        engine = create_engine(conn_string, future=True)
+        engine = create_engine(conn_string)
         schemas.append(schema)
         engines.append(engine)
     assert len(engines) == len(schemas)
