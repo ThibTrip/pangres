@@ -249,3 +249,75 @@ def upsert(engine,
 
     # returns an iterator when we yield chunks otherwise None
     return pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize, yield_chunks=yield_chunks)
+
+# # async upsert
+
+async def aupsert(engine, df, table_name, if_row_exists, schema=None, create_schema=False,
+                 create_table=True, chunksize=10000, dtype=None, yield_chunks=False):
+    """
+    Async variant of `pangres.upsert`. The engine must use an asynchronous driver
+    such as `asyncpg` for PostgreSQL, or `aiomysql` for MySQL etc.
+    You will need to install this driver e.g. `pip install asyncpg`.
+
+    Support for different drivers may vary depending on the SQLalchemy version.
+    In any case, version 1.4. is the minimum requirement.
+
+    See docstring of `pangres.upsert` for details on the parameters.
+    Some parameters are missing in this asynchronous variant of `pangres.uspert` because
+    of a lack of time/knowledge. I'd be glad if you are willing to help.
+
+    Notes
+    -----
+    If executing from an IPython context (e.g. Jupyter) you will need to run this following code
+    for running asynchronous code "on top" of IPython:
+
+    ```python
+    import nest_asyncio # pip install nest_asyncio
+    nest_asyncio.apply()
+    ```
+
+    Examples
+    --------
+    >>> import asyncio
+    >>> import pandas as pd
+    >>> from pangres import aupsert, DocsExampleTable
+    >>> from sqlalchemy import VARCHAR
+    >>> from sqlalchemy.ext.asyncio import create_async_engine # doctest: +SKIP
+    >>> 
+    >>> # IMPORTANT: Change the connection string (this is a fake one), and do not forget to precise postgresql+asyncpg!
+    >>> engine = create_async_engine("postgresql+asyncpg://user:password@localhost:5432/postgres") # doctest: +SKIP
+    >>> df = DocsExampleTable.df
+    >>> print(df.to_markdown()) # to_markdown exists since pandas v1
+    | full_name     | likes_sport   | updated                   |   size_in_meters |
+    |:--------------|:--------------|:--------------------------|-----------------:|
+    | John Rambo    | True          | 2020-02-01 00:00:00+00:00 |             1.77 |
+    | The Rock      | True          | 2020-04-01 00:00:00+00:00 |             1.96 |
+    | John Travolta | False         | NaT                       |           nan    |
+
+    >>> # create SQL table
+    >>> # it does not matter if if_row_exists is set
+    >>> # to "update" or "ignore" for table creation
+    >>> loop = asyncio.get_event_loop()
+    >>> coroutines = [aupsert(engine=engine, df=df, table_name='example', if_row_exists='update')] # doctest: +SKIP
+    >>> tasks = asyncio.gather(*coroutines, return_exceptions=True) # doctest: +SKIP
+    >>> results = loop.run_until_complete(tasks) # doctest: +SKIP
+    >>> for r in results: # doctest: +SKIP
+    ...     if isinstance(r, Exception):
+    ...         raise r
+    """
+    pse = PandasSpecialEngine(engine=engine, df=df, table_name=table_name,
+                              schema=schema, dtype=dtype)
+
+    # create schema and table if not exists then insert values
+    if create_schema and schema is not None:
+        await pse.acreate_schema_if_not_exists()
+    if create_table:
+        await pse.acreate_table_if_not_exists()
+
+    # stop if no rows
+    ## note: use simple check with len() as df.empty returns True if there are index values but no columns
+    if len(df) == 0:
+        return
+
+    # returns an iterator when we yield chunks otherwise None
+    return await pse.aupsert(if_row_exists=if_row_exists, chunksize=chunksize, yield_chunks=yield_chunks)

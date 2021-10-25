@@ -161,3 +161,10 @@ class UpsertQuery:
             if hasattr(connection, 'commit'):
                 connection.commit()
         return result
+
+    async def aexecute(self, db_type, values, if_row_exists):
+        query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
+        async with self.engine.connect() as connection:
+            result = await connection.execute(query)
+            await connection.commit()
+        return result

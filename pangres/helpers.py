@@ -549,6 +549,44 @@ class PandasSpecialEngine:
                     yield upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
             return yield_chunks_func()
 
+    # ASYNC VARIANTS (each method name will be prefixed with an "a")
+    async def acreate_schema_if_not_exists(self):
+        async with self.engine.connect() as connection:
+            if self.schema is not None:
+                f_exists = lambda connection: self.schema in sa.inspect(connection).get_schema_names()
+                exists = await connection.run_sync(f_exists)
+                if not exists:
+                    await connection.execute(CreateSchema(self.schema))
+                    await connection.commit()
+
+    async def acreate_table_if_not_exists(self):
+        async with self.engine.connect() as connection:
+            f = lambda connection: self.table.create(bind=connection, checkfirst=True)
+            await connection.run_sync(f)
+            await connection.commit()
+    
+    async def aupsert(self, if_row_exists, chunksize=10000, yield_chunks=False):
+        if if_row_exists not in ('ignore', 'update'):
+            raise ValueError('if_row_exists must be "ignore" or "update"')
+        # convert values if needed
+        values = self._get_values_to_insert()
+        # recalculate chunksize for sqlite
+        if self._db_type == 'sqlite':
+            chunksize = self._sqlite_chunsize_fix(chunksize=chunksize)
+        # create chunks
+        chunks = self._create_chunks(values=values, chunksize=chunksize)
+        upq = UpsertQuery(engine=self.engine, table=self.table)
+
+        # see comment in sync variant
+        if not yield_chunks:
+            for chunk in chunks:
+                await upq.aexecute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
+        else:
+            async def yield_chunks_func():
+                for chunk in chunks:
+                    yield await upq.aexecute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
+            return yield_chunks_func()
+
     def __repr__(self):
         text = f"""PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
                    * connection: {self.engine}
