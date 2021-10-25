@@ -290,6 +290,8 @@ class PandasSpecialEngine:
                 op.add_column(self.table.name, col, schema=self.schema)
                 log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
                     f'(schema="{self.schema}")')
+            if hasattr(con, 'commit'):
+                con.commit()
 
 
     def get_db_table_schema(self):
@@ -331,7 +333,8 @@ class PandasSpecialEngine:
             stmt = select(from_obj=db_table,
                           columns=[col],
                           whereclause=col.isnot(None)).limit(1)
-            results = self.engine.execute(stmt).fetchall()
+            with self.engine.connect() as connection:
+                results = connection.execute(stmt).fetchall()
             if results == []:
                 empty_columns.append(col)
         return empty_columns
