@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
+# +
 """
 Configuration and helpers for the tests of pangres with pytest.
 """
 import pandas as pd
 import json
 from sqlalchemy import create_engine, text
+
+from pangres.helpers import _sqla_gt14
+
+
+# -
 
 # # Helpers
 
@@ -39,9 +45,13 @@ def pytest_generate_tests(metafunc):
             continue
         schema = metafunc.config.option.pg_schema if db_type == 'pg' else None
         engine = create_engine(conn_string)
-        future_engine = create_engine(conn_string, future=True)
-        schemas.extend([schema]*2)
-        engines.extend([engine, future_engine])
+        schemas.append(schema)
+        engines.append(engine)
+        # for sqlalchemy 1.4+ use future=True to try the future sqlalchemy 2.0
+        if _sqla_gt14():
+            future_engine = create_engine(conn_string, future=True)
+            schemas.append(schema)
+            engines.append(future_engine)
     assert len(engines) == len(schemas)
     if len(engines) == 0:
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
