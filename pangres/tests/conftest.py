@@ -6,7 +6,8 @@ Configuration and helpers for the tests of pangres with pytest.
 """
 import pandas as pd
 import json
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, MetaData, Table, text
+from sqlalchemy import inspect as sqla_inspect
 
 from pangres.helpers import _sqla_gt14
 
@@ -15,15 +16,55 @@ from pangres.helpers import _sqla_gt14
 
 # # Helpers
 
+# ## Functions for dropping a table
+
+# +
+def _drop_table_from_conn(connection, schema, table_name):
+    """
+    SQL injection safe table dropping. Does not raise if table
+    does not exist.
+    Also works in all (?) versions of sqlalchemy.
+
+    Notes
+    -----
+    Reflecting to get the table model and then using drop or drop_all
+    is the only way I found for dropping tables in async context
+    (raw SQL did not work and neither did sqlalchemy.schema.DropTable).
+    See coroutine adrop_table_if_exists.
+    """
+    meta = MetaData(bind=connection, schema=schema)
+    table = Table(table_name, meta)
+    insp = sqla_inspect(connection)
+    # try to drop, if it fails check if it is due to table absence
+    # this is faster
+    try:
+        if hasattr(insp, 'reflect_table'):
+            insp.reflect_table(table, include_columns=None)
+        else:
+            meta.reflect(only=[table_name])
+        meta.drop_all()
+    except Exception as e:
+        insp = sqla_inspect(connection)
+        if hasattr(insp, 'has_table'):
+            has_table = insp.has_table(schema=schema, table_name=table_name)
+        else:
+            has_table = connection.dialect.has_table(connection=connection, schema=schema,
+                                                     table_name=table_name)
+        if has_table:
+            raise e
+
+
 def drop_table_if_exists(engine, schema, table_name):
-    namespace = f'{schema}.{table_name}' if schema is not None else table_name
     with engine.connect() as connection:
-        connection.execute(text(f'DROP TABLE IF EXISTS {namespace};'))
+        _drop_table_from_conn(connection=connection, schema=schema, table_name=table_name)
         if hasattr(connection, 'commit'):
             connection.commit()
 
 
-# ## Class TestDB
+async def adrop_table_if_exists(engine, schema, table_name):
+    async with engine.connect() as connection:
+        await connection.run_sync(_drop_table_from_conn, schema=schema, table_name=table_name)
+        await connection.commit()
 
 # +
 def pytest_addoption(parser):
