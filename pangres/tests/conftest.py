@@ -169,22 +169,39 @@ def pytest_generate_tests(metafunc):
 
 # -
 
-# ## Function to read back from database data we inserted
-# We need to apply a few modification for comparing DataFrames we get back from the DB and DataFrames we expect e.g. for JSON (with SQlite pandas reads it as string).
+# ## Tool for reading example data we inserted in the database
 
-def read_example_table_from_db(engine, schema, table_name):
-    def load_json_if_needed(obj):
-        """
-        For SQlite we receive strings back (or None) for a JSON column.
-        For Postgres we receive lists or dicts (or None) back.
-        """
-        if isinstance(obj, str):
-            return json.loads(obj)
-        return obj
-    namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    with engine.connect() as connection:
-        df_db = (pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='profileid')
-                 .astype({'likes_pizza':bool})
-                 .assign(timestamp=lambda df: pd.to_datetime(df['timestamp'], utc=True))
-                 .assign(favorite_colors= lambda df: df['favorite_colors'].map(load_json_if_needed)))
-    return df_db
+class ReaderSQLExampleTables:
+    """
+    Tool for reading and then wrangling example tables we saved in SQL
+    databases for our tests.
+    This is necessary because we can get different data
+    back than what we would expect e.g. for JSON in SQlite,
+    pandas will read it as a string.
+    After we have applied this sort of normalization
+    we can compare DataFrames in memory with tables
+    in SQL databases.
+    """
+    def _wrangle(df):
+        json_convert = lambda obj: json.loads(obj) if isinstance(obj, str) else obj
+        return (df.astype({'likes_pizza':bool})
+                .assign(timestamp=lambda df: pd.to_datetime(df['timestamp'], utc=True))
+                .assign(favorite_colors=lambda df: df['favorite_colors'].map(json_convert)))
+
+
+    def read(engine, schema, table_name):
+        namespace = f'{schema}.{table_name}' if schema is not None else table_name
+        with engine.connect() as connection:
+            df_db = pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='profileid')
+            return ReaderSQLExampleTables._wrangle(df_db)
+
+
+    # async variant
+    async def aread(engine, schema, table_name):
+        namespace = f'{schema}.{table_name}' if schema is not None else table_name
+        async with engine.connect() as connection:
+            # pandas does not support async engines yet
+            proxy = await connection.execute(text(f'SELECT * FROM {namespace}'))
+            results = [r._asdict() for r in proxy.all()]
+            df_db = pd.DataFrame(results).set_index('profileid')
+            return ReaderSQLExampleTables._wrangle(df_db)

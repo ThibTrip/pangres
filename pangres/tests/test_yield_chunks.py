@@ -10,7 +10,7 @@ import pandas as pd
 from sqlalchemy import VARCHAR
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
+from pangres.tests.conftest import ReaderSQLExampleTables, drop_table_if_exists
 
 
 # # Insert values one by one
@@ -36,5 +36,5 @@ def test_get_nb_rows(engine, schema):
 
     # verify the inserted data is as expected
     # we sort the index for MySQL
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    df_db = ReaderSQLExampleTables.read(engine=engine, schema=schema, table_name=table_name)
     pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())

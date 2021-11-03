@@ -11,7 +11,7 @@ import random
 from sqlalchemy import VARCHAR
 from pangres import upsert, fix_psycopg2_bad_cols
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
+from pangres.tests.conftest import ReaderSQLExampleTables, drop_table_if_exists
 
 
 # # Config
@@ -50,7 +50,7 @@ def test_create_table(engine, schema):
     
     drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
     upsert(engine=engine, schema=schema, df=df, if_row_exists='update', dtype=dtype, **default_args)
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    df_db = ReaderSQLExampleTables.read(engine=engine, schema=schema, table_name=table_name)
     pd.testing.assert_frame_equal(df, df_db)
 
 
@@ -60,7 +60,7 @@ def test_upsert_update(engine, schema):
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
     upsert(engine=engine, schema=schema, df=df2, if_row_exists='update', dtype=dtype, **default_args)
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    df_db = ReaderSQLExampleTables.read(engine=engine, schema=schema, table_name=table_name)
     pd.testing.assert_frame_equal(df2, df_db)
 
 
@@ -68,11 +68,11 @@ def test_upsert_update(engine, schema):
 
 def test_upsert_ignore(engine, schema):
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-    
+
     drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
     for _df in (df, df3):
         upsert(engine=engine, schema=schema, df=_df, if_row_exists='ignore', dtype=dtype, **default_args)
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    df_db = ReaderSQLExampleTables.read(engine=engine, schema=schema, table_name=table_name)
     expected = pd.concat((df, df3.tail(1)), axis=0)
     pd.testing.assert_frame_equal(expected, df_db)
 

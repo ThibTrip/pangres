@@ -8,7 +8,7 @@ import pandas as pd
 from sqlalchemy import VARCHAR
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
+from pangres.tests.conftest import ReaderSQLExampleTables, drop_table_if_exists
 
 
 # # Helpers
@@ -25,7 +25,7 @@ def insert_chunks(engine, schema, chunksize, nb_rows):
            if_row_exists='update',
            # MySQL does not want flexible text length in indices/PK
            dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None)
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    df_db = ReaderSQLExampleTables.read(engine=engine, schema=schema, table_name=table_name)
     # sort index (for MySQL...)
     pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())
 

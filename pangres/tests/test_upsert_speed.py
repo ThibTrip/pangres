@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
+"""
+Benchmarks of the following operations:
+1. CREATE TABLE... with pandas
+2. CREATE TABLE... with pangres (by default a table gets created
+when you use upsert if it did not already exist)
+3. INSERT... ON CONFLICT IGNORE with pangres
+4. INSERT... ON CONFLICT UPDATE with pangres
+"""
 import json
 from math import floor
 from sqlalchemy import VARCHAR
