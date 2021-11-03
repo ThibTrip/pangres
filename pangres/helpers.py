@@ -450,10 +450,10 @@ class PandasSpecialEngine:
                     values[i][j] = str(val)
         return values
 
-    def _sqlite_chunsize_fix(self, chunksize):
+    def _chunsize_fix(self, chunksize):
         """
-        Changes the chunksize given by the user to circumvent the max of 999 parameters
-        for sqlite.
+        Changes the chunksize given by the user if it exceeds
+        the maximal number of parameters for given engine
 
         Raises
         ------
@@ -469,29 +469,39 @@ class PandasSpecialEngine:
         >>> engine = create_engine("sqlite:///:memory:)")
         >>> df = pd.DataFrame({'name':['Albert']}).rename_axis(index='profileid')
         >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
-        >>> pse._sqlite_chunsize_fix(chunksize=1000)
+        >>> pse._chunsize_fix(chunksize=1000)
         499
 
         >>> df = pd.DataFrame({i:[0] for i in range (1000)}).rename_axis(index='profileid')
         >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
         >>> try:
-        ...     pse._sqlite_chunsize_fix(chunksize=1000)
+        ...     pse._chunsize_fix(chunksize=1000)
         ... except Exception as e:
         ...     print(e)
-        Updating SQlite tables with more than 999 columns is not supported due to max variables restriction (999 max).
+        Updating tables with more than 999 columns is not supported due to max variables restriction
+        of given driver (999 max for driver sqlite).
         If you know a way around that please let me know (e.g. post a GitHub issue)!
         """
-        new_chunksize = floor(999 / len(self.table.columns))
+        drivername = self.engine.url.drivername
+        if self._db_type == 'sqlite':
+            maximum = 999
+        elif 'asyncpg' in drivername:
+            maximum = 32767
+        else:
+            return chunksize
+
+        new_chunksize = floor(maximum / len(self.table.columns))
+        # case of too many columns (even inserting one row is too much)
         if new_chunksize < 1:
-            # case > 999 columns
-            err = ('Updating SQlite tables with more than 999 columns is '
-                   'not supported due to max variables restriction (999 max).\n'
+            err = (f'Updating tables with more than {maximum} columns is '
+                   f'not supported due to max variables restriction\n'
+                   f'of given driver ({maximum} max for driver {drivername}).\n'
                    'If you know a way around that please let me know '
                    '(e.g. post a GitHub issue)!')
             raise NotImplementedError(err)
         if chunksize > new_chunksize:
             log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
-                'to SQlite max variable restriction (max 999).',
+                f'to driver variable restriction ({maximum} max for driver {drivername}).\n',
                 level=logging.WARNING)
             chunksize = new_chunksize
         return chunksize
@@ -529,9 +539,9 @@ class PandasSpecialEngine:
             raise ValueError('if_row_exists must be "ignore" or "update"')
         # convert values if needed
         values = self._get_values_to_insert()
-        # recalculate chunksize for sqlite
-        if self._db_type == 'sqlite':
-            chunksize = self._sqlite_chunsize_fix(chunksize=chunksize)
+        # recalculate chunksize to avoid known max parameters limitations
+        chunksize = self._chunsize_fix(chunksize=chunksize)
+
         # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
         upq = UpsertQuery(engine=self.engine, table=self.table)
@@ -559,6 +569,7 @@ class PandasSpecialEngine:
                     await connection.execute(CreateSchema(self.schema))
                     await connection.commit()
 
+
     async def acreate_table_if_not_exists(self):
         async with self.engine.connect() as connection:
             f = lambda connection: self.table.create(bind=connection, checkfirst=True)
@@ -570,9 +581,8 @@ class PandasSpecialEngine:
             raise ValueError('if_row_exists must be "ignore" or "update"')
         # convert values if needed
         values = self._get_values_to_insert()
-        # recalculate chunksize for sqlite
-        if self._db_type == 'sqlite':
-            chunksize = self._sqlite_chunsize_fix(chunksize=chunksize)
+        # recalculate chunksize to avoid known max parameters limitations
+        chunksize = self._chunsize_fix(chunksize=chunksize)
         # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
         upq = UpsertQuery(engine=self.engine, table=self.table)
