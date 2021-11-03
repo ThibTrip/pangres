@@ -560,21 +560,52 @@ class PandasSpecialEngine:
             return yield_chunks_func()
 
     # ASYNC VARIANTS (each method name will be prefixed with an "a")
-    async def acreate_schema_if_not_exists(self):
-        async with self.engine.connect() as connection:
-            if self.schema is not None:
-                f_exists = lambda connection: self.schema in sa.inspect(connection).get_schema_names()
-                exists = await connection.run_sync(f_exists)
+    async def acreate_schema_if_not_exists(self, handle_concurrent_objects_creation=True):
+        # case where we don't have to do anything
+        if self.schema is None:
+            retur
+        # a local helper
+        schema_exists = lambda connection: self.schema in sa.inspect(connection).get_schema_names()
+        # try schema creation
+        try:
+            async with self.engine.connect() as connection:
+                exists = await connection.run_sync(schema_exists)
                 if not exists:
                     await connection.execute(CreateSchema(self.schema))
                     await connection.commit()
+        except Exception as e:
+            # handle race conditions if requested (check if the object was already created)
+            if not handle_concurrent_objects_creation:
+                raise e
+            # raise an error only if the object is absent
+            exists = await connection.run_sync(schema_exists)
+            if not exists:
+                raise e
+            else:
+                raise e
 
 
-    async def acreate_table_if_not_exists(self):
-        async with self.engine.connect() as connection:
-            f = lambda connection: self.table.create(bind=connection, checkfirst=True)
-            await connection.run_sync(f)
-            await connection.commit()
+    async def acreate_table_if_not_exists(self, handle_concurrent_objects_creation=True):
+        # checkfirst does not account for race conditions due to asynchronous workflows
+        # so if we are handling such problems we may as well deactivate that to speed things up
+        checkfirst = not handle_concurrent_objects_creation
+        try:
+            async with self.engine.connect() as connection:
+                f = lambda connection: self.table.create(bind=connection, checkfirst=checkfirst)
+                await connection.run_sync(f)
+                await connection.commit()
+        # after an error the connection is dead so we create a new one (https://stackoverflow.com/a/13103690)
+        except Exception as e:
+            # handle race conditions if requested (check if the object was already created)
+            if not handle_concurrent_objects_creation:
+                raise e
+            # raise an error only if the object is absent
+            async with self.engine.connect() as connection:
+                table_exists = lambda connection: sa.inspect(connection).has_table(schema=self.schema,
+                                                                                   table_name=self.table.name)
+                exists = await connection.run_sync(table_exists)
+                if not exists:
+                    raise e
 
 
     async def aupsert(self, if_row_exists, chunksize=10000):

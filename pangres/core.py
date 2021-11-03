@@ -253,7 +253,8 @@ def upsert(engine,
 # # async upsert
 
 async def aupsert(engine, df, table_name, if_row_exists, schema=None, create_schema=False,
-                 create_table=True, chunksize=10000, dtype=None):
+                  create_table=True, chunksize=10000, dtype=None,
+                  handle_concurrent_objects_creation=True):
     """
     Async variant of `pangres.upsert`. The engine must use an asynchronous driver
     such as `asyncpg` for PostgreSQL, or `aiomysql` for MySQL etc.
@@ -277,9 +278,21 @@ async def aupsert(engine, df, table_name, if_row_exists, schema=None, create_sch
     >
     > Source: https://docs.sqlalchemy.org/en/14/orm/extensions/asyncio.html (2021-11-03)
 
-    See docstring of `pangres.upsert` for details on the parameters.
+    See docstring of `pangres.upsert` for details on the parameters that are not described below.
     Some parameters are missing in this asynchronous variant of `pangres.uspert` because
     of a lack of time/knowledge. I'd be glad if you are willing to help.
+
+    Parameters
+    ----------
+    handle_concurrent_objects_creation : bool, default True
+        Only relevant when `create_schema` or `create_table` are set to True.
+        If True, handles the case when multiple connections try to create the same
+        object (given table or schema) at the same time.
+        This can happen for instance if you execute in parallel multiple `aupsert`
+        coroutines for a same table which does not exist yet.
+        In such a case it is possible that the SQL server tells more than one coroutine
+        that the table does not exist yet. We would then have multiple create statements
+        issued at the same time for the same table which would throw an error.
 
     Notes
     -----
