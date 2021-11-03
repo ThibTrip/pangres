@@ -338,9 +338,9 @@ async def aupsert(engine, df, table_name, if_row_exists, schema=None, create_sch
 
     # create schema and table if not exists then insert values
     if create_schema and schema is not None:
-        await pse.acreate_schema_if_not_exists()
+        await pse.acreate_schema_if_not_exists(handle_concurrent_objects_creation=handle_concurrent_objects_creation)
     if create_table:
-        await pse.acreate_table_if_not_exists()
+        await pse.acreate_table_if_not_exists(handle_concurrent_objects_creation=handle_concurrent_objects_creation)
 
     # stop if no rows
     ## note: use simple check with len() as df.empty returns True if there are index values but no columns
