@@ -3,6 +3,7 @@ dependencies:
   - pytest
   - pytest-cov
   - pytest-benchmark
+  - pytest-asyncio
   - psycopg2
   - pymysql
   - tabulate

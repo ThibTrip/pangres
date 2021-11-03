@@ -88,10 +88,12 @@ If you wish you can also use the provided environment (see `environment.yml` fil
 You can test one or multiple of the following SQL flavors (you will of course need a live database for this): PostgreSQL, SQlite or MySQL.
 
 Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. You will have to replace the following variables in those commands:
-* SQLITE_CONNECTION_STRING: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
-* POSTGRES_CONNECTION_STRING: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public).
+* SQLITE_CONN: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
+* PG_CONN: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database")
+* PG_CONN_ASYNC: replace with an asynchronous Postgres sqlalchemy connection string (e.g. "postgres+asyncpg:///user:password@localhost:5432/database")
+* MYSQL_CONN: replace with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database")
+* MYSQL_CONN_ASYNC: replace with an asynchronous MySQL sqlalchemy connection string (e.g. "mysql+aiomysql:///user:password@localhost:3306/database")
 * PG_SCHEMA (optional): schema for postgres (defaults to public)
-* MYSQL_CONNECTION_STRING: replace with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database")
 
 ```shell
 # 1. Create and activate the build environment
@@ -104,5 +106,5 @@ pip install -e .
 # -v prints test parameters
 # --cov=./pangres shows coverage only for pangres
 # --doctest-modules tests with doctest in all modules
-pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests
+pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$PG_CONN --pg_conn_async=$PG_CONN_ASYNC --mysql_conn=$MYSQL_CONN --mysql_conn_async=$MYSQL_CONN_ASYNC --pg_schema=tests
 ```
