@@ -7,7 +7,7 @@ is True. It also check the integrity of the data.
 """
 import math
 import pandas as pd
-from sqlalchemy import VARCHAR
+from sqlalchemy import VARCHAR, INT
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
@@ -38,3 +38,16 @@ def test_get_nb_rows(engine, schema):
     # we sort the index for MySQL
     df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
     pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())
+
+
+# # Test of an empty DataFrame
+
+def test_yield_empty_df(engine, schema):
+    table_name = 'test_yield_empty'
+    df = pd.DataFrame({'id':[], 'value':[]}).set_index('id')
+    # we should get an empty generator back
+    iterator = upsert(engine=engine, df=df, table_name=table_name, if_row_exists='update',
+                      schema=schema, dtype={'id':INT, 'value':INT}, yield_chunks=True)
+    for result in iterator:
+        # the for loop should never run because the generator should be empty
+        raise AssertionError('Expected the generator returned by upsert with an empty df to be empty')

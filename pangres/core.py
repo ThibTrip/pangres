@@ -1,9 +1,30 @@
 #!/usr/bin/env python
 # coding: utf-8
 """
-Main functions of pangres that will be directly exposed to its users.
+This module contains the functions of pangres
+that will be directly exposed to its users.
 """
 from pangres.helpers import PandasSpecialEngine
+
+
+# # Local helpers
+
+def empty_generator():
+    """
+    Returns an empty generator. This is used for consistent return types
+    for `upsert`.
+    Thanks to https://stackoverflow.com/a/13243870 !
+
+    Examples
+    --------
+    >>> gen = empty_generator()
+    >>>
+    >>> # this produces 0 output (no values to iterate over)
+    >>> for val in gen:
+    ...    print(val)
+    """
+    return
+    yield
 
 
 # # upsert
@@ -245,7 +266,7 @@ def upsert(engine,
     # stop if no rows
     ## note: use simple check with len() as df.empty returns True if there are index values but no columns
     if len(df) == 0:
-        return
+        return None if not yield_chunks else empty_generator()
 
     # returns an iterator when we yield chunks otherwise None
     return pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize, yield_chunks=yield_chunks)
