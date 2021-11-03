@@ -18,5 +18,5 @@ coverage:
         base: auto
 
 ignore:
-  - "pangres/docs/*"  # ignore script to generate the documentation
-  - "pangres/pangres/tests/*"
+  - "**/docs/*"  # ignore script to generate the documentation
+  - "**/tests/*"
