@@ -253,7 +253,7 @@ def upsert(engine,
 # # async upsert
 
 async def aupsert(engine, df, table_name, if_row_exists, schema=None, create_schema=False,
-                 create_table=True, chunksize=10000, dtype=None, yield_chunks=False):
+                 create_table=True, chunksize=10000, dtype=None):
     """
     Async variant of `pangres.upsert`. The engine must use an asynchronous driver
     such as `asyncpg` for PostgreSQL, or `aiomysql` for MySQL etc.
@@ -319,5 +319,4 @@ async def aupsert(engine, df, table_name, if_row_exists, schema=None, create_sch
     if len(df) == 0:
         return
 
-    # returns an iterator when we yield chunks otherwise None
-    return await pse.aupsert(if_row_exists=if_row_exists, chunksize=chunksize, yield_chunks=yield_chunks)
+    return await pse.aupsert(if_row_exists=if_row_exists, chunksize=chunksize)
