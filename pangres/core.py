@@ -259,8 +259,23 @@ async def aupsert(engine, df, table_name, if_row_exists, schema=None, create_sch
     such as `asyncpg` for PostgreSQL, or `aiomysql` for MySQL etc.
     You will need to install this driver e.g. `pip install asyncpg`.
 
-    Support for different drivers may vary depending on the SQLalchemy version.
-    In any case, version 1.4. is the minimum requirement.
+    Such asynchronous engines are only available from version 1.4. onwards.
+    Not all databases/drivers are supported by `sqlalchemy` yet.
+    E.g. `aiosqlite` does not seem to work in version 1.4.x.
+
+    WARNING:
+    This is an experimental feature. Usage may change without warnings in the next
+    versions of pangres and compatibility with sqlalchemy versions different than
+    1.4. is not guaranteed.
+    While this function has been well tested in `pangres` there could still be changes
+    when it comes to asynchronous engines in `sqlalchemy`:
+
+    > The asyncio extension as of SQLAlchemy 1.4.3 can now be considered to be
+    > beta level software.
+    > API details are subject to change however at this point it is unlikely for
+    > there to be significant backwards-incompatible changes.
+    >
+    > Source: https://docs.sqlalchemy.org/en/14/orm/extensions/asyncio.html (2021-11-03)
 
     See docstring of `pangres.upsert` for details on the parameters.
     Some parameters are missing in this asynchronous variant of `pangres.uspert` because
