@@ -398,6 +398,8 @@ class PandasSpecialEngine:
                     log(f"Changed type of column {new_col.name} "
                         f"from {col.type} to {new_col.type} "
                         f'in table {self.table.name} (schema="{self.schema}")')
+                    if hasattr(con, 'commit'):
+                        con.commit()
 
     @staticmethod
     def _create_chunks(values, chunksize=10000):
