@@ -210,6 +210,15 @@ class PandasSpecialEngine:
         else:
             return "other"
 
+
+    def schema_exists(self, connection) -> bool:
+        if _sqla_gt14():
+            insp = sa.inspect(connection)
+            return self.schema in insp.get_schema_names()
+        else:
+            return self.engine.dialect.has_schema(connection, self.schema)
+
+
     def table_exists(self) -> bool:
         """
         Returns True if the table defined in given instance
@@ -227,6 +236,7 @@ class PandasSpecialEngine:
         else:
             return self.engine.has_table(schema=self.schema, table_name=self.table.name) 
 
+
     def create_schema_if_not_exists(self):
         """
         Creates the schema defined in given instance of
@@ -238,11 +248,7 @@ class PandasSpecialEngine:
                                              '(AFAIK only PostgreSQL has this feature)')
  
         with self.engine.connect() as connection:
-            if _sqla_gt14():
-                insp = sa.inspect(connection)
-                exists = self.schema in insp.get_schema_names()
-            else:
-                exists = self.engine.dialect.has_schema(connection, self.schema)
+            exists = self.schema_exists(connection=connection)
             if self.schema is not None and not exists:
                 connection.execute(CreateSchema(self.schema))
                 if hasattr(connection, 'commit'):
