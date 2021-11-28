@@ -5,7 +5,7 @@ from math import floor
 from sqlalchemy import VARCHAR
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import drop_table_if_exists
+from pangres.tests.conftest import AutoDropTableContext
 
 
 # # Test data
@@ -65,9 +65,9 @@ def pd_to_sql(engine, schema):
 
 def test_creation_speed_with_upsert(engine, schema, benchmark):
     # benchmark is implicitly imported with pytest
-    drop_table_if_exists(engine=engine, schema=schema, table_name=pangres_table_name)
-    benchmark.pedantic(lambda: create_or_update(engine=engine, schema=schema, if_row_exists='update'),
-                       rounds=1, iterations=1)
+    with AutoDropTableContext(engine=engine, schema=schema, table_name=pangres_table_name) as ctx:
+        benchmark.pedantic(lambda: create_or_update(engine=engine, schema=schema, if_row_exists='update'),
+                           rounds=1, iterations=1)
 
 
 # # Upsert overwrite speed
@@ -87,6 +87,5 @@ def test_upsert_keep_speed_with_upsert(engine, schema, benchmark):
 # # Compare with pandas
 
 def test_creation_speed_with_pandas(engine, schema, benchmark):
-    drop_table_if_exists(engine=engine, schema=schema, table_name=pandas_table_name)
-    benchmark.pedantic(lambda: pd_to_sql(engine=engine, schema=schema),
-                       rounds=1, iterations=1)
+    with AutoDropTableContext(engine=engine, schema=schema, table_name=pandas_table_name) as ctx:
+        benchmark.pedantic(lambda: pd_to_sql(engine=engine, schema=schema), rounds=1, iterations=1)

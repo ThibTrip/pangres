@@ -7,10 +7,10 @@ See https://github.com/ThibTrip/pangres/issues/12
 """
 import pandas as pd
 import datetime
-from pangres import upsert
-from pangres.tests.conftest import drop_table_if_exists
 from sqlalchemy import INTEGER, VARCHAR, MetaData, Column, text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from pangres import upsert
+from pangres.tests.conftest import AutoDropTableContext
 
 # # Helpers
 
@@ -59,34 +59,33 @@ df_new = pd.DataFrame(data_new).set_index(['order_id', 'product_id'])
 
 def test_upsert_with_unique_keys(engine, schema):
 
-    # helpers
-    namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    def read_from_db():
+    # local helpers
+    if_row_exists = 'update'
+    def read_from_db(namespace):
         with engine.connect() as connection:
             return pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='row_id')
 
-    # create our test table
-    drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
-    create_test_table(engine=engine, schema=schema)
+    with AutoDropTableContext(engine=engine, schema=schema, table_name=table_name) as ctx:
+        create_test_table(engine=engine, schema=schema)
 
-    # add initial data (df_old)
-    upsert(engine=engine, df=df_old, schema=schema, table_name='test_unique_key', if_row_exists='update')
-    df = read_from_db()
-    df_expected = df_old.assign(row_id=range(1, 4)).reset_index().set_index('row_id')
-    pd.testing.assert_frame_equal(df, df_expected)
+        # add initial data (df_old)
+        upsert(engine=engine, df=df_old, schema=schema, table_name=table_name, if_row_exists='update')
+        df = read_from_db(namespace=ctx.namespace)
+        df_expected = df_old.assign(row_id=range(1, 4)).reset_index().set_index('row_id')
+        pd.testing.assert_frame_equal(df, df_expected)
 
-    # add new data (df_new)
-    upsert(engine=engine, df=df_new, schema=schema, table_name='test_unique_key', if_row_exists='update')
-    df = read_from_db()
-    # before creating our expected df we need to implement the special case of postgres
-    # where the id of the last row will be 7 instead of 4. I suppose that PG's ON
-    # CONFLICT UPDATE clause will run in such a way that it will count 4 (number we
-    # would expected) + 3 (three previous rows that were updated)
-    last_row_id = 7 if 'postgres' in engine.dialect.dialect_description else 4
-    df_expected = (pd.DataFrame([[1, 'A0001', 'PD100', 10],
-                                 [2, 'A0002', 'PD200', 20],
-                                 [3, 'A0002', 'PD201', 77],
-                                 [last_row_id, 'A0003', 'PD300', 30]],
-                                columns=['row_id'] + df_old.reset_index().columns.tolist())
-                   .set_index('row_id'))
-    pd.testing.assert_frame_equal(df, df_expected)
+        # add new data (df_new)
+        upsert(engine=engine, df=df_new, schema=schema, table_name=table_name, if_row_exists='update')
+        df = read_from_db(namespace=ctx.namespace)
+        # before creating our expected df we need to implement the special case of postgres
+        # where the id of the last row will be 7 instead of 4. I suppose that PG's ON
+        # CONFLICT UPDATE clause will run in such a way that it will count 4 (number we
+        # would expected) + 3 (three previous rows that were updated)
+        last_row_id = 7 if 'postgres' in engine.dialect.dialect_description else 4
+        df_expected = (pd.DataFrame([[1, 'A0001', 'PD100', 10],
+                                     [2, 'A0002', 'PD200', 20],
+                                     [3, 'A0002', 'PD201', 77],
+                                     [last_row_id, 'A0003', 'PD300', 30]],
+                                    columns=['row_id'] + df_old.reset_index().columns.tolist())
+                       .set_index('row_id'))
+        pd.testing.assert_frame_equal(df, df_expected)

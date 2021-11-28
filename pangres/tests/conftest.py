@@ -7,20 +7,68 @@ Configuration and helpers for the tests of pangres with pytest.
 import pandas as pd
 import json
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine.base import Engine
+from typing import Optional, Dict
 
-from pangres.helpers import _sqla_gt14
+from pangres.helpers import _sqla_gt14, PandasSpecialEngine
 
 
 # -
 
 # # Helpers
 
-def drop_table_if_exists(engine, schema, table_name):
-    namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    with engine.connect() as connection:
-        connection.execute(text(f'DROP TABLE IF EXISTS {namespace};'))
-        if hasattr(connection, 'commit'):
-            connection.commit()
+class AutoDropTableContext:
+    """
+    This context manager drops given table (if exists) before giving back
+    control and drops the table (if exists) again after you ran whichever tests
+    you wanted.
+
+    The context gets populated with every parameter of the init methods and
+    if a DataFrame is provided, you get an instance of `pangres.helpers.PandasSpecialEngine`
+    as well (under the attribute `pse`) which simplifies our testing.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from pangres import upsert
+    >>> from pangres.helpers import PandasSpecialEngine
+    >>> from sqlalchemy import create_engine
+    >>>
+    >>> df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
+    >>> engine = create_engine('sqlite:///:memory:')
+    >>> with AutoDropTableContext(engine=engine, df=df, schema=None, table_name='test') as ctx:
+    ...     upsert(engine=engine, df=df, if_row_exists='update', schema=ctx.schema, table_name=ctx.table_name)
+    ...     ctx.pse.table_exists()
+    True
+    >>> ctx.pse.table_exists()
+    False
+    """
+    def __init__(self, engine:Engine, table_name:str, df:Optional[pd.DataFrame]=None,
+                 schema:Optional[str]=None, dtype:Optional[Dict]=None, drop_on_exit:bool=True):
+        if df is not None:
+            self.pse = PandasSpecialEngine(engine=engine, df=df, table_name=table_name, schema=schema, dtype=dtype)
+        self.engine = engine
+        self.schema = schema
+        self.table_name = table_name
+        self.namespace = f'{schema}.{table_name}' if schema is not None else table_name
+        self.dtype = dtype
+        self._drop_on_exit = drop_on_exit
+
+    # helper
+    def drop_table(self):
+        with self.engine.connect() as connection:
+            connection.execute(text(f'DROP TABLE IF EXISTS {self.namespace};'))
+            if hasattr(connection, 'commit'):
+                connection.commit()
+
+    def __enter__(self):
+        self.drop_table()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        if self._drop_on_exit:
+            self.drop_table()
+        return False # raise any error
 
 
 # ## Class TestDB

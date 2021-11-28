@@ -10,7 +10,7 @@ import pandas as pd
 from sqlalchemy import VARCHAR, INT
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
+from pangres.tests.conftest import read_example_table_from_db, AutoDropTableContext
 
 
 # # Insert values one by one
@@ -20,34 +20,35 @@ def test_get_nb_rows(engine, schema):
     nb_rows, chunksize = 20, 3
     nb_last_chunk = nb_rows % chunksize
     nb_chunks = math.ceil(nb_rows/chunksize)
-    table_name = 'test_yield_get_nb_rows'
     # MySQL does not want flexible text length in indices/PK
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-    drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
-
-    # generate example df and iterate over upsert results
-    # make sure we can extract the number of updated rows and that it is correct
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
-    iterator = upsert(engine=engine, df=df, table_name=table_name, if_row_exists='update',
-                      schema=schema, chunksize=chunksize, dtype=dtype, yield_chunks=True)
+    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_yield_get_nb_rows', df=df) as ctx:
 
-    for ix, result in enumerate(iterator):
-        assert result.rowcount == (chunksize if ix != nb_chunks-1 else nb_last_chunk)
+        # iterate over upsert results
+        # make sure we can extract the number of updated rows and that it is correct
+        iterator = upsert(engine=engine, df=df, table_name=ctx.table_name, if_row_exists='update',
+                          schema=schema, chunksize=chunksize, dtype=dtype, yield_chunks=True)
 
-    # verify the inserted data is as expected
-    # we sort the index for MySQL
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
-    pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())
+        for ix, result in enumerate(iterator):
+            assert result.rowcount == (chunksize if ix != nb_chunks-1 else nb_last_chunk)
+
+        # verify the inserted data is as expected
+        # we sort the index for MySQL
+        df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=ctx.table_name)
+        pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())
 
 
 # # Test of an empty DataFrame
 
 def test_yield_empty_df(engine, schema):
-    table_name = 'test_yield_empty'
     df = pd.DataFrame({'id':[], 'value':[]}).set_index('id')
-    # we should get an empty generator back
-    iterator = upsert(engine=engine, df=df, table_name=table_name, if_row_exists='update',
-                      schema=schema, dtype={'id':INT, 'value':INT}, yield_chunks=True)
-    for result in iterator:
+    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_yield_empty', df=df) as ctx:
+
+        # we should get an empty generator back
+        iterator = upsert(engine=engine, df=df, table_name=ctx.table_name, if_row_exists='update',
+                          schema=schema, dtype={'id':INT, 'value':INT}, yield_chunks=True)
+
         # the for loop should never run because the generator should be empty
-        raise AssertionError('Expected the generator returned by upsert with an empty df to be empty')
+        for result in iterator:
+            raise AssertionError('Expected the generator returned by upsert with an empty df to be empty')
