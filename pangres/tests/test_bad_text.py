@@ -16,7 +16,7 @@ bad_char_seq = """/_- ?§$&"',:;*()%[]{}|<>=!+#""" + "\\"
 # +
 def test_bad_text_insert(engine, schema):
     # add bad text in a column named 'text'
-    create_random_text = lambda: ''.join([random.choice(bad_char_seq) for i in range(10)])
+    create_random_text = lambda: ''.join(random.choice(bad_char_seq) for i in range(10))
     df_test = (pd.DataFrame({'text': [create_random_text() for i in range(10)]})
                .rename_axis(['profileid'], axis='index', inplace=False))
     with AutoDropTableContext(engine=engine, schema=schema, table_name='test_bad_text') as ctx:
@@ -30,12 +30,13 @@ def test_bad_column_names(engine, schema):
         pytest.skip()
 
     for i in range(5):
-        random_bad_col_name = ''.join([random.choice(bad_char_seq) for i in range(50)])
+        random_bad_col_name = ''.join(random.choice(bad_char_seq) for i in range(50))
         df_test = (pd.DataFrame({random_bad_col_name: ['test', None]})
                    .rename_axis(['profileid'], axis='index', inplace=False))
 
         # psycopg2 can't process columns with "%" or "(" or ")" so we will need `fix_psycopg2_bad_cols`
-        df_test = fix_psycopg2_bad_cols(df_test)
+        if 'postgres' in engine.dialect.dialect_description:
+            df_test = fix_psycopg2_bad_cols(df_test)
         with AutoDropTableContext(engine=engine, schema=schema, table_name=f'test_bad_col_names_{i}') as ctx:
             upsert(engine=engine, schema=schema, df=df_test, table_name=ctx.table_name, if_row_exists='update')
 
