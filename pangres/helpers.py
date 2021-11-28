@@ -211,7 +211,19 @@ class PandasSpecialEngine:
             return "other"
 
 
+    def _raise_no_schema_feature(self):
+        """
+        Function to raise an error if we try to do operations on schemas on a database that does not
+        support such feature.
+        """
+        # Should I just do self.db_type != 'postgres'? (not sure if any other DBs use schemas)
+        if self._db_type not in ('postgres', 'other'):
+            raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
+                                             '(AFAIK only PostgreSQL has this feature)')
+
+
     def schema_exists(self, connection) -> bool:
+        self._raise_no_schema_feature()
         if _sqla_gt14():
             insp = sa.inspect(connection)
             return self.schema in insp.get_schema_names()
@@ -242,10 +254,7 @@ class PandasSpecialEngine:
         Creates the schema defined in given instance of
         PandasSpecialEngine if it does not exist.
         """
-        # Should I just do self.db_type != 'postgres'? (not sure if any other DBs use schemas)
-        if self._db_type not in ('postgres', 'other'):
-            raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
-                                             '(AFAIK only PostgreSQL has this feature)')
+        self._raise_no_schema_feature()
         if self.schema is None:
             raise AssertionError('Cannot create schema because it is None. '
                                  'If you used PostgreSQL the schema should have defaulted to `public`. '
