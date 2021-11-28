@@ -87,6 +87,8 @@ If you wish you can also use the provided environment (see `environment.yml` fil
 
 You can test one or multiple of the following SQL flavors (you will of course need a live database for this): PostgreSQL, SQlite or MySQL.
 
+NOTE: in one of the tests of `pangres` we will try to drop and then create a PostgreSQL schema called `pangres_create_schema_test`. If the schema existed and was not empty an error will be raised.
+
 Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. You will have to replace the following variables in those commands:
 * SQLITE_CONNECTION_STRING: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
 * POSTGRES_CONNECTION_STRING: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public).
