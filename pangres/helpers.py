@@ -7,6 +7,7 @@ import pandas as pd
 import logging
 import re
 import sqlalchemy as sa
+import sqlite3
 from copy import deepcopy
 from distutils.version import LooseVersion
 from math import floor
@@ -31,6 +32,7 @@ RE_CHARCOUNT_COL_TYPE = re.compile(r'(?<=.)+\(\d+\)')
 
 # # "Adapter" for sqlalchemy (handle pre and post version 1.4)
 
+# +
 def _sqla_gt14() -> bool:
     """
     Checks if sqlalchemy.__version__ is at least 1.4.0, when several
@@ -42,6 +44,17 @@ def _sqla_gt14() -> bool:
     import sqlalchemy
     return LooseVersion(sqlalchemy.__version__) >= LooseVersion("1.4.0")
 
+def _sqlite_gt3_22_0() -> bool:
+    """
+    Checks if the SQLite version is >= than 3.22.0.
+    Starting from this version we can use more SQL parameters.
+    See https://github.com/ThibTrip/pangres/issues/43
+    """
+    import sqlite3
+    return LooseVersion(sqlite3.sqlite_version) >= LooseVersion("3.22.0")
+
+
+# -
 
 # # Class PandasSpecialEngine
 
@@ -467,33 +480,26 @@ class PandasSpecialEngine:
         Examples
         --------
         >>> from sqlalchemy import create_engine
-        >>> 
+        >>>
+        >>> # this assumes you have SQlite version >= 3.22.0 
         >>> engine = create_engine("sqlite:///:memory:)")
         >>> df = pd.DataFrame({'name':['Albert']}).rename_axis(index='profileid')
         >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
-        >>> pse._sqlite_chunsize_fix(chunksize=1000)
-        499
-
-        >>> df = pd.DataFrame({i:[0] for i in range (1000)}).rename_axis(index='profileid')
-        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
-        >>> try:
-        ...     pse._sqlite_chunsize_fix(chunksize=1000)
-        ... except Exception as e:
-        ...     print(e)
-        Updating SQlite tables with more than 999 columns is not supported due to max variables restriction (999 max).
-        If you know a way around that please let me know (e.g. post a GitHub issue)!
+        >>> pse._sqlite_chunsize_fix(chunksize=33000)
+        16383
         """
-        new_chunksize = floor(999 / len(self.table.columns))
+        maximum = 32766 if _sqlite_gt3_22_0() else 999
+        new_chunksize = floor(maximum / len(self.table.columns))
         if new_chunksize < 1:
-            # case > 999 columns
-            err = ('Updating SQlite tables with more than 999 columns is '
-                   'not supported due to max variables restriction (999 max).\n'
+            # case > maximum columns
+            err = (f'Updating SQlite tables with more than {maximum} columns is '
+                   f'not supported due to max variables restriction ({maximum} max).\n'
                    'If you know a way around that please let me know '
                    '(e.g. post a GitHub issue)!')
             raise NotImplementedError(err)
         if chunksize > new_chunksize:
             log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '
-                'to SQlite max variable restriction (max 999).',
+                f'to SQlite max variable restriction (max {maximum}).',
                 level=logging.WARNING)
             chunksize = new_chunksize
         return chunksize
