@@ -258,7 +258,7 @@ def upsert(engine,
         pse.adapt_dtype_of_empty_db_columns()
 
     # create schema and table if not exists then insert values
-    if create_schema and schema is not None:
+    if create_schema:
         pse.create_schema_if_not_exists()
     if create_table:
         pse.create_table_if_not_exists()

@@ -246,10 +246,16 @@ class PandasSpecialEngine:
         if self._db_type not in ('postgres', 'other'):
             raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
                                              '(AFAIK only PostgreSQL has this feature)')
- 
+        if self.schema is None:
+            raise AssertionError('Cannot create schema because it is None. '
+                                 'If you used PostgreSQL the schema should have defaulted to `public`. '
+                                 'If using something other than PostgreSQL make sure it supports schemas '
+                                 '(AFAIK only PostgreSQL has this feature) and retry your operation '
+                                 'after setting the default schema `public` yourself '
+                                 '(if that is the schema you wish to use).')
+
         with self.engine.connect() as connection:
-            exists = self.schema_exists(connection=connection)
-            if self.schema is not None and not exists:
+            if not self.schema_exists(connection=connection):
                 connection.execute(CreateSchema(self.schema))
                 if hasattr(connection, 'commit'):
                     connection.commit()
