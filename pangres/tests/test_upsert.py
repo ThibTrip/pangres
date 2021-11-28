@@ -7,20 +7,15 @@ Here we want to test if:
 3. Crappy text insert and column names does not cause issues
 """
 import pandas as pd
-import random
 from sqlalchemy import VARCHAR
-from pangres import upsert, fix_psycopg2_bad_cols
+from pangres import upsert
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import read_example_table_from_db, drop_table_if_exists
+from pangres.tests.conftest import read_example_table_from_db, AutoDropTableContext
 
 
 # # Config
 
 table_name = 'test_upsert'
-default_args = {'table_name':table_name,
-                'create_schema':True,
-                'add_new_columns':True,
-                'adapt_dtype_of_empty_db_columns':False}
 
 
 # # Test data
@@ -42,75 +37,35 @@ df3 = _TestsExampleTable.create_example_df(nb_rows=6)
 # # Tests
 # ORDER MATTERS!
 
-# ## Create table
+# ## 1. Create table
 
 def test_create_table(engine, schema):
     # dtype for index for MySQL... (can't have flexible text length)
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-    
-    drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
-    upsert(engine=engine, schema=schema, df=df, if_row_exists='update', dtype=dtype, **default_args)
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
-    pd.testing.assert_frame_equal(df, df_db)
+    # IMPORTANT! don't drop one exit of context manager, we need the table for the next tests
+    with AutoDropTableContext(engine=engine, schema=schema, table_name=table_name, df=df, drop_on_exit=False) as ctx:
+        upsert(engine=engine, schema=schema, df=df, if_row_exists='update', dtype=dtype, table_name=table_name)
+        df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+        pd.testing.assert_frame_equal(df, df_db)
 
 
-# ## INSERT UPDATE 
+# ## 2. INSERT UPDATE 
 
+# continues previous test!
 def test_upsert_update(engine, schema):
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-
-    upsert(engine=engine, schema=schema, df=df2, if_row_exists='update', dtype=dtype, **default_args)
+    upsert(engine=engine, schema=schema, df=df2, if_row_exists='update', dtype=dtype, table_name=table_name)
     df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
     pd.testing.assert_frame_equal(df2, df_db)
 
 
-# ## INSERT IGNORE
+# ## 3. INSERT IGNORE
 
 def test_upsert_ignore(engine, schema):
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-    
-    drop_table_if_exists(engine=engine, schema=schema, table_name=table_name)
-    for _df in (df, df3):
-        upsert(engine=engine, schema=schema, df=_df, if_row_exists='ignore', dtype=dtype, **default_args)
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
-    expected = pd.concat((df, df3.tail(1)), axis=0)
-    pd.testing.assert_frame_equal(expected, df_db)
-
-
-# # Add colums with crappy names and insert crappy text values
-
-def test_crappy_text_insert(engine, schema):
-    is_mysql = 'mysql' in engine.dialect.dialect_description
-    dtype = {'profileid':VARCHAR(10)} if is_mysql else None
-    
-    # mix crappy letters with a few normal ones
-    crap_char_seq = """/_- ?§$&"',:;*()%[]{}|<>=!+#""" + "\\" + "sknalji"  
-
-    # add columns with crappy names
-    # don't do this for MySQL which has more strict rules for column names 
-    if not is_mysql:
-        for i in range(5):
-            random_crappy_col_name = ''.join([random.choice(crap_char_seq)
-                                              for i in range(50)])
-
-            df_test = (pd.DataFrame({random_crappy_col_name: ['test', None]})
-                       .rename_axis(['profileid'], axis='index', inplace=False))
-
-            # psycopg2 can't process columns with "%" or "(" or ")"
-            df_test = fix_psycopg2_bad_cols(df_test)
-            upsert(engine=engine, schema=schema, df=df_test, if_row_exists='update', dtype=dtype, **default_args)
-
-    # add crappy text in a column named 'text'
-    create_random_text = lambda: ''.join([random.choice(crap_char_seq)
-                                          for i in range(10)])
-
-    df_test = (pd.DataFrame({'text': [create_random_text() for i in range(10)]})
-               .rename_axis(['profileid'], axis='index', inplace=False))
-    upsert(engine=engine, schema=schema, df=df_test, if_row_exists='update', dtype=dtype, **default_args)
-
-
-# # Another test with the column name `values` (see issue #34 of pangres)
-
-def test_column_named_values(engine, schema):
-    df = pd.DataFrame({'values': range(5, 9)}, index=pd.Index(range(1, 5), name='idx'))
-    upsert(engine=engine, schema=schema, df=df, if_row_exists='update', table_name='test_column_values')
+    with AutoDropTableContext(engine=engine, schema=schema, table_name=table_name) as ctx:
+        for _df in (df, df3):
+            upsert(engine=engine, schema=schema, df=_df, if_row_exists='ignore', dtype=dtype, table_name=table_name)
+        df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+        expected = pd.concat((df, df3.tail(1)), axis=0)
+        pd.testing.assert_frame_equal(expected, df_db)
