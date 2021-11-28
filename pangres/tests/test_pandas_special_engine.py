@@ -54,8 +54,6 @@ def test_schema_creation(engine, schema):
             pse.create_schema_if_not_exists()
             assert pse.schema_exists(connection=connection)
         except Exception as e:
-            # if it is postgres then schema creation should work, otherwise
-            # we should get HasNoSchemaSystemException
             if pse._db_type == 'postgres' or not isinstance(e, HasNoSchemaSystemException):
                 raise e
         finally:
