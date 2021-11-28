@@ -4,6 +4,7 @@ import json
 from math import floor
 from sqlalchemy import VARCHAR
 from pangres import upsert
+from pangres.helpers import _sqlite_gt3_22_0
 from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import AutoDropTableContext
 
@@ -42,13 +43,14 @@ def pd_to_sql(engine, schema):
     # MySQL does not want flexible text length in indices/PK
     dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     # we need this for SQlite when using pandas table creation
-    # since we cannot use more than 999 parameters in a parameterized query
+    # since we cannot use more than X parameters in a parameterized query
+    max_params = 32766 if _sqlite_gt3_22_0() else 999
     if 'sqlite' in engine.dialect.dialect_description:
         col_len = len(df.columns) + len(df.index.names)
-        chunksize = floor(999 / col_len)
+        chunksize = floor(max_params / col_len)
     else:
         chunksize=None
-    
+
     df_no_json_like.to_sql(con=engine, schema=schema,
                            name=pandas_table_name,
                            method='multi', chunksize=chunksize,
