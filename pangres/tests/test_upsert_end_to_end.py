@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import VARCHAR
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
+from pangres.exceptions import HasNoSchemaSystemException
 from pangres.tests.conftest import read_example_table_from_db, AutoDropTableContext
 
 
@@ -55,6 +56,7 @@ df_after_insert_ignore = pd.concat(objs=(df,
 
 # # Tests
 
+# +
 # after the table is created with a first `upsert`
 # using `create_table=False` or `create_table=True` should both work
 @pytest.mark.parametrize('create_table', [False, True], ids=['create_table_false', 'create_table_true'])
@@ -77,3 +79,29 @@ def test_end_to_end(engine, schema, create_table, if_row_exists, df_expected):
         upsert(engine=engine, schema=schema, df=df2, if_row_exists=if_row_exists, dtype=dtype, table_name=table_name,
                create_table=create_table)
         pd.testing.assert_frame_equal(df_expected, read_table())
+
+
+def test_create_schema_none(engine, schema):
+    """
+    If `create_schema` is True in `pangres.upsert` but the schema is `None`
+    we should not raise an error even if it is a database that does not
+    support schemas
+    """
+    df = pd.DataFrame({'id':[0]}).set_index('id')
+    with AutoDropTableContext(engine=engine, schema=None, table_name='test_create_schema_none') as ctx:
+        upsert(engine=engine, schema=ctx.schema, df=df, if_row_exists='update', create_schema=True,
+               table_name=ctx.table_name, create_table=True)
+
+
+def test_create_schema_not_none(engine, schema):
+    df = pd.DataFrame({'id':[0]}).set_index('id')
+    with AutoDropTableContext(engine=engine, df=df, schema=None, table_name='test_create_schema_none') as ctx:
+        try:
+            upsert(engine=engine, schema=ctx.schema, df=df, if_row_exists='update', create_schema=True,
+                   table_name=ctx.table_name, create_table=True)
+        except Exception as e:
+            # for postgres this should have worked
+            if ctx.pse._db_type == 'postgres':
+                raise e
+            else:
+                assert isinstance(e, HasNoSchemaSystemException)
