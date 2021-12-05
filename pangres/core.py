@@ -24,7 +24,7 @@ def empty_generator():
     ...    print(val)
     """
     return
-    yield
+    yield  # pragma: no cover
 
 
 # # upsert
