@@ -143,6 +143,13 @@ class UpsertQuery:
         >>> pprint_query(query)
         INSERT INTO doc_upsert (ix, email, ts, `float`, bool, json) VALUES (%(ix_m0)s, %(email_m0)s, %(ts_m0)s, %(float_m0)s, %(bool_m0)s, %(json_m0)s) 
         ON DUPLICATE KEY UPDATE email = VALUES(email), ts = VALUES(ts), `float` = VALUES(`float`), bool = VALUES(bool), json = VALUES(json)
+
+        >>> # unsupported databases will raise a NotImplementedError
+        >>> try:
+        ...     query = upq.create_query(db_type='oracle',values=test_values, if_row_exists='update')
+        ... except Exception as e:
+        ...     print(e)
+        No query creation method for oracle. Expected one of ['postgres', 'mysql', 'sqlite', 'other']
         """
         query_creation_methods = {"postgres":self._create_pg_query,
                                   "mysql":self._create_mysql_query,
@@ -150,9 +157,9 @@ class UpsertQuery:
                                   "other":self._create_sqlite_query}
         try:
             return query_creation_methods[db_type](values=values, if_row_exists=if_row_exists)
-        except KeyError as e:
+        except KeyError:
             raise NotImplementedError(f'No query creation method for {db_type}. '
-                                      f'Expected one of {query_creation_methods.keys()}')
+                                      f'Expected one of {list(query_creation_methods.keys())}')
 
     def execute(self, db_type, values, if_row_exists):
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
