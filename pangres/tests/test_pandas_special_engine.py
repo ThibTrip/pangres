@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+import logging
 import pandas as pd
 import pytest
 from sqlalchemy import VARCHAR, text
@@ -100,25 +101,34 @@ def test_add_new_columns(engine, schema):
         pse.add_new_columns()
 
 
-@pytest.mark.parametrize("new_empty_column_value", [1, 1.1, "abc", pd.Timestamp("2020-01-01", tz='UTC'), {'foo':'bar'}, ['foo'], True])
-def test_change_column_type_if_column_empty(engine, schema, new_empty_column_value):
-    df = _TestsExampleTable.create_example_df(nb_rows=10)
-    # store arguments we will use for both AutoDropTableContext and PandasSpecialEngine
-    common_kwargs = dict(engine=engine, schema=schema, table_name='test_alter_dtype_empty_col')
-    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
-    with AutoDropTableContext(df=df, **common_kwargs) as ctx:
+@pytest.mark.parametrize("new_empty_column_value", [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'), {'foo':'bar'}, ['foo'], True])
+def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_column_value):
+
+    dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+
+    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_alter_dtype_empty_col') as ctx:
         # create our example table
-        ctx.pse.create_table_if_not_exists()
-        ctx.pse.upsert(if_row_exists='update')
+        df = _TestsExampleTable.create_example_df(nb_rows=10)
+        df['empty_col'] = None
+
+        # create the SQL table
+        pse = PandasSpecialEngine(engine=engine, df=df, table_name=ctx.table_name, schema=schema, dtype=dtype)
+        pse.create_table_if_not_exists()
+        pse.upsert(if_row_exists='update')
+
         # skip for sqlite as it does not support such alteration
-        if ctx.pse._db_type == 'sqlite':
+        if pse._db_type == 'sqlite':
             pytest.skip()
 
-        # hack to set any type of element as a column value without pandas trying to broadcast it if it is a list or such 
+        # hack to set any type of element as a column value without pandas trying to broadcast it
+        # this is useful when passing a list or such
         df['empty_col'] = df.index.map(lambda x: new_empty_column_value)
         # recreate pse then change column type
-        pse = PandasSpecialEngine(df=df, **common_kwargs)
-        pse.adapt_dtype_of_empty_db_columns()
+        pse = PandasSpecialEngine(engine=engine, df=df, table_name=ctx.table_name, schema=schema, dtype=dtype)
+        with caplog.at_level(logging.INFO, logger='pangres'):
+            pse.adapt_dtype_of_empty_db_columns()
+        assert len(caplog.records) == 1
+        assert 'Changed type of column empty_col' in caplog.text
 
 
 # -
