@@ -4,8 +4,10 @@
 """
 Configuration and helpers for the tests of pangres with pytest.
 """
-import pandas as pd
 import json
+import logging
+import os
+import pandas as pd
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine.base import Engine
 from typing import Optional, Dict
@@ -75,14 +77,22 @@ class AutoDropTableContext:
 
 # +
 def pytest_addoption(parser):
-    parser.addoption('--sqlite_conn', action="store", default=None)
-    parser.addoption('--pg_conn', action="store", default=None)
-    parser.addoption('--mysql_conn', action="store", default=None)
-    parser.addoption('--pg_schema', action='store', default=None)
+    parser.addoption('--sqlite_conn', action="store", type=str, default=None)
+    parser.addoption('--pg_conn', action="store", type=str, default=None)
+    parser.addoption('--mysql_conn', action="store", type=str, default=None)
+    parser.addoption('--pg_schema', action='store', type=str, default=None)
 
 def pytest_generate_tests(metafunc):
     # This is called for every test. Only get/set command line arguments
     # if the argument is specified in the list of test "fixturenames".
+    # handle special cases first:
+    if metafunc.module.__name__ == 'pangres.tests.test_logging':
+        # I could not find any other way than to add a dummy
+        # for executing the test only once (parameterize needs arguments)
+        metafunc.parametrize('_', [''], scope='module')
+        return
+
+    # tests that we need to repeat for each engine + options (e.g. future)
     conn_strings = {'sqlite':metafunc.config.option.sqlite_conn,
                     'pg':metafunc.config.option.pg_conn,
                     'mysql':metafunc.config.option.mysql_conn}

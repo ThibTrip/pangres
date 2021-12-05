@@ -7,7 +7,6 @@ of `pangres.upsert`.
 We will create a table and then insert with update and then ignore for the
 `ON CONFLICT` clause.
 """
-import numpy as np
 import pandas as pd
 import pytest
 from sqlalchemy import VARCHAR
