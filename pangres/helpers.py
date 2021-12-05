@@ -263,7 +263,7 @@ class PandasSpecialEngine:
                                  'If using something other than PostgreSQL make sure it supports schemas '
                                  '(AFAIK only PostgreSQL has this feature) and retry your operation '
                                  'after setting the default schema `public` yourself '
-                                 '(if that is the schema you wish to use).')
+                                 '(if that is the schema you wish to use).')  # pragma: no cover
 
         with self.engine.connect() as connection:
             if not self.schema_exists(connection=connection):
@@ -526,7 +526,7 @@ class PandasSpecialEngine:
             chunksize = new_chunksize
         return chunksize
 
-    
+
     def upsert(self, if_row_exists, chunksize=10000, yield_chunks=False):
         """
         Generates and executes an upsert (insert update or 
@@ -586,7 +586,7 @@ class PandasSpecialEngine:
                    * table: {self.table.name}
                    * SQLalchemy table model:\n{self.table.__repr__()}"""
         text = '\n'.join([line.strip() for line in text.splitlines()])
-        
+
         df_repr = (str(self.df.head()) if not hasattr(self.df, 'to_markdown')
                    else str(self.df.head().to_markdown()))
         text += f'\n* df.head():\n{df_repr}'
