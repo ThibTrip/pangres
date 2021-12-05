@@ -86,7 +86,8 @@ def pytest_generate_tests(metafunc):
     # This is called for every test. Only get/set command line arguments
     # if the argument is specified in the list of test "fixturenames".
     # handle special cases first:
-    if metafunc.module.__name__ == 'pangres.tests.test_logging':
+    if metafunc.module.__name__ in ('pangres.tests.test_logging',
+                                    'pangres.tests.test_utils'):
         # I could not find any other way than to add a dummy
         # for executing the test only once (parameterize needs arguments)
         metafunc.parametrize('_', [''], scope='module')
