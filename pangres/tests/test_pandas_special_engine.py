@@ -9,7 +9,7 @@ from pangres.exceptions import (DuplicateLabelsException,
                                 DuplicateValuesInIndexException,
                                 HasNoSchemaSystemException,
                                 UnnamedIndexLevelsException)
-from pangres.helpers import PandasSpecialEngine
+from pangres.helpers import PandasSpecialEngine, _sqla_gt14
 from pangres.tests.conftest import AutoDropTableContext
 
 
@@ -107,6 +107,10 @@ def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_co
     dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     with AutoDropTableContext(engine=engine, schema=schema, table_name='test_alter_dtype_empty_col') as ctx:
+        # json like will not work for sqlalchemy < 1.4
+        if isinstance(new_empty_column_value, (dict, list)) and not _sqla_gt14():
+            pytest.skip()
+
         # create our example table
         df = _TestsExampleTable.create_example_df(nb_rows=10)
         df['empty_col'] = None
