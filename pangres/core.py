@@ -134,16 +134,16 @@ def upsert(engine,
     ##### 1.1. Creating a SQL table
     >>> import pandas as pd
     >>> from pangres import upsert, DocsExampleTable
-    >>> from sqlalchemy import create_engine, VARCHAR
-    >>> 
+    >>> from sqlalchemy import create_engine, text, VARCHAR
+    >>>
     >>> # create a SQLalchemy engine
     >>> engine = create_engine("sqlite:///:memory:")
-    >>> 
+    >>>
     >>> # this is necessary if you want to test with MySQL
     >>> # instead of SQlite or Postgres because MySQL needs
     >>> # to have a definite limit for text primary keys/indices
     >>> dtype = {'full_name':VARCHAR(50)}
-    >>> 
+    >>>
     >>> # get or create a pandas DataFrame
     >>> # for our example full_name is the index
     >>> # and will thus be used as primary key
@@ -173,16 +173,22 @@ def upsert(engine,
     | Arnold Schwarzenegger | True          | NaT                       |             1.88 |
 
     >>> # insert update using our new data
+    >>> # we know the table already exists so we can pass `create_table=False`
+    >>> # to skip the table existence check and gain a little time
+    >>> # note that if the table did not exist we would get an error!
     >>> upsert(engine=engine,
     ...        df=new_df,
     ...        table_name='example',
     ...        if_row_exists='update',
-    ...        dtype=dtype)
+    ...        dtype=dtype,
+    ...        create_table=False)
     >>> 
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was updated and Arnold Schwarzenegger was added!
-    >>> print(pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
-    ...  .astype({'likes_sport':bool}).to_markdown())
+    >>> with engine.connect() as connection:
+    ...     query = text('SELECT * FROM example')
+    ...     print(pd.read_sql(query, con=connection, index_col='full_name')
+    ...           .astype({'likes_sport':bool}).to_markdown())
     | full_name             | likes_sport   | updated                    |   size_in_meters |
     |:----------------------|:--------------|:---------------------------|-----------------:|
     | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
@@ -202,11 +208,16 @@ def upsert(engine,
     ...        df=new_df2,
     ...        table_name='example',
     ...        if_row_exists='ignore',
-    ...        dtype=dtype)
+    ...        dtype=dtype,
+    ...        create_table=False)
+    >>>
+    >>>
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was NOT updated and John Cena was added!
-    >>> print(pd.read_sql('SELECT * FROM example', con=engine, index_col='full_name')
-    ...  .astype({'likes_sport':bool}).to_markdown())
+    >>> with engine.connect() as connection:
+    ...     query = text('SELECT * FROM example')
+    ...     print(pd.read_sql(query, con=connection, index_col='full_name')
+    ...           .astype({'likes_sport':bool}).to_markdown())
     | full_name             | likes_sport   | updated                    |   size_in_meters |
     |:----------------------|:--------------|:---------------------------|-----------------:|
     | John Rambo            | True          | 2020-02-01 00:00:00.000000 |             1.77 |
