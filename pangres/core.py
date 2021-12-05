@@ -122,10 +122,19 @@ def upsert(engine,
 
     Raises
     ------
-    pangres.HasNoSchemaSystemException
+    pangres.exceptions.HasNoSchemaSystemException
         When `create_schema` is True but the SQL flavor of given
         engine has no schema system (AFAIK only PostgreSQL has a
         schema system)
+    pangres.exceptions.BadColumnNamesException
+        When column names are incompatible with the SQL driver
+        (e.g. psycopg2 does not accept "(" in a column name)
+    pangres.exceptions.UnnamedIndexLevelsException
+        When some of the index levels of the df are not named
+    pangres.exceptions.DuplicateValuesInIndexException
+        When any entry in the df's index is duplicated
+    pangres.exceptions.DuplicateLabelsException
+        When any name across the df's index/columns appears more than once
 
     Examples
     --------
