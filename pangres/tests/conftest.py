@@ -86,8 +86,7 @@ def pytest_generate_tests(metafunc):
     conn_strings = {'sqlite':metafunc.config.option.sqlite_conn,
                     'pg':metafunc.config.option.pg_conn,
                     'mysql':metafunc.config.option.mysql_conn}
-    engines = []
-    schemas = []
+    engines, schemas, ids = [], [], []
     for db_type, conn_string in conn_strings.items():
         if conn_string is None:
             continue
@@ -95,15 +94,17 @@ def pytest_generate_tests(metafunc):
         engine = create_engine(conn_string)
         schemas.append(schema)
         engines.append(engine)
+        ids.append(f'{engine.url.drivername}_{schema}')
         # for sqlalchemy 1.4+ use future=True to try the future sqlalchemy 2.0
         if _sqla_gt14():
             future_engine = create_engine(conn_string, future=True)
             schemas.append(schema)
             engines.append(future_engine)
-    assert len(engines) == len(schemas)
+            ids.append(f'{engine.url.drivername}_{schema}_future')
+    assert len(engines) == len(schemas) == len(ids)
     if len(engines) == 0:
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
-    metafunc.parametrize("engine, schema", list(zip(engines, schemas)), scope='module')
+    metafunc.parametrize("engine, schema", list(zip(engines, schemas)), ids=ids, scope='module')
 
 
 # -
