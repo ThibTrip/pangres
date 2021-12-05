@@ -6,6 +6,8 @@ Welcome to the pangres wiki!
 
 [Fix bad column names for Postgres](https://github.com/ThibTrip/pangres/wiki/Fix-bad-column-names-postgres)
 
+See also [**demo notebook**](https://github.com/ThibTrip/pangres/blob/master/pangres/docs/pangres_demo.ipynb)
+
 # Notes
 
 Parts of the documentation were automatically generated using the docstrings of pangres' functions/classes/methods via my library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md).
