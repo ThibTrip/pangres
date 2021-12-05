@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 import random
 from pangres import upsert, fix_psycopg2_bad_cols
+from pangres.exceptions import BadColumnNamesException
 from pangres.tests.conftest import AutoDropTableContext
 
 # # Helpers
@@ -39,6 +40,15 @@ def test_bad_column_names(engine, schema):
             df_test = fix_psycopg2_bad_cols(df_test)
         with AutoDropTableContext(engine=engine, schema=schema, table_name=f'test_bad_col_names_{i}') as ctx:
             upsert(engine=engine, schema=schema, df=df_test, table_name=ctx.table_name, if_row_exists='update')
+
+def test_bad_column_name_postgres_raises(engine, schema):
+    if 'postgres' not in engine.dialect.dialect_description:
+        pytest.skip()
+    df = pd.DataFrame({'id':[0], '(test)':[0]}).set_index('id')
+    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_bad_col_name_pg') as ctx:
+        with pytest.raises(BadColumnNamesException) as exc_info:
+            upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update')
+            assert 'does not seem to support column names with' in str(exc_info.value)
 
 
 # -
