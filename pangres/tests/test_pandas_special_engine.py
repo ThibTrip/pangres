@@ -4,7 +4,10 @@ import pandas as pd
 import pytest
 from sqlalchemy import VARCHAR, text
 from pangres.examples import _TestsExampleTable
-from pangres.exceptions import HasNoSchemaSystemException
+from pangres.exceptions import (DuplicateLabelsException,
+                                DuplicateValuesInIndexException,
+                                HasNoSchemaSystemException,
+                                UnnamedIndexLevelsException)
 from pangres.helpers import PandasSpecialEngine
 from pangres.tests.conftest import AutoDropTableContext
 
@@ -23,6 +26,7 @@ def test_repr(engine, schema):
               'schema', 'table', 'SQLalchemy table model'):
         assert s in txt
 
+
 def test_table_attr(engine, schema):
     # generate a somewhat complex table model via the _TestsExampleTable class
     df = _TestsExampleTable.create_example_df(nb_rows=10)
@@ -38,7 +42,7 @@ def test_schema_creation(engine, schema):
     # overwrite schema
     schema = 'pangres_create_schema_test'
     # local helpers
-    def drop_schema(connection):        
+    def drop_schema(connection):
         connection.execute(text(f'DROP SCHEMA IF EXISTS {schema};'))
         if hasattr(connection, 'commit'):
             connection.commit()
@@ -124,8 +128,8 @@ def test_change_column_type_if_column_empty(engine, schema, new_empty_column_val
 # +
 def test_error_index_level_named(engine, schema):
     df = pd.DataFrame({'test':[0]})
-    with pytest.raises(IndexError) as excinfo:
-        pse = PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
+    with pytest.raises(UnnamedIndexLevelsException) as excinfo:
+        PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
         assert "All index levels must be named" in str(excinfo.value)
 
 @pytest.mark.parametrize("option", ['index and column collision', 'columns duplicated', 'index duplicated'])
@@ -141,15 +145,15 @@ def test_duplicated_names(engine, schema, option):
     else:
         raise AssertionError(f'Unexpected value for param `option`: {option}')
 
-    with pytest.raises(ValueError) as excinfo:
-        pse = PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
+    with pytest.raises(DuplicateLabelsException) as excinfo:
+        PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
         assert "There cannot be duplicated names" in str(excinfo.value)
 
 
 def test_non_unique_index(engine, schema):
     df = pd.DataFrame(index=pd.Index(data=[0, 0], name='ix'))
-    with pytest.raises(IndexError) as excinfo:
-        pse = PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
+    with pytest.raises(DuplicateValuesInIndexException) as excinfo:
+        PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
         assert "The index must be unique" in str(excinfo.value)
 
 

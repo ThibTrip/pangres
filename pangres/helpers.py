@@ -17,7 +17,11 @@ from sqlalchemy.schema import (PrimaryKeyConstraint, CreateColumn, CreateSchema)
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
 from pangres.logger import log
-from pangres.exceptions import HasNoSchemaSystemException
+from pangres.exceptions import (BadColumnNamesException,
+                                DuplicateLabelsException,
+                                DuplicateValuesInIndexException,
+                                HasNoSchemaSystemException,
+                                UnnamedIndexLevelsException)
 from pangres.upsert import UpsertQuery
 
 # # Regexes
@@ -43,6 +47,7 @@ def _sqla_gt14() -> bool:
     """
     import sqlalchemy
     return LooseVersion(sqlalchemy.__version__) >= LooseVersion("1.4.0")
+
 
 def _sqlite_gt3_22_0() -> bool:
     """
@@ -127,17 +132,19 @@ class PandasSpecialEngine:
         if self._db_type == "postgres":
             schema = 'public' if schema is None else schema
             # raise if we find columns with "(", ")" or "%"
-            if any((RE_BAD_COL_NAME.search(col) for col in df.columns)):
-                err = ("psycopg2 (Python postgres driver) does not seem to support"
+            bad_col_names = [col for col in df.columns if RE_BAD_COL_NAME.search(col)]
+            if len(bad_col_names) > 0:
+                err = ("psycopg2 (Python postgres driver) does not seem to support "
                        "column names with '%', '(' or ')' "
-                       "(see https://github.com/psycopg/psycopg2/issues/167)")
-                raise ValueError(err)
+                       "(see https://github.com/psycopg/psycopg2/issues/167). You need to fix "
+                       f"these names: {bad_col_names}")
+                raise BadColumnNamesException(err)
 
         # VERIFY ARGUMENTS
         # all index levels have names
         index_names = list(df.index.names)
         if any([ix_name is None for ix_name in index_names]):
-            raise IndexError("All index levels must be named!")
+            raise UnnamedIndexLevelsException("All index levels must be named!")
 
         # index is unique
         if not df.index.is_unique:
@@ -146,13 +153,14 @@ class PandasSpecialEngine:
                    "Check duplicates using this code (assuming df "
                    " is the DataFrame you want to upsert):\n"
                    ">>> df.index[df.index.duplicated(keep=False)]")
-            raise IndexError(err)
+            raise DuplicateValuesInIndexException(err)
 
         # there are no duplicated names
         fields = list(df.index.names) + df.columns.tolist()
         if len(set(fields)) != len(fields):
-            raise ValueError(("There cannot be duplicated names amongst "
-                              "index levels and/or columns!"))
+            duplicated_labels = [c for c in fields if fields.count(c) > 1]
+            raise DuplicateLabelsException("Found duplicates across index "
+                                           f"and columns: {duplicated_labels}")
 
         # detect json columns
         def is_json(col):
