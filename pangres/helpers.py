@@ -98,7 +98,7 @@ class PandasSpecialEngine:
             Similar to pd.to_sql dtype argument.
             This is especially useful for MySQL where the length of
             primary keys with text has to be provided (see Examples)
-        
+
         Examples
         --------
         >>> from sqlalchemy import create_engine
@@ -181,14 +181,12 @@ class PandasSpecialEngine:
         constraint = PrimaryKeyConstraint(*[table.columns[name]
                                             for name in df.index.names])
         table.append_constraint(constraint)
-        
 
         # add remaining attributes
         self.engine = engine
         self.df = df
         self.schema = schema
         self.table = table
-
 
     @staticmethod
     def _detect_db_type(engine) -> str:
@@ -210,7 +208,6 @@ class PandasSpecialEngine:
         else:
             return "other"
 
-
     def _raise_no_schema_feature(self):
         """
         Function to raise an error if we try to do operations on schemas on a database that does not
@@ -221,7 +218,6 @@ class PandasSpecialEngine:
             raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
                                              '(AFAIK only PostgreSQL has this feature)')
 
-
     def schema_exists(self, connection) -> bool:
         self._raise_no_schema_feature()
         if _sqla_gt14():
@@ -229,7 +225,6 @@ class PandasSpecialEngine:
             return self.schema in insp.get_schema_names()
         else:
             return self.engine.dialect.has_schema(connection, self.schema)
-
 
     def table_exists(self) -> bool:
         """
@@ -247,7 +242,6 @@ class PandasSpecialEngine:
             return insp.has_table(schema=self.schema, table_name=self.table.name)
         else:
             return self.engine.has_table(schema=self.schema, table_name=self.table.name) 
-
 
     def create_schema_if_not_exists(self):
         """
@@ -327,7 +321,6 @@ class PandasSpecialEngine:
             if hasattr(con, 'commit'):
                 con.commit()
 
-
     def get_db_table_schema(self):
         """
         Gets the sqlalchemy table model for the SQL table
@@ -341,7 +334,7 @@ class PandasSpecialEngine:
         table_name = self.table.name
         schema = self.schema
         engine = self.engine
-        
+
         metadata = MetaData(bind=engine, schema=schema)
         metadata.reflect(bind=engine, schema=schema, only=[table_name])
         namespace = table_name if schema is None else f'{schema}.{table_name}'
