@@ -25,6 +25,18 @@ def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements={'%':'', '(':'', ')':''}
         The keys '%', '(' and ')' are mandatory.
         There cannot be any extra keys.
 
+    Raises
+    ------
+    pangres.exceptions.UnnamedIndexLevelsException
+        When you pass a df where not all index levels are named
+    pangres.exceptions.DuplicateLabelsException
+        When you pass a df with duplicated labels accross index/columns
+        or when after cleaning we end up with duplicated labels
+        e.g. "test(" and "test)" would by default both be renamed to "test"
+    TypeError
+        When `replacements` is not of the expected type or has wrong keys
+        or has non string values
+
     Returns
     -------
     new_df : pd.DataFrame
