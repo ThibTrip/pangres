@@ -105,8 +105,6 @@ def test_add_column(engine, schema):
         # verify content matches
         with engine.connect() as connection:
             df_db = pd.read_sql(text(f'SELECT * FROM {ctx.namespace}'), con=connection, index_col='id')
-            print(df.to_markdown())
-            print(df_db.to_markdown())
             pd.testing.assert_frame_equal(df, df_db)
 
 
