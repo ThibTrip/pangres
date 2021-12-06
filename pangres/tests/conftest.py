@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import pandas as pd
+from inspect import signature
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine.base import Engine
 from typing import Optional, Dict
@@ -84,13 +85,13 @@ def pytest_addoption(parser):
     parser.addoption('--pg_schema', action='store', type=str, default=None)
 
 def pytest_generate_tests(metafunc):
-    # This is called for every test. Only get/set command line arguments
-    # if the argument is specified in the list of test "fixturenames".
-    # handle special cases first:
-    if metafunc.module.__name__ in ('pangres.tests.test_logging',
-                                    'pangres.tests.test_utils'):
+    # this is called for every test
+    # if we see the parameters "engine" and "schema" in a function
+    # then we will repeat the test for each engine
+    func_params = signature(metafunc.function).parameters
+    if not ('engine' in func_params and 'schema' in func_params):
         # I could not find any other way than to add a dummy
-        # for executing the test only once (parameterize needs arguments)
+        # for executing a test only once (parameterize needs arguments)
         metafunc.parametrize('_', [''], scope='module')
         return
 
