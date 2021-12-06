@@ -482,8 +482,8 @@ class PandasSpecialEngine:
                     values[i][j] = null()
                 # cast pd.Interval to str
                 elif isinstance(val, pd.Interval):
-                    warnings.warn(('found pd.Interval objects, '
-                                   'they will be casted to str'))
+                    log('found pd.Interval objects, they will be casted to str',
+                        level=logging.WARNING)
                     values[i][j] = str(val)
         return values
 
