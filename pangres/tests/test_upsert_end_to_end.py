@@ -82,6 +82,49 @@ def test_end_to_end(engine, schema, create_table, if_row_exists, df_expected):
         pd.testing.assert_frame_equal(df_expected, read_table())
 
 
+def test_bad_value_if_row_exists(_):
+    df = pd.DataFrame({'id':[0]}).set_index('id')
+    engine = create_engine('sqlite:///')
+    with AutoDropTableContext(engine=engine, schema=None, table_name='test_fail_missing_table') as ctx:
+        with pytest.raises(ValueError) as excinfo:
+            upsert(engine=engine, df=df, table_name=ctx.table_name, if_row_exists='test')
+        assert 'must be "ignore" or "update"' in str(excinfo.value)
+
+
+def test_add_column(engine, schema):
+    dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = pd.DataFrame({'id':['foo']}).set_index('id')
+    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_add_column') as ctx:
+        # 1. create table
+        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
+               dtype=dtype)
+        # 2. add a new column and repeat upsert
+        df['new_column'] = 'bar'
+        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
+               add_new_columns=True, dtype=dtype)
+        # verify content matches
+        with engine.connect() as connection:
+            df_db = pd.read_sql(text(f'SELECT * FROM {ctx.namespace}'), con=connection, index_col='id')
+            print(df.to_markdown())
+            print(df_db.to_markdown())
+            pd.testing.assert_frame_equal(df, df_db)
+
+
+def test_adapt_column_type(engine, schema):
+    # skip for sqlite as it does not support such alteration
+    if 'sqlite' in engine.dialect.dialect_description:
+        pytest.skip()
+
+    dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = pd.DataFrame({'id':['foo'], 'empty_column':[None]}).set_index('id')
+    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_adapt_column_type') as ctx:
+        # 1. create table
+        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
+               dtype=dtype)
+        # 2. add non string data in empty column and repeat upsert
+        df['empty_column'] = 1
+        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
+               adapt_dtype_of_empty_db_columns=True, dtype=dtype)
 
 
 def test_cannot_insert_missing_table_no_create(engine, schema):
