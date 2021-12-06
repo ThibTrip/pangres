@@ -8,6 +8,7 @@ from pangres.examples import _TestsExampleTable
 from pangres.exceptions import (DuplicateLabelsException,
                                 DuplicateValuesInIndexException,
                                 HasNoSchemaSystemException,
+                                MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
 from pangres.helpers import PandasSpecialEngine, _sqla_gt14
 from pangres.tests.conftest import AutoDropTableContext
@@ -99,6 +100,27 @@ def test_add_new_columns(engine, schema):
         # (engine, schema and table name did not change)
         pse = PandasSpecialEngine(df=df, **common_kwargs)
         pse.add_new_columns()
+
+
+def test_add_new_columns_from_index(engine, schema):
+    # store arguments we will use for both AutoDropTableContext and PandasSpecialEngine
+    common_kwargs = dict(engine=engine, schema=schema, table_name='test_pse_add_new_columns_index')
+    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = _TestsExampleTable.create_example_df(nb_rows=10)
+    with AutoDropTableContext(df=df, **common_kwargs) as ctx:
+        # create our example table
+        ctx.pse.create_table_if_not_exists()
+        ctx.pse.upsert(if_row_exists='update')
+        df['new_index_col'] = 'foo'
+        df.set_index('new_index_col', append=True, inplace=True)
+
+        # recreate pse (so that a new table model with the new columns is created) then add columns
+        # note that we don't need to overwrite `ctx.pse` since the __exit__ method that drops the table will still work
+        # (engine, schema and table name did not change)
+        pse = PandasSpecialEngine(df=df, **common_kwargs)
+        with pytest.raises(MissingIndexLevelInSqlException) as exc_info:
+            pse.add_new_columns()
+        assert 'Cannot add' in str(exc_info.value)
 
 
 @pytest.mark.parametrize("new_empty_column_value", [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'), {'foo':'bar'}, ['foo'], True])
