@@ -49,6 +49,7 @@ class AutoDropTableContext:
                  schema:Optional[str]=None, dtype:Optional[Dict]=None, drop_on_exit:bool=True):
         if df is not None:
             self.pse = PandasSpecialEngine(engine=engine, df=df, table_name=table_name, schema=schema, dtype=dtype)
+        schema = 'public' if 'postgres' in engine.dialect.dialect_description and schema is None else schema
         self.engine = engine
         self.schema = schema
         self.table_name = table_name
@@ -70,7 +71,7 @@ class AutoDropTableContext:
     def __exit__(self, type, value, traceback):
         if self._drop_on_exit:
             self.drop_table()
-        return False # raise any error
+        return False  # raise any error
 
 
 # ## Class TestDB
