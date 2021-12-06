@@ -528,7 +528,6 @@ class PandasSpecialEngine:
             chunksize = new_chunksize
         return chunksize
 
-
     def upsert(self, if_row_exists, chunksize=10000, yield_chunks=False):
         """
         Generates and executes an upsert (insert update or 
