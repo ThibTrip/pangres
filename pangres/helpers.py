@@ -142,7 +142,7 @@ class PandasSpecialEngine:
         # VERIFY ARGUMENTS
         # all index levels have names
         index_names = list(df.index.names)
-        if any([ix_name is None for ix_name in index_names]):
+        if any(ix_name is None for ix_name in index_names):
             raise UnnamedIndexLevelsException("All index levels must be named!")
 
         # index is unique
@@ -511,7 +511,10 @@ class PandasSpecialEngine:
         """
         maximum = 32766 if _sqlite_gt3_22_0() else 999
         new_chunksize = floor(maximum / len(self.table.columns))
-        if new_chunksize < 1:
+        # note: the part below cannot be realistically tested as the table creation
+        # with `pd.io.sql.SQLTable` just takes too much time in presence of a table
+        # with many many columns
+        if new_chunksize < 1:  # pragma: no cover
             # case > maximum columns
             err = (f'Updating SQlite tables with more than {maximum} columns is '
                    f'not supported due to max variables restriction ({maximum} max).\n'
