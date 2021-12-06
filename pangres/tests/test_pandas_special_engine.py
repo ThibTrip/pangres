@@ -199,7 +199,7 @@ def test_error_index_level_named(engine, schema):
     df = pd.DataFrame({'test':[0]})
     with pytest.raises(UnnamedIndexLevelsException) as excinfo:
         PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
-        assert "All index levels must be named" in str(excinfo.value)
+    assert "All index levels must be named" in str(excinfo.value)
 
 @pytest.mark.parametrize("option", ['index and column collision', 'columns duplicated', 'index duplicated'])
 def test_duplicated_names(engine, schema, option):
@@ -216,14 +216,14 @@ def test_duplicated_names(engine, schema, option):
 
     with pytest.raises(DuplicateLabelsException) as excinfo:
         PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
-        assert "There cannot be duplicated names" in str(excinfo.value)
+    assert "Found duplicates across index and columns" in str(excinfo.value)
 
 
 def test_non_unique_index(engine, schema):
     df = pd.DataFrame(index=pd.Index(data=[0, 0], name='ix'))
     with pytest.raises(DuplicateValuesInIndexException) as excinfo:
         PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
-        assert "The index must be unique" in str(excinfo.value)
+    assert "The index must be unique" in str(excinfo.value)
 
 
 @pytest.mark.parametrize("bad_chunksize_value", [0, -1, 1.2])
@@ -233,4 +233,4 @@ def test_bad_chunksize(engine, schema, bad_chunksize_value):
     pse = PandasSpecialEngine(engine=engine, schema=schema, table_name='x', df=df)
     with pytest.raises(ValueError) as excinfo:
         pse._create_chunks(values=[0], chunksize=bad_chunksize_value)
-        assert "integer strictly above 0" in str(excinfo.value)
+    assert "integer strictly above 0" in str(excinfo.value)

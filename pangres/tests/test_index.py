@@ -63,7 +63,7 @@ def test_create_and_insert_table_multiindex(engine, schema):
 def test_index_with_null(engine, schema):
     df = pd.DataFrame({'ix':[None, 0], 'test': [0, 1]}).set_index('ix')
     with AutoDropTableContext(engine=engine, schema=schema, table_name='test_index_with_null') as ctx:
-        with pytest.raises(IntegrityError) as excinfo:
+        with pytest.raises(IntegrityError):
             upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update')
             # don't test error for mysql since only a warning is raised and the line is skipped
             if 'mysql' in engine.dialect.dialect_description:

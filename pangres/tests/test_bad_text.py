@@ -48,7 +48,7 @@ def test_bad_column_name_postgres_raises(engine, schema):
     with AutoDropTableContext(engine=engine, schema=schema, table_name='test_bad_col_name_pg') as ctx:
         with pytest.raises(BadColumnNamesException) as exc_info:
             upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update')
-            assert 'does not seem to support column names with' in str(exc_info.value)
+        assert 'does not seem to support column names with' in str(exc_info.value)
 
 
 # -
