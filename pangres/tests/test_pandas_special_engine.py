@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
+import datetime
 import logging
+import numpy as np
 import pandas as pd
 import pytest
-from sqlalchemy import VARCHAR, text
+from sqlalchemy import create_engine, text, VARCHAR
+from sqlalchemy.sql.elements import Null as SqlaNull
 from pangres.examples import _TestsExampleTable
 from pangres.exceptions import (DuplicateLabelsException,
                                 DuplicateValuesInIndexException,
@@ -79,7 +82,7 @@ def test_table_creation(engine, schema):
 
 def test_add_new_columns(engine, schema):
     # store arguments we will use for both AutoDropTableContext and PandasSpecialEngine
-    common_kwargs = dict(engine=engine, schema=schema, table_name='test_pandas_special_engine')
+    common_kwargs = dict(engine=engine, schema=schema, table_name='test_pse_add_new_columns')
     common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=10)
     with AutoDropTableContext(df=df, **common_kwargs) as ctx:
@@ -155,6 +158,36 @@ def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_co
             pse.adapt_dtype_of_empty_db_columns()
         assert len(caplog.records) == 1
         assert 'Changed type of column empty_col' in caplog.text
+
+
+def test_values_conversion(_):
+    engine = create_engine('sqlite:///')
+    row = {'id':0,
+           'pd_interval':pd.Interval(left=0, right=5),
+           'nan':np.nan,
+           'nat':pd.NaT,
+           'none':None,
+           'pd_na':getattr(pd, 'NA', None),
+           'ts':pd.Timestamp('2021-01-01')}
+    df = pd.DataFrame([row]).set_index('id')
+    pse = PandasSpecialEngine(engine=engine, df=df, table_name='test_values_conversion')
+    values = pse._get_values_to_insert()
+    converted_row = values[0]
+    assert len(row) == len(converted_row)
+    # iterate over the keys of the row and get the index (after conversion we just have a list)
+    for ix, k in enumerate(row):
+        v = row[k]
+        v_converted = converted_row[ix]
+        if k == 'id':
+            assert v_converted == v
+        elif k == 'pd_interval':
+            assert isinstance(v_converted, str)
+        elif k == 'ts':
+            assert isinstance(v_converted, datetime.datetime)
+        # we should receive all null likes here
+        else:
+            assert pd.isna(v)
+            assert isinstance(v_converted, SqlaNull)
 
 
 # -
