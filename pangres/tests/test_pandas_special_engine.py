@@ -190,6 +190,22 @@ def test_values_conversion(_):
             assert isinstance(v_converted, SqlaNull)
 
 
+# dummy connection string to test our categorization for databases
+params_db_type_tests = [('sqlite:///', 'sqlite'),
+                        ('postgresql+psycopg2://username:password@localhost:5432/postgres', 'postgres'),
+                        ('postgresql://username:password@localhost:5432/postgres', 'postgres'),
+                        ('mysql+pymysql://username:password@localhost:3306/db', 'mysql'),
+                        ('oracle+cx_oracle://username:password@localhost', 'other')]
+
+
+@pytest.mark.parametrize("connection_string, expected", params_db_type_tests)
+def test_detect_db_type(_, connection_string, expected):
+    engine = create_engine(connection_string)
+    df = _TestsExampleTable.create_example_df(nb_rows=1)
+    pse = PandasSpecialEngine(engine=engine, df=df, table_name='test_detect_db_type')
+    assert pse._db_type == expected
+
+
 # -
 
 # # Test errors
