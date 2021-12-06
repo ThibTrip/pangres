@@ -9,3 +9,4 @@ dependencies:
   - pip
   - pip:
     - npdoc_to_md
+    - cx_Oracle
