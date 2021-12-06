@@ -267,6 +267,11 @@ def upsert(engine,
     2 row(s) updated
     1 row(s) updated
     """
+    # verify arguments
+    if if_row_exists not in ('ignore', 'update'):
+        raise ValueError('if_row_exists must be "ignore" or "update"')
+
+    # use helpers
     pse = PandasSpecialEngine(engine=engine,
                               df=df,
                               table_name=table_name,

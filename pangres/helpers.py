@@ -2,18 +2,16 @@
 Functions/classes/variables for interacting between a pandas DataFrame
 and postgres/mysql/sqlite (and potentially other databases).
 """
-import json
 import pandas as pd
 import logging
 import re
 import sqlalchemy as sa
-import sqlite3
 from copy import deepcopy
 from distutils.version import LooseVersion
 from math import floor
 from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.sql import null
-from sqlalchemy.schema import (PrimaryKeyConstraint, CreateColumn, CreateSchema)
+from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
 from pangres.logger import log
@@ -555,9 +553,7 @@ class PandasSpecialEngine:
             (sqlalchemy.engine.cursor.LegacyCursorResult)
             at each chunk with which you can for instance count rows.
         """
-        # VERIFY ARGUMENTS
-        if if_row_exists not in ('ignore', 'update'):
-            raise ValueError('if_row_exists must be "ignore" or "update"')
+        assert if_row_exists in ('ignore', 'update')
         # convert values if needed
         values = self._get_values_to_insert()
         # recalculate chunksize for sqlite
