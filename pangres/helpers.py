@@ -21,6 +21,7 @@ from pangres.exceptions import (BadColumnNamesException,
                                 DuplicateLabelsException,
                                 DuplicateValuesInIndexException,
                                 HasNoSchemaSystemException,
+                                MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
 from pangres.upsert import UpsertQuery
 
@@ -314,9 +315,9 @@ class PandasSpecialEngine:
                        if col.name not in self.get_db_columns_names()]
         # check columns are not index levels
         if any((c.name in self.df.index.names for c in cols_to_add)):
-            raise ValueError(('Cannot add any column that is part of the df index!\n'
-                              "You'll have to update your table primary key or change your "
-                              "df index"))
+            raise MissingIndexLevelInSqlException('Cannot add any column that is part of the df index!\n'
+                                                  "You'll have to update your table primary key or change your "
+                                                  "df index")
 
         with self.engine.connect() as con:
             ctx = MigrationContext.configure(con)

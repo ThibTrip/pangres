@@ -135,6 +135,9 @@ def upsert(engine,
         When any entry in the df's index is duplicated
     pangres.exceptions.DuplicateLabelsException
         When any name across the df's index/columns appears more than once
+    pangres.exceptions.MissingIndexLevelInSqlException
+        When `add_new_columns` is True but one of the columns missing
+        in the SQL table is actually part of the df's index
 
     Examples
     --------

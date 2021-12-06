@@ -48,3 +48,12 @@ class DuplicateLabelsException(Exception):
     across columns and index levels
     """
     pass
+
+
+class MissingIndexLevelInSqlException(Exception):
+    """
+    Raised when the user asks to add a column into a SQL table
+    but the column is part of the index we are supposed to use
+    to upsert data
+    """
+    pass
