@@ -9,7 +9,8 @@ We will create a table and then insert with update and then ignore for the
 """
 import pandas as pd
 import pytest
-from sqlalchemy import VARCHAR
+from sqlalchemy import create_engine, text, VARCHAR
+from sqlalchemy.exc import ProgrammingError, OperationalError
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
 from pangres.exceptions import HasNoSchemaSystemException
@@ -79,6 +80,21 @@ def test_end_to_end(engine, schema, create_table, if_row_exists, df_expected):
         upsert(engine=engine, schema=schema, df=df2, if_row_exists=if_row_exists, dtype=dtype, table_name=table_name,
                create_table=create_table)
         pd.testing.assert_frame_equal(df_expected, read_table())
+
+
+
+
+def test_cannot_insert_missing_table_no_create(engine, schema):
+    """
+    Check if an error is raised when trying to insert in a missing table
+    and `create_table` is False.
+    """
+    df = pd.DataFrame({'id':[0]}).set_index('id')
+    with AutoDropTableContext(engine=engine, table_name='test_fail_missing_table') as ctx:
+        with pytest.raises((OperationalError, ProgrammingError)) as excinfo:
+            upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name,
+                   if_row_exists='update', create_table=False)
+            assert any(s in str(excinfo.value) for s in ('no such table', 'does not exist'))
 
 
 def test_create_schema_none(engine, schema):
