@@ -1,5 +1,3 @@
-# Logging
-
 You can set the logging level of pangres by setting the environment variable `PANGRES_LOG_LEVEL` before the first call to one of `pangres`'s functions (ideally do it even before importing `pangres`).
 
 ```python

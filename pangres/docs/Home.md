@@ -8,7 +8,7 @@ Welcome to the pangres wiki!
 
 [Logging](https://github.com/ThibTrip/pangres/wiki/Logging)
 
-See also [**demo notebook**](https://github.com/ThibTrip/pangres/blob/master/pangres/docs/pangres_demo.ipynb)
+See also [**demo notebook**](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo.ipynb)
 
 # Notes
 
