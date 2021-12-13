@@ -122,9 +122,11 @@ class TransactionHandler:
             self.rollback_or_commit(exception_occured=exception_occured)
         finally:
             try:
+                # close transaction if we created one
                 if self.transaction is not None:
                     self.transaction.close()
             finally:
+                # close connection if we created one (user passed an Engine and not a Connection)
                 if isinstance(self.connectable, Engine):
                     logger.debug('Closing connection we created at the context manager start')
                     self.connection.close()
