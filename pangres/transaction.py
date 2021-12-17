@@ -85,10 +85,14 @@ class TransactionHandler:
 
         # 2) get transaction
         if not self.connection.in_transaction():
-            self.transaction = self.connection.begin()
+            # handle case where for some reason we would not be able to create a transaction
+            try:
+                self.transaction = self.connection.begin()
+            except Exception as e:  # pragma: no cover
+                self._close_resources()
+                raise e
         return self
 
-    # helpers for __exit__
     def _rollback_or_commit(self, exception_occured:bool):
         # case where we were inside a transaction from the user
         # the user will have to handle rollback and commit
