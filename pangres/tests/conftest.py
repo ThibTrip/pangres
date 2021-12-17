@@ -10,8 +10,8 @@ import os
 import pandas as pd
 from inspect import signature
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine.base import Engine
-from typing import Optional, Dict
+from sqlalchemy.engine.base import Connection, Engine
+from typing import Dict, Optional, Union
 
 from pangres.helpers import _sqla_gt14, PandasSpecialEngine
 
@@ -38,32 +38,36 @@ class AutoDropTableContext:
     >>> from sqlalchemy import create_engine
     >>>
     >>> # config
-    >>> engine = create_engine('sqlite://')
     >>> df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
+    >>> engine = create_engine('sqlite://')
     >>> table_name = 'test'
     >>>
     >>> with AutoDropTableContext(engine=engine, df=df, schema=None, table_name=table_name) as ctx:
     ...     upsert(engine=engine, df=df, if_row_exists='update', schema=ctx.schema, table_name=ctx.table_name)
     ...     ctx.pse.table_exists()
     True
-    >>> ctx.pse.table_exists()
+    >>> new_pse = PandasSpecialEngine(connection=engine.connect(), df=df, table_name=table_name)
+    >>> new_pse.table_exists()
     False
     """
 
     def __init__(self, engine:Engine, table_name:str, df:Optional[pd.DataFrame]=None,
                  schema:Optional[str]=None, dtype:Optional[Dict]=None, drop_on_exit:bool=True):
-        if df is not None:
-            self.pse = PandasSpecialEngine(engine=engine, df=df, table_name=table_name, schema=schema, dtype=dtype)
-        schema = 'public' if 'postgres' in engine.dialect.dialect_description and schema is None else schema
         self.engine = engine
-        self.schema = schema
+        self.schema = 'public' if 'postgres' in engine.dialect.dialect_description and schema is None else schema
         self.table_name = table_name
+        self.df = df
         self.namespace = f'{schema}.{table_name}' if schema is not None else table_name
         self.dtype = dtype
         self._drop_on_exit = drop_on_exit
 
+        # this will be set upon entering the context and only if df is not None
+        self.pse:Union[PandasSpecialEngine,None] = None
+        self.connection:Union[Connection,None] = None
+
     # helper
     def drop_table(self):
+        # make sure to commit this!
         with self.engine.connect() as connection:
             connection.execute(text(f'DROP TABLE IF EXISTS {self.namespace};'))
             if hasattr(connection, 'commit'):
@@ -71,9 +75,17 @@ class AutoDropTableContext:
 
     def __enter__(self):
         self.drop_table()
+        if self.df is None:
+            return self
+        self.connection = self.engine.connect()
+        self.pse = PandasSpecialEngine(connection=self.connection, df=self.df,
+                                       schema=self.schema, table_name=self.table_name,
+                                       dtype=self.dtype)
         return self
 
     def __exit__(self, type, value, traceback):
+        if self.connection is not None:
+            self.connection.close()
         if self._drop_on_exit:
             self.drop_table()
         return False  # raise any error
