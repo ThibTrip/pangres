@@ -4,8 +4,7 @@ Read docstring of main class Executor
 """
 import pandas as pd
 from sqlalchemy.engine.base import Connection, Engine
-from sqlalchemy.engine.cursor import LegacyCursorResult
-from typing import Generator, Union
+from typing import Union
 
 # local imports
 from pangres.helpers import PandasSpecialEngine
@@ -90,8 +89,7 @@ class Executor:
                 return
             pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize)
 
-    def execute_yield(self, connectable:Connectable, if_row_exists:str,
-                      chunksize:int) -> Generator[LegacyCursorResult, None, None]:
+    def execute_yield(self, connectable:Connectable, if_row_exists:str, chunksize:int):
         """
         Same as `execute` but for each chunk upserted yields a
         `sqlalchemy.engine.cursor.LegacyCursorResult` object with which
