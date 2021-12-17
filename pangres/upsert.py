@@ -18,11 +18,12 @@ class UpsertQuery:
     >>> from pangres.helpers import PandasSpecialEngine
     >>> from pangres.examples import DocsExampleTable
     >>> from sqlalchemy import create_engine
-    >>> 
-    >>> engine = create_engine('sqlite:///:memory:')
+    >>>
+    >>> engine = create_engine('sqlite://')
     >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
     >>> upq = UpsertQuery(engine=engine, table=table)
     """
+
     def __init__(self, engine, table):
         self.engine = engine
         self.table = table
@@ -112,11 +113,11 @@ class UpsertQuery:
         >>> from sqlalchemy import create_engine
         >>>
         >>> test_values = [['foo', 'foo@test.com', pd.Timestamp('2021-01-01', tz='UTC'), 1.4, True, ['blue']]]
+        >>> engine = create_engine('sqlite://')
         >>> pprint_query = lambda query: print(str(query).replace('ON CONFLICT', '\nON CONFLICT')
         ...                                    .replace('SET', '\nSET').replace('ON DUPLICATE', '\nON DUPLICATE'))
         >>>
         >>> # sqlite
-        >>> engine = create_engine('sqlite:///:memory:')
         >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
         >>> upq = UpsertQuery(engine=engine, table=table)
         >>> query = upq.create_query(db_type='sqlite', values=test_values, if_row_exists='update')

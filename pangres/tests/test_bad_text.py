@@ -24,6 +24,7 @@ def test_bad_text_insert(engine, schema):
         upsert(engine=engine, schema=schema, table_name=ctx.table_name, df=df_test,
                if_row_exists='update')
 
+
 def test_bad_column_names(engine, schema):
     # add columns with bad names
     # don't do this for MySQL which has more strict rules for column names
@@ -40,6 +41,7 @@ def test_bad_column_names(engine, schema):
             df_test = fix_psycopg2_bad_cols(df_test)
         with AutoDropTableContext(engine=engine, schema=schema, table_name=f'test_bad_col_names_{i}') as ctx:
             upsert(engine=engine, schema=schema, df=df_test, table_name=ctx.table_name, if_row_exists='update')
+
 
 def test_bad_column_name_postgres_raises(engine, schema):
     if 'postgres' not in engine.dialect.dialect_description:

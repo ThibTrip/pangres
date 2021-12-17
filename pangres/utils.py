@@ -5,7 +5,7 @@ from pangres.exceptions import DuplicateLabelsException, UnnamedIndexLevelsExcep
 
 # # Function to fix bad column names for psycopg2
 
-def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements={'%':'', '(':'', ')':''}) -> pd.DataFrame:
+def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements:dict={'%':'', '(':'', ')':''}) -> pd.DataFrame:
     """
     Replaces '%', '(' and ')' (characters that won't play nicely or even
     at all with psycopg2) in column and index names in a deep copy of df.
