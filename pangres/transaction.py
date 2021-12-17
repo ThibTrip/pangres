@@ -58,6 +58,20 @@ class TransactionHandler:
         self.connection:Connection = None
         self.transaction:Union[Transaction, None] = None
 
+    def _close_resources(self):
+        # we are nesting try...finally (see __exit__ method) to ensure
+        # both resources get closed and we get all tracebacks (we'll see "... another exception occured")
+        # idk if this is the best way to do this but my only other idea was raising two errors at once
+        # (in case the transaction and/or the connection does not close) which does not seem user-friendly
+        try:
+            # close transaction if we created one
+            if self.transaction is not None:
+                self.transaction.close()
+        finally:
+            # close connection if we created one
+            if self.connection is not None and isinstance(self.connectable, Engine):
+                self.connection.close()
+
     def __enter__(self):
 
         # 1) get(create) connection
@@ -86,20 +100,6 @@ class TransactionHandler:
             self.transaction.rollback()
         else:
             self.transaction.commit()
-
-    def _close_resources(self):
-        # we are nesting try...finally (see __exit__ method) to ensure
-        # both resources get closed and we get all tracebacks (we'll see "... another exception occured")
-        # idk if this is the best way to do this but my only other idea was raising two errors at once
-        # (in case the transaction and/or the connection does not close) which does not seem user-friendly
-        try:
-            # close transaction if we created one
-            if self.transaction is not None:
-                self.transaction.close()
-        finally:
-            # close connection if we created one (user passed an Engine and not a Connection)
-            if isinstance(self.connectable, Engine):
-                self.connection.close()
 
     def __exit__(self, ex_type, value, traceback) -> bool:
         # make sure __enter__ was properly executed
