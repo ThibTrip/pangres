@@ -3,9 +3,11 @@ Functions for preparing/compiling and executing upsert statements
 in different SQL flavors.
 """
 from copy import deepcopy
-from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
+from sqlalchemy.engine.base import Connection
+from sqlalchemy.schema import Table
+from sqlalchemy.sql.compiler import SQLCompiler
 
 # # Main class `UpsertQuery`
 
@@ -20,12 +22,14 @@ class UpsertQuery:
     >>> from sqlalchemy import create_engine
     >>>
     >>> engine = create_engine('sqlite://')
-    >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
-    >>> upq = UpsertQuery(engine=engine, table=table)
+    >>> with engine.connect() as connection:
+    ...     table = PandasSpecialEngine(connection=connection, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+    ...     upq = UpsertQuery(connection=connection, table=table)
     """
 
-    def __init__(self, engine, table):
-        self.engine = engine
+    def __init__(self, connection:Connection, table:Table):
+        assert isinstance(connection, Connection)
+        self.connection = connection
         self.table = table
 
     def _create_pg_query(self, values:list, if_row_exists:str) -> str:
@@ -72,10 +76,10 @@ class UpsertQuery:
             # which we could not use in e.g. SQlite
             unbound_col = deepcopy(col)
             unbound_col.table = None
-            return str(unbound_col.compile(dialect=self.engine.dialect))
+            return str(unbound_col.compile(dialect=self.connection.dialect))
 
         # prepare start of upsert (INSERT VALUES (...) ON CONFLICT)
-        upsert = SQLCompiler(dialect=self.engine.dialect,
+        upsert = SQLCompiler(dialect=self.connection.dialect,
                              statement=self.table.insert().values(values))
 
         # append on conflict clause
@@ -98,9 +102,9 @@ class UpsertQuery:
 
         Parameters
         ----------
-        db_type : str
+        db_type
             One of "postgres", "mysql", "sqlite" or "other"
-        values : list
+        values
             The structure for the values must match the table defined
             at instantiation (e.g. same order for the columns)
         if_row_exists : {'ignore', 'update'}
@@ -112,38 +116,24 @@ class UpsertQuery:
         >>> from pangres.examples import DocsExampleTable
         >>> from sqlalchemy import create_engine
         >>>
+        >>> # config
         >>> test_values = [['foo', 'foo@test.com', pd.Timestamp('2021-01-01', tz='UTC'), 1.4, True, ['blue']]]
         >>> engine = create_engine('sqlite://')
+        >>>
+        >>> # helpers
         >>> pprint_query = lambda query: print(str(query).replace('ON CONFLICT', '\nON CONFLICT')
         ...                                    .replace('SET', '\nSET').replace('ON DUPLICATE', '\nON DUPLICATE'))
         >>>
-        >>> # sqlite
-        >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
-        >>> upq = UpsertQuery(engine=engine, table=table)
-        >>> query = upq.create_query(db_type='sqlite', values=test_values, if_row_exists='update')
+        >>>
+        >>> with engine.connect() as connection:
+        ...     table = PandasSpecialEngine(connection=connection, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+        ...     upq = UpsertQuery(connection=connection, table=table)
+        ...     query = upq.create_query(db_type='sqlite', values=test_values, if_row_exists='update')
+        >>>
         >>> pprint_query(query)
         INSERT INTO doc_upsert (ix, email, ts, float, bool, json) VALUES (?, ?, ?, ?, ?, ?) 
         ON CONFLICT (ix) DO UPDATE 
         SET email=EXCLUDED.email, ts=EXCLUDED.ts, float=EXCLUDED.float, bool=EXCLUDED.bool, json=EXCLUDED.json
-
-        >>> # postgres (note: the connection does not need to be valid)
-        >>> engine = create_engine('postgresql+psycopg2://user:password@localhost:5432/postgres')
-        >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
-        >>> upq = UpsertQuery(engine=engine, table=table)
-        >>> query = upq.create_query(db_type='postgres',values=test_values, if_row_exists='update')
-        >>> pprint_query(query)
-        INSERT INTO public.doc_upsert (ix, email, ts, float, bool, json) VALUES (%(ix_m0)s, %(email_m0)s, %(ts_m0)s, %(float_m0)s, %(bool_m0)s, %(json_m0)s) 
-        ON CONFLICT (ix) DO UPDATE 
-        SET email = excluded.email, ts = excluded.ts, float = excluded.float, bool = excluded.bool, json = excluded.json
-
-        >>> # mysql (note: the connection does not need to be valid)
-        >>> engine = create_engine('mysql+pymysql://user:password@host:3306/db')
-        >>> table = PandasSpecialEngine(engine=engine, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
-        >>> upq = UpsertQuery(engine=engine, table=table)
-        >>> query = upq.create_query(db_type='mysql',values=test_values, if_row_exists='update')
-        >>> pprint_query(query)
-        INSERT INTO doc_upsert (ix, email, ts, `float`, bool, json) VALUES (%(ix_m0)s, %(email_m0)s, %(ts_m0)s, %(float_m0)s, %(bool_m0)s, %(json_m0)s) 
-        ON DUPLICATE KEY UPDATE email = VALUES(email), ts = VALUES(ts), `float` = VALUES(`float`), bool = VALUES(bool), json = VALUES(json)
 
         >>> # unsupported databases will raise a NotImplementedError
         >>> try:
@@ -164,8 +154,4 @@ class UpsertQuery:
 
     def execute(self, db_type:str, values:list, if_row_exists:str):
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
-        with self.engine.connect() as connection:
-            result = connection.execute(query)
-            if hasattr(connection, 'commit'):
-                connection.commit()
-        return result
+        return self.connection.execute(query)
