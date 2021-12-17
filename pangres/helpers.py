@@ -304,8 +304,6 @@ class PandasSpecialEngine:
         """
         # get column names in db
         db_columns = self.get_db_columns_names()
-        if db_columns is None:  # handle case of missing table
-            return
         # create deepcopies of the column because we are going to unbound
         # them for the table model (otherwise alembic would think we add
         # a column that already exists in the database)
