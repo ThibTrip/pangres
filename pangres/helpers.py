@@ -11,7 +11,7 @@ from distutils.version import LooseVersion
 from math import floor
 from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.sql import null
-from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema
+from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema, Table
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
 from pangres.logger import log
@@ -22,6 +22,7 @@ from pangres.exceptions import (BadColumnNamesException,
                                 MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
 from pangres.upsert import UpsertQuery
+from typing import Optional, Union
 
 # # Regexes
 
@@ -33,7 +34,7 @@ RE_BAD_COL_NAME = re.compile(r'[\(\)\%]')
 RE_CHARCOUNT_COL_TYPE = re.compile(r'(?<=.)+\(\d+\)')
 
 
-# # "Adapter" for sqlalchemy (handle pre and post version 1.4)
+# # Versions checking
 
 # +
 def _sqla_gt14() -> bool:
@@ -66,10 +67,10 @@ class PandasSpecialEngine:
 
     def __init__(self,
                  engine,
-                 df,
-                 table_name,
-                 schema=None,
-                 dtype=None):
+                 df:pd.DataFrame,
+                 table_name:str,
+                 schema:Optional[str]=None,
+                 dtype:Optional[dict]=None):
         """
         Interacts with SQL tables via pandas and SQLalchemy table models.
 
@@ -93,9 +94,9 @@ class PandasSpecialEngine:
             and examples below)
         df : pd.DataFrame
             A pandas DataFrame
-        table_name : str
+        table_name
             Name of the SQL table
-        schema : str or None, default None
+        schema
             Name of the schema that contains/will contain the table
             For postgres defaults to "public" if not provided.
         dtype : None or dict {str:SQL_TYPE}, default None
@@ -162,16 +163,18 @@ class PandasSpecialEngine:
                                            f"and columns: {duplicated_labels}")
 
         # detect json columns
-        def is_json(col):
+        def is_json(col:str):
             s = df[col].dropna()
             return (not s.empty and
                     s.map(lambda x: isinstance(x, (list, dict))).all())
         json_cols = [col for col in df.columns if is_json(col)]
+
         # merge with dtype from user
         new_dtype = {c:JSON for c in json_cols}
         if dtype is not None:
             new_dtype.update(dtype)
         new_dtype = None if new_dtype == {} else new_dtype
+
         # create sqlalchemy table model via pandas
         pandas_sql_engine = pd.io.sql.SQLDatabase(engine=engine, schema=schema)
         table = pd.io.sql.SQLTable(name=table_name,
@@ -237,11 +240,6 @@ class PandasSpecialEngine:
         """
         Returns True if the table defined in given instance
         of PandasSpecialEngine exists else returns False.
-
-        Returns
-        -------
-        exists : bool
-            True if table exists else False
         """
         if _sqla_gt14():
             import sqlalchemy as sa
@@ -436,7 +434,7 @@ class PandasSpecialEngine:
                         con.commit()
 
     @staticmethod
-    def _create_chunks(values, chunksize=10000):
+    def _create_chunks(values:list, chunksize:int=10000):
         """
         Chunks a list into a list of lists of size
         :chunksize:.
@@ -486,7 +484,7 @@ class PandasSpecialEngine:
                     values[i][j] = str(val)
         return values
 
-    def _sqlite_chunsize_fix(self, chunksize):
+    def _sqlite_chunsize_fix(self, chunksize:int):
         """
         Changes the chunksize given by the user to circumvent the max of 999 parameters
         for sqlite.

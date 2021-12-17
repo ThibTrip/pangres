@@ -5,6 +5,9 @@ This module contains the functions of pangres
 that will be directly exposed to its users.
 """
 from pangres.helpers import PandasSpecialEngine
+import pandas as pd
+from sqlalchemy.engine.base import Engine
+from typing import Optional, Union
 
 
 # # Local helpers
@@ -29,18 +32,18 @@ def empty_generator():
 
 # # upsert
 
-def upsert(engine,
-           df,
-           table_name,
-           if_row_exists,
-           schema=None,
-           create_schema=False,
-           create_table=True,
-           add_new_columns=False,
-           adapt_dtype_of_empty_db_columns=False,
-           chunksize=10000,
-           dtype=None,
-           yield_chunks=False):
+def upsert(engine:Engine,
+           df:pd.DataFrame,
+           table_name:str,
+           if_row_exists:str,
+           schema:Optional[str]=None,
+           create_schema:bool=False,
+           create_table:bool=True,
+           add_new_columns:bool=False,
+           adapt_dtype_of_empty_db_columns:bool=False,
+           chunksize:int=10000,
+           dtype:Union[dict,None]=None,
+           yield_chunks:bool=False):
     """
     Insert updates/ignores a pandas DataFrame into a SQL table (or
     creates a SQL table from the DataFrame if it does not exist).

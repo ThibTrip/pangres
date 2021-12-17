@@ -28,7 +28,7 @@ class UpsertQuery:
         self.engine = engine
         self.table = table
 
-    def _create_pg_query(self, values, if_row_exists):
+    def _create_pg_query(self, values:list, if_row_exists:str) -> str:
         insert_stmt = pg_insert(self.table).values(values)
         if if_row_exists == 'update':
             update_cols = [c.name
@@ -44,7 +44,7 @@ class UpsertQuery:
             upsert = insert_stmt.on_conflict_do_nothing()
         return upsert
 
-    def _create_mysql_query(self, values, if_row_exists):
+    def _create_mysql_query(self, values:list, if_row_exists:str) -> str:
         insert_stmt = mysql_insert(self.table).values(values)
         if if_row_exists == 'update':
             # thanks to: https://stackoverflow.com/a/58180407/10551772
@@ -65,7 +65,7 @@ class UpsertQuery:
             upsert = insert_stmt.prefix_with('IGNORE')
         return upsert
 
-    def _create_sqlite_query(self, values, if_row_exists):
+    def _create_sqlite_query(self, values:list, if_row_exists:str) -> str:
         def escape_col(col):
             # unbound column from its table
             # otherwise the column would compile as "table.col_name"
@@ -92,7 +92,7 @@ class UpsertQuery:
             upsert.string = ' '.join((upsert.string, ondup, ondup_action, updates))
         return upsert
 
-    def create_query(self, db_type, values, if_row_exists):
+    def create_query(self, db_type:str, values:list, if_row_exists:str) -> str:
         r"""
         Helper for creating UPSERT queries in various SQL flavors
 
@@ -162,7 +162,7 @@ class UpsertQuery:
             raise NotImplementedError(f'No query creation method for {db_type}. '
                                       f'Expected one of {list(query_creation_methods.keys())}')
 
-    def execute(self, db_type, values, if_row_exists):
+    def execute(self, db_type:str, values:list, if_row_exists:str):
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
         with self.engine.connect() as connection:
             result = connection.execute(query)
