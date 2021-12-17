@@ -37,15 +37,19 @@ class AutoDropTableContext:
     >>> from pangres.helpers import PandasSpecialEngine
     >>> from sqlalchemy import create_engine
     >>>
+    >>> # config
+    >>> engine = create_engine('sqlite://')
     >>> df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
-    >>> engine = create_engine('sqlite:///:memory:')
-    >>> with AutoDropTableContext(engine=engine, df=df, schema=None, table_name='test') as ctx:
+    >>> table_name = 'test'
+    >>>
+    >>> with AutoDropTableContext(engine=engine, df=df, schema=None, table_name=table_name) as ctx:
     ...     upsert(engine=engine, df=df, if_row_exists='update', schema=ctx.schema, table_name=ctx.table_name)
     ...     ctx.pse.table_exists()
     True
     >>> ctx.pse.table_exists()
     False
     """
+
     def __init__(self, engine:Engine, table_name:str, df:Optional[pd.DataFrame]=None,
                  schema:Optional[str]=None, dtype:Optional[Dict]=None, drop_on_exit:bool=True):
         if df is not None:

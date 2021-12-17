@@ -11,6 +11,7 @@ from pangres.logger import log, loggers
 log_level_names = ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')
 log_level_values_to_names = {getattr(logging, k):k for k in log_level_names}
 
+
 @contextmanager
 def custom_logger(logger_level):
     # kick out any already initalized logger before setting the environment variable
@@ -45,6 +46,7 @@ def test_bad_log_level(_):
         log('test', level=5)
     assert 'not a valid log level' in str(exc_info.value)
 
+
 # by default DEBUG is not shown
 @pytest.mark.parametrize("test_level", [k for k, v in log_level_values_to_names.items() if v != 'DEBUG'], scope='session')
 def test_log_output(_, caplog, test_level):
@@ -54,6 +56,7 @@ def test_log_output(_, caplog, test_level):
     assert len(caplog.records) == 1
     assert caplog.records[0].levelname == log_level_values_to_names[test_level]
     assert txt in caplog.text
+
 
 def test_custom_level(_, caplog):
     base_text = 'TESTING CUSTOM LOGGER LEVEL'
