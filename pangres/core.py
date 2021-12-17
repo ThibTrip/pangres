@@ -149,7 +149,7 @@ def upsert(engine,
     >>> from sqlalchemy import create_engine, text, VARCHAR
     >>>
     >>> # create a SQLalchemy engine
-    >>> engine = create_engine("sqlite:///:memory:")
+    >>> engine = create_engine("sqlite://")
     >>>
     >>> # this is necessary if you want to test with MySQL
     >>> # instead of SQlite or Postgres because MySQL needs
@@ -244,7 +244,7 @@ def upsert(engine,
     >>> from sqlalchemy import create_engine, VARCHAR
     >>>
     >>> # config
-    >>> engine = create_engine("sqlite:///:memory:")
+    >>> engine = create_engine("sqlite://")
     >>> chunksize = 2
     >>>
     >>> # get a DataFrame from somwhere

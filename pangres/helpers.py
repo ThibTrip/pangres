@@ -503,7 +503,7 @@ class PandasSpecialEngine:
         >>> from sqlalchemy import create_engine
         >>>
         >>> # this assumes you have SQlite version >= 3.22.0 
-        >>> engine = create_engine("sqlite:///:memory:)")
+        >>> engine = create_engine("sqlite://")
         >>> df = pd.DataFrame({'name':['Albert']}).rename_axis(index='profileid')
         >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
         >>> pse._sqlite_chunsize_fix(chunksize=33000)
