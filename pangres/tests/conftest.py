@@ -78,6 +78,45 @@ def drop_table_for_test(table_name, drop_before_test=True, drop_after_test=True)
             return
         return wrapper
     return sub_decorator
+
+
+def get_table_namespace(schema, table_name):
+    return f'{schema}.{table_name}' if schema is not None else table_name
+
+
+def commit(connection):
+    if hasattr(connection, 'commit'):
+        connection.commit()
+
+
+class TableNames:
+    ADD_NEW_COLUMN = 'test_add_new_column'
+    BAD_COLUMN_NAMES = 'test_bad_column_names'
+    BAD_TEXT = 'test_bad_text'
+    CHANGE_EMPTY_COL_TYPE = 'test_change_empty_col_type'
+    COLUMN_NAMED_VALUES = 'test_column_named_values'
+    CREATE_SCHEMA_NONE = 'test_create_schema_none'
+    CREATE_SCHEMA_NOT_NONE = 'test_create_schema_not_none'
+    END_TO_END = 'test_end_to_end'
+    INDEX_ONLY_INSERT = 'test_index_only_insert'
+    INDEX_WITH_NULL = 'test_index_with_null'
+    MULTIINDEX = 'test_multiindex'
+    TABLE_CREATION = 'test_table_creation'
+    UNIQUE_KEY = 'test_unique_key'
+    VARIOUS_CHUNKSIZES = 'test_chunksize'
+    WITH_YIELD = 'test_with_yield'
+    WITH_YIELD_EMPTY = 'test_with_yield_empty'
+    # case when we need a table name but we are not going to use it for
+    # creating/updating a table (if you see it in the DB, something went wrong)
+    NO_TABLE = 'test_no_table'
+
+
+# name of the PostgreSQL schema used for testing schema creation
+schema_for_testing_creation = 'pangres_create_schema_test'
+
+
+# -
+
 # ## Class TestDB
 
 # +
@@ -86,6 +125,7 @@ def pytest_addoption(parser):
     parser.addoption('--pg_conn', action="store", type=str, default=None)
     parser.addoption('--mysql_conn', action="store", type=str, default=None)
     parser.addoption('--pg_schema', action='store', type=str, default=None)
+
 
 def pytest_generate_tests(metafunc):
     # this is called for every test
