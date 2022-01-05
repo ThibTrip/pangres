@@ -14,7 +14,8 @@ from sqlalchemy.exc import ProgrammingError, OperationalError
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
 from pangres.exceptions import HasNoSchemaSystemException
-from pangres.tests.conftest import (drop_table,
+from pangres.tests.conftest import (commit,
+                                    drop_table,
                                     drop_table_for_test,
                                     get_table_namespace,
                                     read_example_table_from_db,
@@ -165,8 +166,15 @@ def test_create_schema_none(engine, schema):
 
 
 def test_create_schema_not_none(engine, schema):
-    # local helper
+    # local helpers
     is_postgres = 'postgres' in engine.dialect.dialect_description
+
+    def drop_schema():
+        if not is_postgres:
+            return
+        with engine.connect() as connection:
+            connection.execute(text(f'DROP SCHEMA IF EXISTS {schema};'))
+            commit(connection)
 
     # overwrite schema
     schema = schema_for_testing_creation
@@ -179,6 +187,7 @@ def test_create_schema_not_none(engine, schema):
     # when having an optional arg schema=None due to variable scopes problems)
     if is_postgres:
         drop_table(engine=engine, schema=schema, table_name=table_name)
+        drop_schema()
 
     try:
         upsert(engine=engine, schema=schema, df=df, if_row_exists='update', create_schema=True,
@@ -192,6 +201,7 @@ def test_create_schema_not_none(engine, schema):
         else:
             assert isinstance(e, HasNoSchemaSystemException)
     finally:
-        # drop table after test
+        # drop table and schema after test
         if is_postgres:
             drop_table(engine=engine, schema=schema, table_name=table_name)
+            drop_schema()
