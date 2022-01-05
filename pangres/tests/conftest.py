@@ -5,92 +5,79 @@
 Configuration and helpers for the tests of pangres with pytest.
 """
 import json
-import logging
-import os
 import pandas as pd
+from functools import wraps
 from inspect import signature
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine.base import Connection, Engine
-from typing import Dict, Optional, Union
 
-from pangres.helpers import _sqla_gt14, PandasSpecialEngine
+from pangres.helpers import _sqla_gt14
 
 
 # -
 
-# # Helpers
+# # Helpers for other test modules
 
-class AutoDropTableContext:
+# +
+def _get_function_param_value(sig, param_name, args, kwargs):
     """
-    This context manager drops given table (if exists) before giving back
-    control and drops the table (if exists) again after you ran whichever tests
-    you wanted.
-
-    The context gets populated with every parameter of the init methods and
-    if a DataFrame is provided, you get an instance of `pangres.helpers.PandasSpecialEngine`
-    as well (under the attribute `pse`) which simplifies our testing.
-
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> from pangres import upsert
-    >>> from pangres.helpers import PandasSpecialEngine
-    >>> from sqlalchemy import create_engine
-    >>>
-    >>> # config
-    >>> df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
-    >>> engine = create_engine('sqlite://')
-    >>> table_name = 'test'
-    >>>
-    >>> with AutoDropTableContext(engine=engine, df=df, schema=None, table_name=table_name) as ctx:
-    ...     upsert(engine=engine, df=df, if_row_exists='update', schema=ctx.schema, table_name=ctx.table_name)
-    ...     ctx.pse.table_exists()
-    True
-    >>> new_pse = PandasSpecialEngine(connection=engine.connect(), df=df, table_name=table_name)
-    >>> new_pse.table_exists()
-    False
+    Helper to retrieve the value of a specific parameter
+    from *args and **kwargs like when we wrap a function
     """
-
-    def __init__(self, engine:Engine, table_name:str, df:Optional[pd.DataFrame]=None,
-                 schema:Optional[str]=None, dtype:Optional[Dict]=None, drop_on_exit:bool=True):
-        self.engine = engine
-        self.schema = 'public' if 'postgres' in engine.dialect.dialect_description and schema is None else schema
-        self.table_name = table_name
-        self.df = df
-        self.namespace = f'{schema}.{table_name}' if schema is not None else table_name
-        self.dtype = dtype
-        self._drop_on_exit = drop_on_exit
-
-        # this will be set upon entering the context and only if df is not None
-        self.pse:Union[PandasSpecialEngine,None] = None
-        self.connection:Union[Connection,None] = None
-
-    # helper
-    def drop_table(self):
-        # make sure to commit this!
-        with self.engine.connect() as connection:
-            connection.execute(text(f'DROP TABLE IF EXISTS {self.namespace};'))
-            if hasattr(connection, 'commit'):
-                connection.commit()
-
-    def __enter__(self):
-        self.drop_table()
-        if self.df is None:
-            return self
-        self.connection = self.engine.connect()
-        self.pse = PandasSpecialEngine(connection=self.connection, df=self.df,
-                                       schema=self.schema, table_name=self.table_name,
-                                       dtype=self.dtype)
-        return self
-
-    def __exit__(self, type, value, traceback):
-        if self.connection is not None:
-            self.connection.close()
-        if self._drop_on_exit:
-            self.drop_table()
-        return False  # raise any error
+    param_ix = list(sig.parameters).index(param_name)
+    if param_ix <= len(args) - 1:
+        return args[param_ix]
+    else:
+        return kwargs[param_name]
 
 
+def drop_table(engine, schema, table_name):
+    # make sure to commit this!
+    namespace = f'{schema}.{table_name}' if schema is not None else table_name
+    with engine.connect() as connection:
+        connection.execute(text(f'DROP TABLE IF EXISTS {namespace};'))
+        if hasattr(connection, 'commit'):
+            connection.commit()
+
+
+# thanks to https://stackoverflow.com/a/42581103
+def drop_table_for_test(table_name, drop_before_test=True, drop_after_test=True):
+    """
+    Decorator for wrapping our tests functions. Expects the tests function
+    to have the arguments "engine" and "schema" and will retrieve their values
+    for dropping the table named `table_name`.
+
+    Parameters
+    ----------
+    drop_before_test
+        Whether to drop the table before executing the test
+    drop_after_test
+        Whether to drop the table after executing the test
+    """
+    assert drop_before_test or drop_after_test, 'One of drop_before_test or drop_after_test must be True'
+
+    def sub_decorator(function):
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            # get engine and schema
+            sig = signature(function)
+            assert 'engine' in sig.parameters
+            assert 'schema' in sig.parameters
+            engine = _get_function_param_value(sig=sig, param_name='engine', args=args, kwargs=kwargs)
+            schema = _get_function_param_value(sig=sig, param_name='schema', args=args, kwargs=kwargs)
+
+            # before test
+            if drop_before_test:
+                drop_table(engine=engine, schema=schema, table_name=table_name)
+
+            # test
+            function(*args, **kwargs)
+
+            # after test
+            if drop_after_test:
+                drop_table(engine=engine, schema=schema, table_name=table_name)
+            return
+        return wrapper
+    return sub_decorator
 # ## Class TestDB
 
 # +
