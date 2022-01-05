@@ -14,7 +14,12 @@ from sqlalchemy.exc import ProgrammingError, OperationalError
 from pangres import upsert
 from pangres.examples import _TestsExampleTable
 from pangres.exceptions import HasNoSchemaSystemException
-from pangres.tests.conftest import read_example_table_from_db, AutoDropTableContext
+from pangres.tests.conftest import (drop_table,
+                                    drop_table_for_test,
+                                    get_table_namespace,
+                                    read_example_table_from_db,
+                                    schema_for_testing_creation,
+                                    TableNames)
 
 
 # # Helpers
@@ -64,80 +69,90 @@ df_after_insert_ignore = pd.concat(objs=(df,
 @pytest.mark.parametrize('if_row_exists, df_expected', [['update', df_after_insert_update],
                                                         ['ignore', df_after_insert_ignore]],
                          ids=['update', 'ignore'])
+@drop_table_for_test(TableNames.END_TO_END)
 def test_end_to_end(engine, schema, create_table, if_row_exists, df_expected):
-    # helpers
-    ## dtype for index for MySQL... (can't have flexible text length)
+    # config
+    # dtype for index for MySQL... (can't have flexible text length)
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
+    table_name = TableNames.END_TO_END
+    # common kwargs for every time we use the upsert function
+    common_kwargs = dict(if_row_exists=if_row_exists, dtype=dtype, table_name=table_name)
     read_table = lambda: read_example_table_from_db(engine=engine, schema=schema, table_name=table_name).sort_index()
 
-    with AutoDropTableContext(engine=engine, schema=schema, table_name=table_name):
-        # 1. create table
-        upsert(engine=engine, schema=schema, df=df, if_row_exists=if_row_exists, dtype=dtype, table_name=table_name,
-               create_table=True)
-        pd.testing.assert_frame_equal(df, read_table())
+    # 1. create table
+    upsert(engine=engine, schema=schema, df=df, create_table=True, **common_kwargs)
+    pd.testing.assert_frame_equal(df, read_table())
 
-        # 2. insert update/ignore
-        upsert(engine=engine, schema=schema, df=df2, if_row_exists=if_row_exists, dtype=dtype, table_name=table_name,
-               create_table=create_table)
-        pd.testing.assert_frame_equal(df_expected, read_table())
+    # 2. insert update/ignore
+    upsert(engine=engine, schema=schema, df=df2, create_table=create_table, **common_kwargs)
+    pd.testing.assert_frame_equal(df_expected, read_table())
 
 
 def test_bad_value_if_row_exists(_):
     df = pd.DataFrame({'id':[0]}).set_index('id')
     engine = create_engine('sqlite:///')
-    with AutoDropTableContext(engine=engine, schema=None, table_name='test_fail_missing_table') as ctx:
-        with pytest.raises(ValueError) as excinfo:
-            upsert(engine=engine, df=df, table_name=ctx.table_name, if_row_exists='test')
-        assert 'must be "ignore" or "update"' in str(excinfo.value)
+    with pytest.raises(ValueError) as excinfo:
+        upsert(engine=engine, df=df, table_name=TableNames.NO_TABLE, if_row_exists='test')
+    assert 'must be "ignore" or "update"' in str(excinfo.value)
 
 
-def test_add_column(engine, schema):
+@drop_table_for_test(TableNames.ADD_NEW_COLUMN)
+def test_add_new_column(engine, schema):
+    # config
+    table_name = TableNames.ADD_NEW_COLUMN
+    ns = get_table_namespace(schema=schema, table_name=table_name)
     dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = pd.DataFrame({'id':['foo']}).set_index('id')
-    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_add_column') as ctx:
-        # 1. create table
-        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
-               dtype=dtype)
-        # 2. add a new column and repeat upsert
-        df['new_column'] = 'bar'
-        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
-               add_new_columns=True, dtype=dtype)
-        # verify content matches
-        with engine.connect() as connection:
-            df_db = pd.read_sql(text(f'SELECT * FROM {ctx.namespace}'), con=connection, index_col='id')
-            pd.testing.assert_frame_equal(df, df_db)
+    # common kwargs for all the times we use upsert
+    common_kwargs = dict(engine=engine, schema=schema, df=df, table_name=table_name,
+                         if_row_exists='update', dtype=dtype)
+
+    # 1. create table
+    upsert(**common_kwargs)
+    # 2. add a new column and repeat upsert
+    df['new_column'] = 'bar'
+    upsert(**common_kwargs, add_new_columns=True)
+    # verify content matches
+    with engine.connect() as connection:
+        df_db = pd.read_sql(text(f'SELECT * FROM {ns}'), con=connection, index_col='id')
+        pd.testing.assert_frame_equal(df, df_db)
 
 
+@drop_table_for_test(TableNames.CHANGE_EMPTY_COL_TYPE)
 def test_adapt_column_type(engine, schema):
     # skip for sqlite as it does not support such alteration
     if 'sqlite' in engine.dialect.dialect_description:
         pytest.skip()
 
+    # config
+    table_name = TableNames.CHANGE_EMPTY_COL_TYPE
     dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = pd.DataFrame({'id':['foo'], 'empty_column':[None]}).set_index('id')
-    with AutoDropTableContext(engine=engine, schema=schema, table_name='test_adapt_column_type') as ctx:
-        # 1. create table
-        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
-               dtype=dtype)
-        # 2. add non string data in empty column and repeat upsert
-        df['empty_column'] = 1
-        upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name, if_row_exists='update',
-               adapt_dtype_of_empty_db_columns=True, dtype=dtype)
+    # common kwargs for all the times we use upsert
+    common_kwargs = dict(engine=engine, schema=schema, df=df, table_name=table_name,
+                         if_row_exists='update', dtype=dtype)
+
+    # 1. create table
+    upsert(**common_kwargs)
+    # 2. add non string data in empty column and repeat upsert
+    df['empty_column'] = 1
+    upsert(**common_kwargs, adapt_dtype_of_empty_db_columns=True)
 
 
+@drop_table_for_test(TableNames.NO_TABLE)
 def test_cannot_insert_missing_table_no_create(engine, schema):
     """
     Check if an error is raised when trying to insert in a missing table
     and `create_table` is False.
     """
     df = pd.DataFrame({'id':[0]}).set_index('id')
-    with AutoDropTableContext(engine=engine, table_name='test_fail_missing_table') as ctx:
-        with pytest.raises((OperationalError, ProgrammingError)) as excinfo:
-            upsert(engine=engine, schema=schema, df=df, table_name=ctx.table_name,
-                   if_row_exists='update', create_table=False)
-        assert any(s in str(excinfo.value) for s in ('no such table', 'does not exist', "doesn't exist"))
+    with pytest.raises((OperationalError, ProgrammingError)) as excinfo:
+        upsert(engine=engine, schema=schema, df=df, table_name=TableNames.NO_TABLE,
+               if_row_exists='update', create_table=False)
+    assert any(s in str(excinfo.value) for s in ('no such table', 'does not exist', "doesn't exist"))
 
 
+@drop_table_for_test(TableNames.CREATE_SCHEMA_NONE)
 def test_create_schema_none(engine, schema):
     """
     If `create_schema` is True in `pangres.upsert` but the schema is `None`
@@ -145,20 +160,38 @@ def test_create_schema_none(engine, schema):
     support schemas
     """
     df = pd.DataFrame({'id':[0]}).set_index('id')
-    with AutoDropTableContext(engine=engine, schema=None, table_name='test_create_schema_none') as ctx:
-        upsert(engine=engine, schema=ctx.schema, df=df, if_row_exists='update', create_schema=True,
-               table_name=ctx.table_name, create_table=True)
+    upsert(engine=engine, schema=None, df=df, if_row_exists='update', create_schema=True,
+            table_name=TableNames.CREATE_SCHEMA_NONE, create_table=True)
 
 
 def test_create_schema_not_none(engine, schema):
+    # local helper
+    is_postgres = 'postgres' in engine.dialect.dialect_description
+
+    # overwrite schema
+    schema = schema_for_testing_creation
+
+    # config
     df = pd.DataFrame({'id':[0]}).set_index('id')
-    with AutoDropTableContext(engine=engine, df=df, schema=None, table_name='test_create_schema_none') as ctx:
-        try:
-            upsert(engine=engine, schema=ctx.schema, df=df, if_row_exists='update', create_schema=True,
-                   table_name=ctx.table_name, create_table=True)
-        except Exception as e:
-            # for postgres this should have worked
-            if ctx.pse._db_type == 'postgres':
-                raise e
-            else:
-                assert isinstance(e, HasNoSchemaSystemException)
+    table_name = TableNames.CREATE_SCHEMA_NOT_NONE
+
+    # drop table before test (could not get my decorator to work with another schema
+    # when having an optional arg schema=None due to variable scopes problems)
+    if is_postgres:
+        drop_table(engine=engine, schema=schema, table_name=table_name)
+
+    try:
+        upsert(engine=engine, schema=schema, df=df, if_row_exists='update', create_schema=True,
+               table_name=table_name, create_table=True)
+        if not is_postgres:
+            raise AssertionError('Expected the upsert to fail when not using a postgres database')
+    except Exception as e:
+        # for postgres this should have worked
+        if is_postgres:
+            raise e
+        else:
+            assert isinstance(e, HasNoSchemaSystemException)
+    finally:
+        # drop table after test
+        if is_postgres:
+            drop_table(engine=engine, schema=schema, table_name=table_name)
