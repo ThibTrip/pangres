@@ -22,7 +22,7 @@ from pangres.exceptions import (BadColumnNamesException,
                                 HasNoSchemaSystemException,
                                 MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
-from pangres.upsert import UpsertQuery
+from pangres.upsert_query import UpsertQuery
 from typing import List, Optional, Union
 
 # # Regexes
