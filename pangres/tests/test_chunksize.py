@@ -28,14 +28,6 @@ def insert_chunks(engine, schema, chunksize, nb_rows):
 
 # # Tests
 
-# ## Insert values one by one
-
-def test_insert_one(engine, schema):
-    insert_chunks(engine, schema, chunksize=1, nb_rows=11)
-
-
-# ## Insert an odd size of chunks that is not a multiple of df length
-
-def test_insert_odd_chunksize(engine, schema):
-    insert_chunks(engine, schema, chunksize=3, nb_rows=11)
-
+@pytest.mark.parametrize('chunksize, nb_rows', [[1, 11], [3, 11]], ids=['one_by_one', 'odd_chunksize'])
+def test_insert_various_chunksizes(engine, schema, chunksize, nb_rows):
+    insert_chunks(engine, schema, chunksize=chunksize, nb_rows=nb_rows)
