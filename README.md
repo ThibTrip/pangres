@@ -39,7 +39,7 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 1. **SQlite must be version 3.24.4 or higher**! UPSERT syntax did not exist before. 
 2. Column type alteration is not possible for SQlite.
 3. SQlite inserts can be at worst 5 times slower than pd.to_sql for some reasons. If you can help please contact me!
-4. Inserts with 1000 columns or more are not supported due to a restriction of 999 parameters per queries. One way to fix this would inserting the columns progressively but this seems quite tricky. If you know a better way please contact me.
+4. Inserts with 1000 columns (or 32767 columns for SQlite >= 3.32.0) or more are not supported because one could not even insert one row without exceeding the max number of parameters per queries. One way to fix this would inserting the columns progressively but this seems quite tricky. If you know a better way please contact me.
 
 ## MySQL
 

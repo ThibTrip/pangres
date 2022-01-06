@@ -6,7 +6,7 @@ from math import floor
 from sqlalchemy import VARCHAR
 
 from pangres import upsert
-from pangres.helpers import _sqlite_gt3_22_0
+from pangres.helpers import _sqlite_gt3_32_0
 from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import drop_table_for_test, drop_table
 # -

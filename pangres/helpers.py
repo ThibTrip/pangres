@@ -50,14 +50,14 @@ def _sqla_gt14() -> bool:
     return LooseVersion(sqlalchemy.__version__) >= LooseVersion("1.4.0")
 
 
-def _sqlite_gt3_22_0() -> bool:
+def _sqlite_gt3_32_0() -> bool:
     """
-    Checks if the SQLite version is >= than 3.22.0.
+    Checks if the SQLite version is >= than 3.32.0.
     Starting from this version we can use more SQL parameters.
     See https://github.com/ThibTrip/pangres/issues/43
     """
     import sqlite3
-    return LooseVersion(sqlite3.sqlite_version) >= LooseVersion("3.22.0")
+    return LooseVersion(sqlite3.sqlite_version) >= LooseVersion("3.32.0")
 
 
 # -
@@ -497,7 +497,7 @@ class PandasSpecialEngine:
         >>> new_chunksize
         16383
         """
-        maximum = 32766 if _sqlite_gt3_22_0() else 999
+        maximum = 32766 if _sqlite_gt3_32_0() else 999
         new_chunksize = floor(maximum / len(self.table.columns))
         # note: the part below cannot be realistically tested as the table creation
         # with `pd.io.sql.SQLTable` just takes too much time in presence of a table
