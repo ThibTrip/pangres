@@ -3,18 +3,15 @@
 Read docstring of main class Executor
 """
 import pandas as pd
-from sqlalchemy.engine.base import Connection, Engine
+from sqlalchemy.engine.base import Connectable
 from typing import Union
 
 # local imports
 from pangres.helpers import PandasSpecialEngine
 from pangres.transaction import TransactionHandler
+
+
 # -
-
-# # Local helpers
-
-Connectable = Union[Connection, Engine]
-
 
 # # Class Executor
 
