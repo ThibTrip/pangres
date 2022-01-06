@@ -6,6 +6,7 @@ Configuration and helpers for the tests of pangres with pytest.
 """
 import json
 import pandas as pd
+import sqlalchemy as sa
 from functools import wraps
 from inspect import signature
 from sqlalchemy import create_engine, text
@@ -30,11 +31,25 @@ def _get_function_param_value(sig, param_name, args, kwargs):
         return kwargs[param_name]
 
 
+def table_exists(connection, schema, table_name) -> bool:
+    insp = sa.inspect(connection)
+    if _sqla_gt14():
+        return insp.has_table(schema=schema, table_name=table_name)
+    else:
+        return table_name in insp.get_table_names(schema=schema)
+
+
 def drop_table(engine, schema, table_name):
-    # make sure to commit this!
     namespace = f'{schema}.{table_name}' if schema is not None else table_name
     with engine.connect() as connection:
-        connection.execute(text(f'DROP TABLE IF EXISTS {namespace};'))
+        # instead of using `DROP TABLE IF EXISTS` which produces warnings
+        # in MySQL when the table does exist, we will just check if it does exist
+        # and using a `DROP TABLE` query accordingly
+        if not table_exists(connection=connection, schema=schema,
+                            table_name=table_name):
+            return
+        # make sure to commit this!
+        connection.execute(text(f'DROP TABLE {namespace};'))
         if hasattr(connection, 'commit'):
             connection.commit()
 
