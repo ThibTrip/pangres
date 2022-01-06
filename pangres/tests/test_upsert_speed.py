@@ -34,7 +34,7 @@ def create_with_pandas(engine, schema, df):
     # we need this for SQlite when using pandas table creation
     # since we cannot use more than X parameters in a parameterized query
     if 'sqlite' in engine.dialect.dialect_description:
-        max_params = 32766 if _sqlite_gt3_22_0() else 999
+        max_params = 32766 if _sqlite_gt3_32_0() else 999
         col_len = len(df.columns) + len(df.index.names)
         chunksize = floor(max_params / col_len)
     else:
