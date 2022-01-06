@@ -1,3 +1,4 @@
+# +
 """
 This module tests that we can use a unique key instead of a primary key for upserting.
 
@@ -9,21 +10,24 @@ import pandas as pd
 import datetime
 from sqlalchemy import INTEGER, VARCHAR, MetaData, Column, text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
+
 from pangres import upsert
-from pangres.tests.conftest import AutoDropTableContext
+from pangres.tests.conftest import (drop_table_for_test,
+                                    get_table_namespace,
+                                    TableNames)
+
+
+# -
 
 # # Helpers
 
 # ## Table model
 
-# +
-table_name = 'test_unique_key'
-
 def create_test_table(engine, schema):
     Base = declarative_base(bind=engine)
 
     class TestUniqueKey(Base):
-        __tablename__ = table_name
+        __tablename__ = TableNames.UNIQUE_KEY
         __table_args__ = (UniqueConstraint('order_id', 'product_id'),
                           {'schema':schema})
 
@@ -34,8 +38,6 @@ def create_test_table(engine, schema):
 
     Base.metadata.create_all()
 
-
-# -
 
 # ## Data to be inserted/upserted in tests
 
@@ -57,35 +59,41 @@ df_new = pd.DataFrame(data_new).set_index(['order_id', 'product_id'])
 
 # # Unique key test
 
+@drop_table_for_test(TableNames.UNIQUE_KEY)
 def test_upsert_with_unique_keys(engine, schema):
+    # config/local helpers
+    # common kwargs for all the upsert commands below
+    table_name = TableNames.UNIQUE_KEY
+    common_kwargs_upsert = dict(engine=engine, schema=schema, table_name=table_name,
+                                if_row_exists='update')
+    namespace = get_table_namespace(schema=schema, table_name=table_name)
 
-    # local helpers
-    if_row_exists = 'update'
-    def read_from_db(namespace):
+    def read_from_db():
         with engine.connect() as connection:
-            return pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='row_id')
+            return pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection,
+                               index_col='row_id')
 
-    with AutoDropTableContext(engine=engine, schema=schema, table_name=table_name) as ctx:
-        create_test_table(engine=engine, schema=schema)
+    # create table
+    create_test_table(engine=engine, schema=schema)
 
-        # add initial data (df_old)
-        upsert(engine=engine, df=df_old, schema=schema, table_name=table_name, if_row_exists='update')
-        df = read_from_db(namespace=ctx.namespace)
-        df_expected = df_old.assign(row_id=range(1, 4)).reset_index().set_index('row_id')
-        pd.testing.assert_frame_equal(df, df_expected)
+    # add initial data (df_old)
+    upsert(df=df_old, **common_kwargs_upsert)
+    df = read_from_db()
+    df_expected = df_old.assign(row_id=range(1, 4)).reset_index().set_index('row_id')
+    pd.testing.assert_frame_equal(df, df_expected)
 
-        # add new data (df_new)
-        upsert(engine=engine, df=df_new, schema=schema, table_name=table_name, if_row_exists='update')
-        df = read_from_db(namespace=ctx.namespace)
-        # before creating our expected df we need to implement the special case of postgres
-        # where the id of the last row will be 7 instead of 4. I suppose that PG's ON
-        # CONFLICT UPDATE clause will run in such a way that it will count 4 (number we
-        # would expected) + 3 (three previous rows that were updated)
-        last_row_id = 7 if 'postgres' in engine.dialect.dialect_description else 4
-        df_expected = (pd.DataFrame([[1, 'A0001', 'PD100', 10],
-                                     [2, 'A0002', 'PD200', 20],
-                                     [3, 'A0002', 'PD201', 77],
-                                     [last_row_id, 'A0003', 'PD300', 30]],
-                                    columns=['row_id'] + df_old.reset_index().columns.tolist())
-                       .set_index('row_id'))
-        pd.testing.assert_frame_equal(df, df_expected)
+    # add new data (df_new)
+    upsert(df=df_new, **common_kwargs_upsert)
+    df = read_from_db()
+    # before creating our expected df we need to implement the special case of postgres
+    # where the id of the last row will be 7 instead of 4. I suppose that PG's ON
+    # CONFLICT UPDATE clause will run in such a way that it will count 4 (number we
+    # would expected) + 3 (three previous rows that were updated)
+    last_row_id = 7 if 'postgres' in engine.dialect.dialect_description else 4
+    df_expected = (pd.DataFrame([[1, 'A0001', 'PD100', 10],
+                                 [2, 'A0002', 'PD200', 20],
+                                 [3, 'A0002', 'PD201', 77],
+                                 [last_row_id, 'A0003', 'PD300', 30]],
+                                columns=['row_id'] + df_old.reset_index().columns.tolist())
+                   .set_index('row_id'))
+    pd.testing.assert_frame_equal(df, df_expected)

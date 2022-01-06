@@ -5,79 +5,132 @@
 Configuration and helpers for the tests of pangres with pytest.
 """
 import json
-import logging
-import os
 import pandas as pd
+import sqlalchemy as sa
+from functools import wraps
 from inspect import signature
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine.base import Engine
-from typing import Optional, Dict
 
-from pangres.helpers import _sqla_gt14, PandasSpecialEngine
+from pangres.helpers import _sqla_gt14
 
 
 # -
 
-# # Helpers
+# # Helpers for other test modules
 
-class AutoDropTableContext:
+# +
+def _get_function_param_value(sig, param_name, args, kwargs):
     """
-    This context manager drops given table (if exists) before giving back
-    control and drops the table (if exists) again after you ran whichever tests
-    you wanted.
-
-    The context gets populated with every parameter of the init methods and
-    if a DataFrame is provided, you get an instance of `pangres.helpers.PandasSpecialEngine`
-    as well (under the attribute `pse`) which simplifies our testing.
-
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> from pangres import upsert
-    >>> from pangres.helpers import PandasSpecialEngine
-    >>> from sqlalchemy import create_engine
-    >>>
-    >>> # config
-    >>> engine = create_engine('sqlite://')
-    >>> df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
-    >>> table_name = 'test'
-    >>>
-    >>> with AutoDropTableContext(engine=engine, df=df, schema=None, table_name=table_name) as ctx:
-    ...     upsert(engine=engine, df=df, if_row_exists='update', schema=ctx.schema, table_name=ctx.table_name)
-    ...     ctx.pse.table_exists()
-    True
-    >>> ctx.pse.table_exists()
-    False
+    Helper to retrieve the value of a specific parameter
+    from *args and **kwargs like when we wrap a function
     """
+    param_ix = list(sig.parameters).index(param_name)
+    if param_ix <= len(args) - 1:
+        return args[param_ix]
+    else:
+        return kwargs[param_name]
 
-    def __init__(self, engine:Engine, table_name:str, df:Optional[pd.DataFrame]=None,
-                 schema:Optional[str]=None, dtype:Optional[Dict]=None, drop_on_exit:bool=True):
-        if df is not None:
-            self.pse = PandasSpecialEngine(engine=engine, df=df, table_name=table_name, schema=schema, dtype=dtype)
-        schema = 'public' if 'postgres' in engine.dialect.dialect_description and schema is None else schema
-        self.engine = engine
-        self.schema = schema
-        self.table_name = table_name
-        self.namespace = f'{schema}.{table_name}' if schema is not None else table_name
-        self.dtype = dtype
-        self._drop_on_exit = drop_on_exit
 
-    # helper
-    def drop_table(self):
-        with self.engine.connect() as connection:
-            connection.execute(text(f'DROP TABLE IF EXISTS {self.namespace};'))
-            if hasattr(connection, 'commit'):
-                connection.commit()
+def table_exists(connection, schema, table_name) -> bool:
+    insp = sa.inspect(connection)
+    if _sqla_gt14():
+        return insp.has_table(schema=schema, table_name=table_name)
+    else:
+        return table_name in insp.get_table_names(schema=schema)
 
-    def __enter__(self):
-        self.drop_table()
-        return self
 
-    def __exit__(self, type, value, traceback):
-        if self._drop_on_exit:
-            self.drop_table()
-        return False  # raise any error
+def drop_table(engine, schema, table_name):
+    namespace = f'{schema}.{table_name}' if schema is not None else table_name
+    with engine.connect() as connection:
+        # instead of using `DROP TABLE IF EXISTS` which produces warnings
+        # in MySQL when the table does exist, we will just check if it does exist
+        # and using a `DROP TABLE` query accordingly
+        if not table_exists(connection=connection, schema=schema,
+                            table_name=table_name):
+            return
+        # make sure to commit this!
+        connection.execute(text(f'DROP TABLE {namespace};'))
+        if hasattr(connection, 'commit'):
+            connection.commit()
 
+
+# thanks to https://stackoverflow.com/a/42581103
+def drop_table_for_test(table_name, drop_before_test=True, drop_after_test=True):
+    """
+    Decorator for wrapping our tests functions. Expects the tests function
+    to have the arguments "engine" and "schema" and will retrieve their values
+    for dropping the table named `table_name`.
+
+    Parameters
+    ----------
+    drop_before_test
+        Whether to drop the table before executing the test
+    drop_after_test
+        Whether to drop the table after executing the test
+    """
+    assert drop_before_test or drop_after_test, 'One of drop_before_test or drop_after_test must be True'
+
+    def sub_decorator(function):
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            # get engine and schema
+            sig = signature(function)
+            assert 'engine' in sig.parameters
+            assert 'schema' in sig.parameters
+            engine = _get_function_param_value(sig=sig, param_name='engine', args=args, kwargs=kwargs)
+            schema = _get_function_param_value(sig=sig, param_name='schema', args=args, kwargs=kwargs)
+
+            # before test
+            if drop_before_test:
+                drop_table(engine=engine, schema=schema, table_name=table_name)
+
+            # test
+            function(*args, **kwargs)
+
+            # after test
+            if drop_after_test:
+                drop_table(engine=engine, schema=schema, table_name=table_name)
+            return
+        return wrapper
+    return sub_decorator
+
+
+def get_table_namespace(schema, table_name):
+    return f'{schema}.{table_name}' if schema is not None else table_name
+
+
+def commit(connection):
+    if hasattr(connection, 'commit'):
+        connection.commit()
+
+
+class TableNames:
+    ADD_NEW_COLUMN = 'test_add_new_column'
+    BAD_COLUMN_NAMES = 'test_bad_column_names'
+    BAD_TEXT = 'test_bad_text'
+    CHANGE_EMPTY_COL_TYPE = 'test_change_empty_col_type'
+    COLUMN_NAMED_VALUES = 'test_column_named_values'
+    CREATE_SCHEMA_NONE = 'test_create_schema_none'
+    CREATE_SCHEMA_NOT_NONE = 'test_create_schema_not_none'
+    END_TO_END = 'test_end_to_end'
+    INDEX_ONLY_INSERT = 'test_index_only_insert'
+    INDEX_WITH_NULL = 'test_index_with_null'
+    MULTIINDEX = 'test_multiindex'
+    TABLE_CREATION = 'test_table_creation'
+    UNIQUE_KEY = 'test_unique_key'
+    VARIOUS_CHUNKSIZES = 'test_chunksize'
+    WITH_YIELD = 'test_with_yield'
+    WITH_YIELD_EMPTY = 'test_with_yield_empty'
+    # case when we need a table name but we are not going to use it for
+    # creating/updating a table (if you see it in the DB, something went wrong)
+    NO_TABLE = 'test_no_table'
+
+
+# name of the PostgreSQL schema used for testing schema creation
+schema_for_testing_creation = 'pangres_create_schema_test'
+
+
+# -
 
 # ## Class TestDB
 
@@ -87,6 +140,7 @@ def pytest_addoption(parser):
     parser.addoption('--pg_conn', action="store", type=str, default=None)
     parser.addoption('--mysql_conn', action="store", type=str, default=None)
     parser.addoption('--pg_schema', action='store', type=str, default=None)
+
 
 def pytest_generate_tests(metafunc):
     # this is called for every test

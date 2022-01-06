@@ -1,7 +1,8 @@
 # +
-import os
 import argparse
-from pkg_resources import resource_filename
+import os
+import pkgutil
+import sys
 
 script_description = """
 This script generates the documentation of pangres using the library npdoc_to_md (https://github.com/ThibTrip/npdoc_to_md)
@@ -11,6 +12,31 @@ methods or classes are pulled and converted to pretty markdown).
 
 
 # -
+
+# # Helpers
+
+def resource_filename(package, resource):
+    """
+    Rewrite of pkgutil.get_data() that returns the file path.
+    This replaces resource_filename from pkg_resources which is deprecated.
+
+    Source: https://github.com/DLR-RY/pando-core/blob/master/pando/pkg.py
+    (via https://dev.deluge-torrent.org/ticket/3252)
+    """
+    loader = pkgutil.get_loader(package)
+    if loader is None or not hasattr(loader, 'get_data'):
+        return None
+    mod = sys.modules.get(package) or loader.load_module(package)
+    if mod is None or not hasattr(mod, '__file__'):
+        return None
+
+    # Modify the resource name to be compatible with the loader.get_data
+    # signature - an os.path format "filename" starting with the dirname of
+    # the package's __file__
+    parts = resource.split('/')
+    parts.insert(0, os.path.dirname(mod.__file__))
+    return os.path.normpath(os.path.join(*parts))
+
 
 # # Parse arguments
 
@@ -26,7 +52,6 @@ def parse_arguments():
 #
 # Each Markdown file corresponds to a wiki page except README.md
 
-# +
 def generate_doc(wiki_path):
     from npdoc_to_md import render_md_file, get_markdown_files_in_dir
 
@@ -51,7 +76,9 @@ def generate_doc(wiki_path):
         render_md_file(source=file, destination=destination)
     print('Done')
 
+
+# # Execute main function
+
 if __name__ == '__main__':
     wiki_path = parse_arguments()
     generate_doc(wiki_path)
-

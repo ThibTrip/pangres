@@ -10,6 +10,7 @@ from copy import deepcopy
 from distutils.version import LooseVersion
 from math import floor
 from sqlalchemy import JSON, MetaData, select
+from sqlalchemy.engine.base import Connection, Engine
 from sqlalchemy.sql import null
 from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema, Table
 from alembic.runtime.migration import MigrationContext
@@ -21,8 +22,8 @@ from pangres.exceptions import (BadColumnNamesException,
                                 HasNoSchemaSystemException,
                                 MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
-from pangres.upsert import UpsertQuery
-from typing import Optional, Union
+from pangres.upsert_query import UpsertQuery
+from typing import List, Optional, Union
 
 # # Regexes
 
@@ -66,7 +67,7 @@ def _sqlite_gt3_32_0() -> bool:
 class PandasSpecialEngine:
 
     def __init__(self,
-                 engine,
+                 connection:Connection,
                  df:pd.DataFrame,
                  table_name:str,
                  schema:Optional[str]=None,
@@ -76,8 +77,8 @@ class PandasSpecialEngine:
 
         Attributes
         ----------
-        engine : sqlalchemy.engine.base.Engine
-            Engine provided during class instantiation
+        connection : sqlalchemy.engine.base.Connection
+            Connection provided during class instantiation
         df : pd.DataFrame
             DataFrame provided during class instantiation
         table_name : str
@@ -89,10 +90,12 @@ class PandasSpecialEngine:
 
         Parameters
         ----------
-        engine : sqlalchemy.engine.base.Engine
-            Engine from sqlalchemy (see https://docs.sqlalchemy.org/en/13/core/engines.html
-            and examples below)
-        df : pd.DataFrame
+        connection
+            A connection that was for example directly created from a sqlalchemy
+            engine (see https://docs.sqlalchemy.org/en/13/core/engines.html
+            and examples below) or from pangres's transaction handler class
+            (pangres.transaction.TransactionHandler)
+        df
             A pandas DataFrame
         table_name
             Name of the SQL table
@@ -107,13 +110,14 @@ class PandasSpecialEngine:
         Examples
         --------
         >>> from sqlalchemy import create_engine
-        >>> from pangres.helpers import PandasSpecialEngine
-        >>> 
-        >>> engine = create_engine("postgresql://user:password@host.com:5432/database")
+        >>>
+        >>> engine = create_engine("sqlite://")
         >>> df = pd.DataFrame({'name':['Albert', 'Toto'],
         ...                    'profileid':[10, 11]}).set_index('profileid')
-        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
-        >>> pse # doctest: +SKIP
+        >>>
+        >>> with engine.connect() as connection: # doctest: +SKIP
+        ...     pse = PandasSpecialEngine(connection=connection, df=df, table_name='example')
+        ...     print(pse)
         PandasSpecialEngine (id 123546, hexid 0x1E29A)
         * connection: Engine(postgresql://user:***@host.com:5432/database)
         * schema: public
@@ -128,7 +132,7 @@ class PandasSpecialEngine:
         |          10 | Albert |
         |          11 | Toto   |
         """
-        self._db_type = self._detect_db_type(engine)
+        self._db_type = self._detect_db_type(connection)
         if self._db_type == "postgres":
             schema = 'public' if schema is None else schema
             # raise if we find columns with "(", ")" or "%"
@@ -176,7 +180,7 @@ class PandasSpecialEngine:
         new_dtype = None if new_dtype == {} else new_dtype
 
         # create sqlalchemy table model via pandas
-        pandas_sql_engine = pd.io.sql.SQLDatabase(engine=engine, schema=schema)
+        pandas_sql_engine = pd.io.sql.SQLDatabase(engine=connection, schema=schema)
         table = pd.io.sql.SQLTable(name=table_name,
                                    pandas_sql_engine=pandas_sql_engine,
                                    frame=df,
@@ -184,7 +188,7 @@ class PandasSpecialEngine:
 
         # change bindings of table (we want a sqlalchemy engine
         # not a pandas_sql_engine)
-        metadata = MetaData(bind=engine)
+        metadata = MetaData(bind=connection)
         table.metadata = metadata
 
         # add PK
@@ -193,22 +197,22 @@ class PandasSpecialEngine:
         table.append_constraint(constraint)
 
         # add remaining attributes
-        self.engine = engine
+        self.connection = connection
         self.df = df
         self.schema = schema
         self.table = table
 
     @staticmethod
-    def _detect_db_type(engine) -> str:
+    def _detect_db_type(connectable:Union[Connection, Engine]) -> str:
         """
-        Identifies whether the dialect of given sqlalchemy 
-        engine corresponds to postgres, mysql or another sql type.
+        Identifies whether the dialect of given sqlalchemy
+        connection corresponds to postgres, mysql or another sql type.
 
         Returns
         -------
         sql_type : {'postgres', 'mysql', 'sqlite', 'other'}
         """
-        dialect = engine.dialect.dialect_description
+        dialect = connectable.dialect.dialect_description
         if re.search('psycopg|postgres', dialect):
             return "postgres"
         elif 'mysql' in dialect:
@@ -228,25 +232,25 @@ class PandasSpecialEngine:
             raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
                                              '(AFAIK only PostgreSQL has this feature)')
 
-    def schema_exists(self, connection) -> bool:
+    def schema_exists(self) -> bool:
         self._raise_no_schema_feature()
         if _sqla_gt14():
-            insp = sa.inspect(connection)
+            insp = sa.inspect(self.connection)
             return self.schema in insp.get_schema_names()
         else:
-            return self.engine.dialect.has_schema(connection, self.schema)
+            return self.connection.dialect.has_schema(self.connection, self.schema)
 
     def table_exists(self) -> bool:
         """
         Returns True if the table defined in given instance
         of PandasSpecialEngine exists else returns False.
         """
+        insp = sa.inspect(self.connection)
         if _sqla_gt14():
-            import sqlalchemy as sa
-            insp = sa.inspect(self.engine)
             return insp.has_table(schema=self.schema, table_name=self.table.name)
         else:
-            return self.engine.has_table(schema=self.schema, table_name=self.table.name) 
+            # this is not particularly efficient but AFAIK it's the best we can do at connection level
+            return self.table.name in insp.get_table_names(schema=self.schema)
 
     def create_schema_if_not_exists(self):
         """
@@ -261,12 +265,8 @@ class PandasSpecialEngine:
                                  '(AFAIK only PostgreSQL has this feature) and retry your operation '
                                  'after setting the default schema `public` yourself '
                                  '(if that is the schema you wish to use).')  # pragma: no cover
-
-        with self.engine.connect() as connection:
-            if not self.schema_exists(connection=connection):
-                connection.execute(CreateSchema(self.schema))
-                if hasattr(connection, 'commit'):
-                    connection.commit()
+        if not self.schema_exists():
+            self.connection.execute(CreateSchema(self.schema))
 
     def create_table_if_not_exists(self):
         """
@@ -275,24 +275,22 @@ class PandasSpecialEngine:
         """
         self.table.create(checkfirst=True)
 
-    def get_db_columns_names(self) -> list:
+    def get_db_columns_names(self) -> List[str]:
         """
         Gets the column names of the SQL table defined
         in given instance of PandasSpecialEngine.
-
-        Returns
-        -------
-        db_columns_names : list
-            list of column names (str)
         """
         if _sqla_gt14():
-            insp = sa.inspect(self.engine)
+            insp = sa.inspect(self.connection)
             columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)
         else:
-            columns_info = self.engine.dialect.get_columns(connection=self.engine,
-                                                           schema=self.schema,
-                                                           table_name=self.table.name) 
+            columns_info = self.connection.dialect.get_columns(connection=self.connection,
+                                                               schema=self.schema,
+                                                               table_name=self.table.name)
         db_columns_names = [col_info["name"] for col_info in columns_info]
+        # handle case of SQlite where no errors are raised in case of a missing table
+        # but instead 0 columns are returned by sqlalchemy
+        assert len(db_columns_names) > 0
         return db_columns_names
 
     def add_new_columns(self):
@@ -304,44 +302,38 @@ class PandasSpecialEngine:
         -----
         Sadly, it seems that we cannot create JSON columns.
         """
+        # get column names in db
+        db_columns = self.get_db_columns_names()
         # create deepcopies of the column because we are going to unbound
         # them for the table model (otherwise alembic would think we add
         # a column that already exists in the database)
-        cols_to_add = [deepcopy(col) for col in self.table.columns
-                       if col.name not in self.get_db_columns_names()]
+        cols_to_add = [deepcopy(col) for col in self.table.columns if col.name not in db_columns]
         # check columns are not index levels
         if any((c.name in self.df.index.names for c in cols_to_add)):
             raise MissingIndexLevelInSqlException('Cannot add any column that is part of the df index!\n'
                                                   "You'll have to update your table primary key or change your "
                                                   "df index")
 
-        with self.engine.connect() as con:
-            ctx = MigrationContext.configure(con)
-            op = Operations(ctx)
-            for col in cols_to_add:
-                col.table = None # Important! unbound column from table
-                op.add_column(self.table.name, col, schema=self.schema)
-                log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
-                    f'(schema="{self.schema}")')
-            if hasattr(con, 'commit'):
-                con.commit()
+        ctx = MigrationContext.configure(self.connection)
+        op = Operations(ctx)
+        for col in cols_to_add:
+            col.table = None  # Important! unbound column from table
+            op.add_column(self.table.name, col, schema=self.schema)
+            log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
+                f'(schema="{self.schema}")')
 
-    def get_db_table_schema(self):
+    def get_db_table_schema(self) -> Table:
         """
         Gets the sqlalchemy table model for the SQL table
         defined in given PandasSpecialEngine (using schema and
         table_name attributes to find the table in the database).
-
-        Returns
-        -------
-        db_table : sqlalchemy.sql.schema.Table
         """
         table_name = self.table.name
         schema = self.schema
-        engine = self.engine
+        connection = self.connection
 
-        metadata = MetaData(bind=engine, schema=schema)
-        metadata.reflect(bind=engine, schema=schema, only=[table_name])
+        metadata = MetaData(bind=connection, schema=schema)
+        metadata.reflect(bind=connection, schema=schema, only=[table_name])
         namespace = table_name if schema is None else f'{schema}.{table_name}'
         db_table = metadata.tables[namespace]
         return db_table
@@ -355,18 +347,16 @@ class PandasSpecialEngine:
 
         Returns
         -------
-        empty_columns : list of str
-            List of column names that contain no data
+        list of str
+            List of names of columns that contain no data (all rows are NULL)
         """
         db_table = self.get_db_table_schema()
         empty_columns = []
-
         for col in db_table.columns:
             stmt = select(from_obj=db_table,
                           columns=[col],
                           whereclause=col.isnot(None)).limit(1)
-            with self.engine.connect() as connection:
-                results = connection.execute(stmt).fetchall()
+            results = self.connection.execute(stmt).fetchall()
             if results == []:
                 empty_columns.append(col)
         return empty_columns
@@ -389,9 +379,9 @@ class PandasSpecialEngine:
             if col.name not in self.df.columns:
                 continue
             # check same type
-            orig_type = db_table.columns[col.name].type.compile(self.engine.dialect)
-            dest_type = self.table.columns[col.name].type.compile(self.engine.dialect)
-            # remove character count e.g. "VARCHAR(50)" -> "VARCHAR" 
+            orig_type = db_table.columns[col.name].type.compile(self.connection.dialect)
+            dest_type = self.table.columns[col.name].type.compile(self.connection.dialect)
+            # remove character count e.g. "VARCHAR(50)" -> "VARCHAR"
             orig_type = RE_CHARCOUNT_COL_TYPE.sub('', orig_type)
             dest_type = RE_CHARCOUNT_COL_TYPE.sub('', dest_type)
             # if same type or we want to insert TEXT instead of JSON continue
@@ -410,28 +400,25 @@ class PandasSpecialEngine:
                 # (SQLite does not support data type alteration)
                 if self._db_type == 'sqlite':
                     raise ValueError('SQlite does not support column data type alteration!')
-                with self.engine.connect() as con:
-                    ctx = MigrationContext.configure(con)
-                    op = Operations(ctx)
-                    new_col = self.table.columns[col.name]
-                    # check if postgres (in which case we have to use "using" syntax
-                    # to alter columns data types)
-                    if self._db_type == 'postgres':
-                        escaped_col = str(new_col.compile(dialect=self.engine.dialect))
-                        compiled_type = new_col.type.compile(dialect=self.engine.dialect)
-                        alter_kwargs = {'postgresql_using':f'{escaped_col}::{compiled_type}'}
-                    else:
-                        alter_kwargs = {}
-                    op.alter_column(table_name=self.table.name,
-                                    column_name=new_col.name,
-                                    type_=new_col.type,
-                                    schema=self.schema,
-                                    **alter_kwargs)
-                    log(f"Changed type of column {new_col.name} "
-                        f"from {col.type} to {new_col.type} "
-                        f'in table {self.table.name} (schema="{self.schema}")')
-                    if hasattr(con, 'commit'):
-                        con.commit()
+                ctx = MigrationContext.configure(self.connection)
+                op = Operations(ctx)
+                new_col = self.table.columns[col.name]
+                # check if postgres (in which case we have to use "using" syntax
+                # to alter columns data types)
+                if self._db_type == 'postgres':
+                    escaped_col = str(new_col.compile(dialect=self.connection.dialect))
+                    compiled_type = new_col.type.compile(dialect=self.connection.dialect)
+                    alter_kwargs = {'postgresql_using':f'{escaped_col}::{compiled_type}'}
+                else:
+                    alter_kwargs = {}
+                op.alter_column(table_name=self.table.name,
+                                column_name=new_col.name,
+                                type_=new_col.type,
+                                schema=self.schema,
+                                **alter_kwargs)
+                log(f"Changed type of column {new_col.name} "
+                    f"from {col.type} to {new_col.type} "
+                    f'in table {self.table.name} (schema="{self.schema}")')
 
     @staticmethod
     def _create_chunks(values:list, chunksize:int=10000):
@@ -500,11 +487,14 @@ class PandasSpecialEngine:
         --------
         >>> from sqlalchemy import create_engine
         >>>
-        >>> # this assumes you have SQlite version >= 3.22.0 
+        >>> # config (this assumes you have SQlite version >= 3.22.0)
         >>> engine = create_engine("sqlite://")
         >>> df = pd.DataFrame({'name':['Albert']}).rename_axis(index='profileid')
-        >>> pse = PandasSpecialEngine(engine=engine, df=df, table_name='example')
-        >>> pse._sqlite_chunsize_fix(chunksize=33000)
+        >>>
+        >>> with engine.connect() as connection:
+        ...     pse = PandasSpecialEngine(connection=connection, df=df, table_name='example')
+        ...     new_chunksize = pse._sqlite_chunsize_fix(chunksize=33000)
+        >>> new_chunksize
         16383
         """
         maximum = 32766 if _sqlite_gt3_32_0() else 999
@@ -526,7 +516,7 @@ class PandasSpecialEngine:
             chunksize = new_chunksize
         return chunksize
 
-    def upsert(self, if_row_exists, chunksize=10000, yield_chunks=False):
+    def upsert(self, if_row_exists:str, chunksize:int=10000):
         """
         Generates and executes an upsert (insert update or 
         insert ignore depending on :if_row_exists:) statement
@@ -548,10 +538,6 @@ class PandasSpecialEngine:
         chunksize : int > 0, default 900
             Number of values to be inserted at once,
             an integer strictly above zero.
-        yield_chunks : bool, default False
-            If True gives back an sqlalchemy object
-            (sqlalchemy.engine.cursor.LegacyCursorResult)
-            at each chunk with which you can for instance count rows.
         """
         assert if_row_exists in ('ignore', 'update')
         # convert values if needed
@@ -561,24 +547,41 @@ class PandasSpecialEngine:
             chunksize = self._sqlite_chunsize_fix(chunksize=chunksize)
         # create chunks
         chunks = self._create_chunks(values=values, chunksize=chunksize)
-        upq = UpsertQuery(engine=self.engine, table=self.table)
+        upq = UpsertQuery(connection=self.connection, table=self.table)
+        for chunk in chunks:
+            upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
-        # when yield is present in a function it always returns a generator
-        # even if the yield is at a place where the code is not supposed to execute
-        # but one can circumvent this by using a subfunction
-        # which is what we do for when we want to yield results of chunks
-        if not yield_chunks:
-            for chunk in chunks:
-                upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
-        else:
-            def yield_chunks_func():
-                for chunk in chunks:
-                    yield upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
-            return yield_chunks_func()
+    def upsert_yield(self, if_row_exists:str, chunksize:int=10000):
+        """
+        Same as method `upsert` but gives back an sqlalchemy object
+        (sqlalchemy.engine.cursor.LegacyCursorResult) for each chunk inserted
+        with which you can for instance count updated rows.
+
+        Notes
+        -----
+        During my initial attemps with the new transaction model of pangres
+        I had a problem with the connection closing too early when using
+        only one methods with a parameter `yield_chunks`.
+        This is why I made two separate methods.
+
+        I suppose that this is due to the transaction context manager we use
+        in `pangres.executor.Executor`. We were **returning** a generator which most
+        likely led to the outer scope regaining control.
+        """
+        # some unfortunate repetition of method `upsert` (see comments there)
+        assert if_row_exists in ('ignore', 'update')
+        values = self._get_values_to_insert()
+        if self._db_type == 'sqlite':
+            chunksize = self._sqlite_chunsize_fix(chunksize=chunksize)
+        chunks = self._create_chunks(values=values, chunksize=chunksize)
+        upq = UpsertQuery(connection=self.connection, table=self.table)
+        # yield chunks
+        for chunk in chunks:
+            yield upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
     def __repr__(self):
         text = f"""PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
-                   * connection: {self.engine}
+                   * connection: {self.connection}
                    * schema: {self.schema}
                    * table: {self.table.name}
                    * SQLalchemy table model:\n{self.table.__repr__()}"""
@@ -588,3 +591,4 @@ class PandasSpecialEngine:
                    else str(self.df.head().to_markdown()))
         text += f'\n* df.head():\n{df_repr}'
         return text
+

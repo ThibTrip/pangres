@@ -1,34 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
+# +
 """
 This module contains the functions of pangres
 that will be directly exposed to its users.
 """
-from pangres.helpers import PandasSpecialEngine
 import pandas as pd
 from sqlalchemy.engine.base import Engine
 from typing import Optional, Union
 
+# local imports
+from pangres.executor import Executor
 
-# # Local helpers
 
-def empty_generator():
-    """
-    Returns an empty generator. This is used for consistent return types
-    for `upsert`.
-    Thanks to https://stackoverflow.com/a/13243870 !
-
-    Examples
-    --------
-    >>> gen = empty_generator()
-    >>>
-    >>> # this produces 0 output (no values to iterate over)
-    >>> for val in gen:
-    ...    print(val)
-    """
-    return
-    yield  # pragma: no cover
-
+# -
 
 # # upsert
 
@@ -274,34 +259,10 @@ def upsert(engine:Engine,
     if if_row_exists not in ('ignore', 'update'):
         raise ValueError('if_row_exists must be "ignore" or "update"')
 
-    # use helpers
-    pse = PandasSpecialEngine(engine=engine,
-                              df=df,
-                              table_name=table_name,
-                              schema=schema,
-                              dtype=dtype)
-    # add new columns from frame
-    if add_new_columns and pse.table_exists():
-        pse.add_new_columns()
-
-    # change dtype of empty columns in db
-    if adapt_dtype_of_empty_db_columns and pse.table_exists():
-        pse.adapt_dtype_of_empty_db_columns()
-
-    # create schema if not exists
-    # IMPORTANT! `pse.schema` and not `schema`
-    # -> With postgres None will be set to `public`
-    if create_schema and pse.schema is not None:
-        pse.create_schema_if_not_exists()
-
-    # create table if not exists
-    if create_table:
-        pse.create_table_if_not_exists()
-
-    # stop if no rows
-    ## note: use simple check with len() as df.empty returns True if there are index values but no columns
-    if len(df) == 0:
-        return None if not yield_chunks else empty_generator()
-
-    # returns an iterator when we yield chunks otherwise None
-    return pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize, yield_chunks=yield_chunks)
+    executor = Executor(df=df, table_name=table_name, schema=schema, create_schema=create_schema,
+                        create_table=create_table, dtype=dtype, add_new_columns=add_new_columns,
+                        adapt_dtype_of_empty_db_columns=adapt_dtype_of_empty_db_columns)
+    if not yield_chunks:
+        executor.execute(connectable=engine, if_row_exists=if_row_exists, chunksize=chunksize)
+    else:
+        return executor.execute_yield(connectable=engine, if_row_exists=if_row_exists, chunksize=chunksize)
