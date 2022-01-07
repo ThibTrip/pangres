@@ -1,7 +1,7 @@
 """
 Tools for handling transactions in pangres
 """
-from sqlalchemy.engine.base import Connection, Engine, Transaction
+from sqlalchemy.engine.base import Connectable, Connection, Engine, Transaction
 from typing import Union
 
 
@@ -51,7 +51,7 @@ class TransactionHandler:
     |  1 |    2 |
     """
 
-    def __init__(self, connectable:Union[Connection, Engine]):
+    def __init__(self, connectable:Connectable):
         # set attrs
         self.connectable = connectable
         # we will set this when we enter the context
@@ -80,7 +80,7 @@ class TransactionHandler:
         elif isinstance(self.connectable, Connection):
             self.connection = self.connectable
         else:
-            raise TypeError(f'Expected a sqlalchemy connectable object ({Connection} or {Engine}). '
+            raise TypeError(f'Expected a sqlalchemy connectable object ({Connectable}). '
                             f'Got {type(self.connectable)}')
 
         # 2) get transaction
