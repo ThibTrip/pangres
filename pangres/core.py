@@ -300,15 +300,18 @@ def upsert_future(con:Connectable,
     or read pangres/README.md.
 
     **IMPORTANT NOTES ON CONNECTIONS AND TRANSACTIONS**:
-    If an Engine object (sqlalchemy.engine.base.Engine) is given for the parameter `con`
-    we will create a connection and a transaction and handle everything
-    (commit|rollback and closing resources).
 
-    If a Connection object (sqlalchemy.engine.base.Connection) is given for the parameter `con`
-    we will **NOT** close the connection. You will have to close it yourself.
-    If the Connection you passed was inside a transaction we will not touch it!
-    You will have to commit|rollback yourself and also close the transaction yourself.
-    If there was no transaction we will create one and commit|rollback then close it.
+    * If an Engine object (sqlalchemy.engine.base.Engine) is given for the parameter `con`:
+    
+    We will create a connection and a transaction and handle everything (commit|rollback
+    and closing both the connection and transaction).
+
+    * If a connection object (sqlalchemy.engine.base.Connection) is given for the parameter `con`:
+
+    We will not close the connection (so that you may reuse it later). You will have to close
+    it yourself!
+    We will not create or handle transactions. This is for allowing users to make commit-as-you-go
+    workflows.
 
     See examples in notebook https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb
 
@@ -429,6 +432,14 @@ def upsert_future(con:Connectable,
     ...               table_name='example',
     ...               if_row_exists='update',
     ...               dtype=dtype)
+
+    >>> # alternative for the statement above using a connection
+    >>> # instead of an engine (the same logic can be applied for
+    >>> # all usages of the `upsert_future` function below
+    >>> with engine.connect() as con:
+    ...     upsert_future(con=con, df=df, table_name='example',
+    ...                   if_row_exists='update', dtype=dtype)
+    ...     # con.commit() # IMPORTANT! required for sqlalchemy >= 2.0
 
     ##### 1.2. Updating the SQL table we created with if_row_exists='update'
     >>> new_df = DocsExampleTable.new_df

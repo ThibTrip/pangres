@@ -14,11 +14,14 @@ class TransactionHandler:
     Workflow (the numbering below can be found in the comments):
 
     1) create connection (Engine is passed) or use connection (Connection is passed)
-    2) create transaction if not inside one
+    2) create transaction (Engine is passed)
     3) (commit|rollback) if we created a transaction
     4) close connection if we created the connection from the engine
 
     We do not handle transactions from users. They will have to commit/rollback themselves.
+    We also do not create transactions when a Connection is passed so that commit-as-you-go
+    workflows are possible (the operations of pangres will behave like basic SQL executions
+    in sqlalchemy).
 
     Parameters
     ----------
@@ -84,7 +87,7 @@ class TransactionHandler:
                             f'Got {type(self.connectable)}')
 
         # 2) get transaction
-        if not self.connection.in_transaction():
+        if isinstance(self.connectable, Engine):
             # handle case where for some reason we would not be able to create a transaction
             try:
                 self.transaction = self.connection.begin()
