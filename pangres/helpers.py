@@ -118,14 +118,14 @@ class PandasSpecialEngine:
         >>> with engine.connect() as connection: # doctest: +SKIP
         ...     pse = PandasSpecialEngine(connection=connection, df=df, table_name='example')
         ...     print(pse)
-        PandasSpecialEngine (id 123546, hexid 0x1E29A)
-        * connection: Engine(postgresql://user:***@host.com:5432/database)
-        * schema: public
+        PandasSpecialEngine (id 123456, hexid 0x123456)
+        * connection: <sqlalchemy.engine.base.Connection...>
+        * schema: None
         * table: example
         * SQLalchemy table model:
-        Table('example', MetaData(bind=Engine(postgresql://user:***@host.com:5432/database)),
+        Table('example', MetaData(bind=<sqlalchemy.engine.base.Connection...>),
               Column('profileid', BigInteger(), table=<example>, primary_key=True, nullable=False),
-              Column('name', Text(), table=<example>), schema='public')
+              Column('name', Text(), table=<example>), schema=None)
         * df.head():
         |   profileid | name   |
         |------------:|:-------|
