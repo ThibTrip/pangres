@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from functools import wraps
 from inspect import signature
 from sqlalchemy import create_engine, text
+from typing import Union
 
 from pangres.helpers import _sqla_gt14
 
@@ -37,6 +38,32 @@ def table_exists(connection, schema, table_name) -> bool:
         return insp.has_table(schema=schema, table_name=table_name)
     else:
         return table_name in insp.get_table_names(schema=schema)
+
+
+def select_table(engine, schema, table_name,
+                 error_if_missing=True,
+                 **read_sql_kwargs) -> Union[pd.DataFrame, None]:
+    """
+    Does a simple SELECT * FROM {table} and returns a DataFrame from that.
+    Has an option to return None if the table does not exist and
+    `error_if_missing` is False.
+    """
+    ns = f'{schema}.{table_name}' if schema is not None else table_name
+    with engine.connect() as con:
+        try:
+            return pd.read_sql(text(f'SELECT * FROM {ns}'), con=con,
+                               **read_sql_kwargs)
+        except Exception as e:
+            if error_if_missing:
+                raise e
+            else:
+                # check if the table is missing and raise only if it is actually present
+                # (this means we had another error)
+                if table_exists(connection=con, schema=schema,
+                                table_name=table_name):
+                    raise e
+                else:
+                    return None
 
 
 def drop_table(engine, schema, table_name):
