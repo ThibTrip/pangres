@@ -50,20 +50,13 @@ def select_table(engine, schema, table_name,
     """
     ns = f'{schema}.{table_name}' if schema is not None else table_name
     with engine.connect() as con:
-        try:
-            return pd.read_sql(text(f'SELECT * FROM {ns}'), con=con,
-                               **read_sql_kwargs)
-        except Exception as e:
-            if error_if_missing:
-                raise e
-            else:
-                # check if the table is missing and raise only if it is actually present
-                # (this means we had another error)
-                if table_exists(connection=con, schema=schema,
-                                table_name=table_name):
-                    raise e
-                else:
-                    return None
+        # check if the table is present
+        if table_exists(connection=con, schema=schema, table_name=table_name):
+            return pd.read_sql(text(f'SELECT * FROM {ns}'), con=con, **read_sql_kwargs)
+        elif error_if_missing:
+            raise AssertionError(f'Table {ns} does not exist')
+        else:
+            return None
 
 
 def drop_table(engine, schema, table_name):
