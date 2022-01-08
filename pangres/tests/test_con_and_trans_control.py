@@ -4,7 +4,7 @@ instead of an engine and by using transactions
 """
 import pandas as pd
 import pytest
-from sqlalchemy import text
+from sqlalchemy import text, VARCHAR
 from pangres import upsert_future
 from pangres.tests.conftest import commit, drop_table_for_test, select_table, TableNames
 
@@ -29,11 +29,11 @@ def test_connection_usable_after_upsert(engine, schema):
 @pytest.mark.parametrize("trans_op", ['commit', 'rollback'])
 @drop_table_for_test(TableNames.COMMIT_OR_ROLLBACK_TRANS)
 def test_transaction(engine, schema, trans_op):
-    df = pd.DataFrame(index=pd.Index([0], name='ix'))
+    df = pd.DataFrame(index=pd.Index(['foo'], name='ix'))
     table_name = TableNames.COMMIT_OR_ROLLBACK_TRANS
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
-                         if_row_exists='update')
+                         if_row_exists='update', dtype={'ix':VARCHAR(3)})
 
     with engine.connect() as con:
         trans = con.begin()
@@ -41,7 +41,7 @@ def test_transaction(engine, schema, trans_op):
             # do some random upsert operation
             upsert_future(con=con, df=df, **common_kwargs)
             # do some other operation that requires commit
-            upsert_future(con=con, df=df.rename(index={0:1}), **common_kwargs)
+            upsert_future(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
             getattr(trans, trans_op)()  # commit or rollback
         finally:
             trans.close()
@@ -52,7 +52,8 @@ def test_transaction(engine, schema, trans_op):
     # depends on the database type and other factors)
     if trans_op == 'commit':
         df_db = select_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
-        pd.testing.assert_frame_equal(df_db, pd.DataFrame(index=pd.Index([0, 1], name='ix')))
+        pd.testing.assert_frame_equal(df_db.sort_index(),
+                                      pd.DataFrame(index=pd.Index(['bar', 'foo'], name='ix')))
     elif trans_op == 'rollback':
         df_db = select_table(engine=engine, schema=schema, table_name=table_name, error_if_missing=False)
         # no table or an empty table
@@ -61,11 +62,11 @@ def test_transaction(engine, schema, trans_op):
 
 @drop_table_for_test(TableNames.COMMIT_AS_YOU_GO)
 def test_commit_as_you_go(engine, schema):
-    df = pd.DataFrame(index=pd.Index([0], name='ix'))
+    df = pd.DataFrame(index=pd.Index(['foo'], name='ix'))
     table_name = TableNames.COMMIT_AS_YOU_GO
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
-                         if_row_exists='update')
+                         if_row_exists='update', dtype={'ix':VARCHAR(3)})
 
     with engine.connect() as con:
         # skip for sqlalchemy < 2.0 or when future=True flag is not passed
@@ -80,7 +81,7 @@ def test_commit_as_you_go(engine, schema):
         con.commit()
 
         # do some other operation that requires commit and then rollback
-        upsert_future(con=con, df=df.rename(index={0:1}), **common_kwargs)
+        upsert_future(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
         con.rollback()
 
     # the table in the db should be equal to the initial df as the second
