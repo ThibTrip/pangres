@@ -321,7 +321,8 @@ def upsert_future(con:Connectable,
     will implicitely create a transaction requiring you to **commit** pangres' operations when using
     a Connection (see Examples)
 
-    See examples in notebook https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb
+    For examples using transactions and commit-as-you-go strategies, see this notebook:
+    https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb
 
     Notes
     -----
