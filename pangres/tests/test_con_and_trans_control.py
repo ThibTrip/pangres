@@ -1,3 +1,4 @@
+# +
 """
 This module tests different ways of using pangres by providing a connection
 instead of an engine and by using transactions
@@ -5,9 +6,14 @@ instead of an engine and by using transactions
 import pandas as pd
 import pytest
 from sqlalchemy import text, VARCHAR
+
+# local imports
 from pangres import upsert_future
+from pangres.transaction import TransactionHandler
 from pangres.tests.conftest import commit, drop_table_for_test, select_table, TableNames
 
+
+# -
 
 # # Tests
 
@@ -88,3 +94,14 @@ def test_commit_as_you_go(engine, schema):
     # operation was rolled back
     df_db = select_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
     pd.testing.assert_frame_equal(df_db, df)
+
+
+# -
+
+# # Test errors
+
+def test_non_connectable_transaction_handler(_):
+    with pytest.raises(TypeError) as exc_info:
+        with TransactionHandler(connectable='abc'):
+            pass
+    assert 'sqlalchemy connectable' in str(exc_info)
