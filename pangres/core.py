@@ -283,6 +283,9 @@ def upsert_future(con:Connectable,
                   dtype:Union[dict,None]=None,
                   yield_chunks:bool=False):
     """
+    **This is the future version of `upsert`, it will take its place
+    in pangres version 4.0**
+
     Insert updates/ignores a pandas DataFrame into a SQL table (or
     creates a SQL table from the DataFrame if it does not exist).
 
@@ -302,7 +305,7 @@ def upsert_future(con:Connectable,
     **IMPORTANT NOTES ON CONNECTIONS AND TRANSACTIONS**:
 
     * If an Engine object (sqlalchemy.engine.base.Engine) is given for the parameter `con`:
-    
+
     We will create a connection and a transaction and handle everything (commit|rollback
     and closing both the connection and transaction).
 
@@ -312,6 +315,9 @@ def upsert_future(con:Connectable,
     it yourself!
     We will not create or handle transactions. This is for allowing users to make commit-as-you-go
     workflows.
+    On **sqlalchemy >= 2.0** (or in 1.4 when passing `future=True` when creating an engine) sqlalchemy
+    will implicitely create a transaction requiring you to **commit** pangres' operations when using
+    a Connection (see Examples)
 
     See examples in notebook https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb
 
@@ -435,11 +441,11 @@ def upsert_future(con:Connectable,
 
     >>> # alternative for the statement above using a connection
     >>> # instead of an engine (the same logic can be applied for
-    >>> # all usages of the `upsert_future` function below
+    >>> # all usages of the `upsert_future` function below)
     >>> with engine.connect() as con:
     ...     upsert_future(con=con, df=df, table_name='example',
     ...                   if_row_exists='update', dtype=dtype)
-    ...     # con.commit() # IMPORTANT! required for sqlalchemy >= 2.0
+    ...     # con.commit() # IMPORTANT! uncomment if using sqlalchemy >= 2.0
 
     ##### 1.2. Updating the SQL table we created with if_row_exists='update'
     >>> new_df = DocsExampleTable.new_df
