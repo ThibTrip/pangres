@@ -72,7 +72,8 @@ class PandasSpecialEngine:
                  df:pd.DataFrame,
                  table_name:str,
                  schema:Optional[str]=None,
-                 dtype:Optional[dict]=None):
+                 dtype:Optional[dict]=None,
+                 auto_adjust_chunksize:bool=True):
         """
         Interacts with SQL tables via pandas and SQLalchemy table models.
 
@@ -88,6 +89,8 @@ class PandasSpecialEngine:
             SQL schema provided during class instantiation
         table : sqlalchemy.sql.schema.Table
             Sqlalchemy table model for df
+        auto_adjust_chunksize
+            See Parameter of the same name
 
         Parameters
         ----------
@@ -107,6 +110,18 @@ class PandasSpecialEngine:
             Similar to pd.to_sql dtype argument.
             This is especially useful for MySQL where the length of
             primary keys with text has to be provided (see Examples)
+        auto_adjust_chunksize
+            If True, when using upsert methods of this class (e.g. `upsert` or `upsert_yield`)
+            we will adjust users' input for the parameter `chunksize` to avoid limitations
+            with the max number of SQL parameters.
+
+            This parameter will disappear in pangres version 4.0 and will not be doing such
+            adjustments anymore.
+            This may result in Exceptions when inserting too many rows at once but this is
+            really something that we should not be handling ourselves.
+
+            See this issue: https://github.com/ThibTrip/pangres/issues/51
+
 
         Examples
         --------
@@ -198,6 +213,7 @@ class PandasSpecialEngine:
         table.append_constraint(constraint)
 
         # add remaining attributes
+        self.auto_adjust_chunksize = auto_adjust_chunksize
         self.connection = connection
         self.df = df
         self.schema = schema
@@ -474,15 +490,20 @@ class PandasSpecialEngine:
 
     def _sqlite_chunsize_fix(self, chunksize:int):
         """
-        Changes the chunksize given by the user to circumvent the max of 999 parameters
-        for sqlite.
+        Changes the chunksize given by the user to circumvent the max of number of SQL parameters
+        for sqlite (32766 wuth sqlite >= 3.32.0 and before that 999).
+
+        If the class was instantiated with the parameter `auto_adjust_chunksize` set to `False`
+        this function does nothing but returning the original chunksize.
 
         Raises
         ------
         NotImpletementedError
-            When tables have more than 999 columns.
-            In such a case even single row inserts have already too many variables.
-            (you can google "SQLITE_MAX_VARIABLE_NUMBER" for more info)
+            When a DataFrame has more columns than the maximum number of allowed SQL variables
+            for a SQL query.
+            In such a case even inserting row by row would not be possible because we would already
+            have too many variables.
+            For more information you can google "SQLITE_MAX_VARIABLE_NUMBER".
 
         Examples
         --------
@@ -498,6 +519,9 @@ class PandasSpecialEngine:
         >>> new_chunksize
         16383
         """
+        if not self.auto_adjust_chunksize:
+            return chunksize
+
         maximum = 32766 if _sqlite_gt3_32_0() else 999
         new_chunksize = floor(maximum / len(self.table.columns))
         # note: the part below cannot be realistically tested as the table creation
