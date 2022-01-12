@@ -60,7 +60,7 @@ pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 
 @pytest.mark.parametrize('library', ['pandas', 'pangres'])
 @pytest.mark.parametrize(**pytest_params)
 @drop_table_for_test(table_name=table_name)
-def test_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
+def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
     # get a df
     # we don't test JSON as this is problematic with pandas
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
