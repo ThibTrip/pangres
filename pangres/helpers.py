@@ -33,6 +33,7 @@ from typing import List, Optional, Union
 RE_BAD_COL_NAME = re.compile(r'[\(\)\%]')
 # e.g. match "(50)" in "VARCHAR(50)"
 RE_CHARCOUNT_COL_TYPE = re.compile(r'(?<=.)+\(\d+\)')
+RE_POSTGRES = re.compile(r'psycopg|postgres')
 
 
 # # Versions checking
@@ -213,7 +214,7 @@ class PandasSpecialEngine:
         sql_type : {'postgres', 'mysql', 'sqlite', 'other'}
         """
         dialect = connectable.dialect.dialect_description
-        if re.search('psycopg|postgres', dialect):
+        if RE_POSTGRES.search(dialect):
             return "postgres"
         elif 'mysql' in dialect:
             return "mysql"
