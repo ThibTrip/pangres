@@ -133,5 +133,11 @@ pip install -e .
 # -v prints test parameters
 # --cov=./pangres shows coverage only for pangres
 # --doctest-modules tests with doctest in all modules
-pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests
+# --benchmark-XXX : these are options for benchmarks tests (see https://pytest-benchmark.readthedocs.io/en/latest/usage.html)
+pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
 ```
+
+Additionally, the following flags could be of interest for you:
+* `-x` for stopping at the first failure
+* `--benchmark-only` for only testing benchmarks
+* `--benchmark-skip` for skipping benchmarks
