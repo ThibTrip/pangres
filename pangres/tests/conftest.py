@@ -188,13 +188,14 @@ def pytest_generate_tests(metafunc):
         engine = create_engine(conn_string)
         schemas.append(schema)
         engines.append(engine)
-        ids.append(f'{engine.url.drivername}_{schema}')
+        schema_id = '' if schema is None else f'_schema:{schema}'
+        ids.append(f'{engine.url.drivername}{schema_id}')
         # for sqlalchemy 1.4+ use future=True to try the future sqlalchemy 2.0
         if _sqla_gt14():
             future_engine = create_engine(conn_string, future=True)
             schemas.append(schema)
             engines.append(future_engine)
-            ids.append(f'{engine.url.drivername}_{schema}_future')
+            ids.append(f'{engine.url.drivername}{schema_id}_future')
     assert len(engines) == len(schemas) == len(ids)
     if len(engines) == 0:
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
