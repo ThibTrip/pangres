@@ -6,6 +6,8 @@ Welcome to the pangres wiki!
 
 [Upserting DataFrames in SQL (future function as it will be in version 4.0)](https://github.com/ThibTrip/pangres/wiki/Upsert-Future)
 
+[Checking and adjusting the size of chunks to upsert](https://github.com/ThibTrip/pangres/wiki/Chunksize-Adjustment)
+
 [Fix bad column names for Postgres](https://github.com/ThibTrip/pangres/wiki/Fix-bad-column-names-postgres)
 
 [Logging](https://github.com/ThibTrip/pangres/wiki/Logging)
