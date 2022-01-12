@@ -58,11 +58,13 @@ def upsert(con:Connectable,
 
     We will not close the connection (so that you may reuse it later). You will have to close
     it yourself!
-    We will not create or handle transactions. This is for allowing users to make commit-as-you-go
+
+    We will also not create or handle transactions. This is for allowing users to make commit-as-you-go
     workflows.
-    On **sqlalchemy >= 2.0** (or in 1.4 when passing `future=True` when creating an engine) sqlalchemy
+
+    Note that on **sqlalchemy >= 2.0** (or in 1.4 when passing `future=True` when creating an engine) sqlalchemy
     will implicitely create a transaction requiring you to **commit** pangres' operations when using
-    a Connection (see Examples)
+    a Connection (see Examples)!
 
     For examples using transactions and commit-as-you-go strategies, see this notebook:
     https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb
@@ -276,6 +278,8 @@ def upsert(con:Connectable,
     >>> iterator = upsert(con=engine, df=df, table_name='test_row_count',
     ...                   chunksize=chunksize, if_row_exists='update',
     ...                   yield_chunks=True)
+
+    {{txt}}  # placeholder for markdown conversion in the Wiki
     >>> for result in iterator:
     ...     print(f'{result.rowcount} row(s) updated')
     2 row(s) updated
