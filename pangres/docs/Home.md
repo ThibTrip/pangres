@@ -4,6 +4,8 @@ Welcome to the pangres wiki!
 
 [Upserting DataFrames in SQL](https://github.com/ThibTrip/pangres/wiki/Upsert)
 
+[Upserting DataFrames in SQL (future function as it will be in version 4.0)](https://github.com/ThibTrip/pangres/wiki/Upsert-Future)
+
 [Fix bad column names for Postgres](https://github.com/ThibTrip/pangres/wiki/Fix-bad-column-names-postgres)
 
 [Logging](https://github.com/ThibTrip/pangres/wiki/Logging)
