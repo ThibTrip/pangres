@@ -23,7 +23,7 @@ The main function **`pangres.upsert`** is going to change in the next major rele
 
 E.g. inserting 100000 rows at once in a SQlite database with `pangres` will necessarily raise an Exception down the line because we need to pass NUMBER_OF_ROWS * NUMBER_OF_COLUMNS parameters and the maximum of parameters allowed in SQLite is 32766 (for version >= 3.32.0, otherwise it is 999).
 
-I have made a new utility function ** that you can use before calling **`pangres.upsert`** if you want to make sure the `chunksize` is not too big.
+I have made a new utility function [**`pangres.adjust_chunksize`**](https://github.com/ThibTrip/pangres/wiki/Adjust-Chunksize) that you can use before calling **`pangres.upsert`** if you want to make sure the `chunksize` is not too big.
 
 ## New Features
 
