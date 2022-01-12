@@ -46,7 +46,7 @@ def test_transaction(engine, schema, trans_op):
         finally:
             trans.close()
 
-    # if trans_op=='commit': make sure we have 0 and 1 in the index
+    # if trans_op=='commit': make sure we have "bar" and "foo" in the index
     # elif trans_op=='rollback': make sure we don't have any data
     # or that the table was not even created (what is rolled back
     # depends on the database type and other factors)
