@@ -4,15 +4,15 @@ Welcome to the pangres wiki!
 
 [Upserting DataFrames in SQL](https://github.com/ThibTrip/pangres/wiki/Upsert)
 
-[Upserting DataFrames in SQL (future function as it will be in version 4.0)](https://github.com/ThibTrip/pangres/wiki/Upsert-Future)
-
 [Checking and adjusting the size of chunks to upsert](https://github.com/ThibTrip/pangres/wiki/Chunksize-Adjustment)
 
 [Fix bad column names for Postgres](https://github.com/ThibTrip/pangres/wiki/Fix-bad-column-names-postgres)
 
 [Logging](https://github.com/ThibTrip/pangres/wiki/Logging)
 
-See also [**demo notebook**](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo.ipynb)
+[**Demo notebook**](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo.ipynb)
+
+[Notebook with transaction control and commit-as-you-go workflows example](https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb)
 
 # Notes
 
