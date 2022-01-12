@@ -110,7 +110,7 @@ class TransactionHandler:
 
     def __exit__(self, ex_type, value, traceback) -> bool:
         # make sure __enter__ was properly executed
-        if self.connection is None:
+        if self.connection is None:  # pragma: no cover
             raise AssertionError('No active connection. Perhaps the context manager was not properly entered?')
 
         # combine step 3) rollback or commit and 4) closing resources
