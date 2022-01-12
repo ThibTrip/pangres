@@ -7,8 +7,7 @@ with an example.
 See https://github.com/ThibTrip/pangres/issues/12
 """
 import pandas as pd
-import datetime
-from sqlalchemy import INTEGER, VARCHAR, MetaData, Column, text, UniqueConstraint
+from sqlalchemy import INTEGER, VARCHAR, Column, text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
 from pangres import upsert
