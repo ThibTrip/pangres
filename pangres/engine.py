@@ -1,3 +1,4 @@
+# +
 """
 Functions/classes/variables for interacting between a pandas DataFrame
 and postgres/mysql/sqlite (and potentially other databases).
@@ -7,7 +8,6 @@ import logging
 import re
 import sqlalchemy as sa
 from copy import deepcopy
-from distutils.version import LooseVersion
 from math import floor
 from sqlalchemy import JSON, MetaData, select
 from sqlalchemy.engine.base import Connection, Engine
@@ -15,6 +15,10 @@ from sqlalchemy.sql import null
 from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema, Table
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
+from typing import List, Optional, Union
+
+# local imports
+from pangres.helpers import _sqla_gt14, _sqlite_gt3_32_0
 from pangres.logger import log
 from pangres.exceptions import (BadColumnNamesException,
                                 DuplicateLabelsException,
@@ -23,9 +27,11 @@ from pangres.exceptions import (BadColumnNamesException,
                                 MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
 from pangres.upsert_query import UpsertQuery
-from typing import List, Optional, Union
+# -
 
-# # Regexes
+# # Local helpers
+
+# ## Regexes
 
 # compile some regexes
 # column names that will cause issues with psycopg2 default parameter style
@@ -35,33 +41,6 @@ RE_BAD_COL_NAME = re.compile(r'[\(\)\%]')
 RE_CHARCOUNT_COL_TYPE = re.compile(r'(?<=.)+\(\d+\)')
 RE_POSTGRES = re.compile(r'psycopg|postgres')
 
-
-# # Versions checking
-
-# +
-def _sqla_gt14() -> bool:
-    """
-    Checks if sqlalchemy.__version__ is at least 1.4.0, when several
-    deprecations were made.
-
-    Stolen from pandas.io.sql (we don't import it as it's private
-    and has just 2 lines of code).
-    """
-    import sqlalchemy
-    return LooseVersion(sqlalchemy.__version__) >= LooseVersion("1.4.0")
-
-
-def _sqlite_gt3_32_0() -> bool:
-    """
-    Checks if the SQLite version is >= than 3.32.0.
-    Starting from this version we can use more SQL parameters.
-    See https://github.com/ThibTrip/pangres/issues/43
-    """
-    import sqlite3
-    return LooseVersion(sqlite3.sqlite_version) >= LooseVersion("3.32.0")
-
-
-# -
 
 # # Class PandasSpecialEngine
 
