@@ -30,7 +30,7 @@ def test_get_nb_rows(engine, schema):
 
     # iterate over upsert results
     # make sure we can extract the number of updated rows and that it is correct
-    iterator = upsert(engine=engine, df=df, table_name=table_name, if_row_exists='update',
+    iterator = upsert(con=engine, df=df, table_name=table_name, if_row_exists='update',
                       schema=schema, chunksize=chunksize, dtype=dtype, yield_chunks=True)
 
     for ix, result in enumerate(iterator):
@@ -49,7 +49,7 @@ def test_yield_empty_df(engine, schema):
     df = pd.DataFrame({'id':[], 'value':[]}).set_index('id')
 
     # we should get an empty generator back
-    iterator = upsert(engine=engine, df=df, table_name=TableNames.WITH_YIELD_EMPTY, if_row_exists='update',
+    iterator = upsert(con=engine, df=df, table_name=TableNames.WITH_YIELD_EMPTY, if_row_exists='update',
                       schema=schema, dtype={'id':INT, 'value':INT}, yield_chunks=True)
 
     # the for loop should never run because the generator should be empty

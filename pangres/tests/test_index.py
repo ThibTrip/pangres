@@ -53,12 +53,12 @@ def test_create_and_insert_table_multiindex(engine, schema):
     dtype = {'ix2':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # create
-    upsert(engine=engine, schema=schema, df=df_multiindex, table_name=table_name, dtype=dtype, if_row_exists='update')
+    upsert(con=engine, schema=schema, df=df_multiindex, table_name=table_name, dtype=dtype, if_row_exists='update')
     df_db = read_from_db()
     pd.testing.assert_frame_equal(df_db, df_multiindex)
 
     # insert
-    upsert(engine=engine, schema=schema, df=df_multiindex2, table_name=table_name, dtype=dtype, if_row_exists='update')
+    upsert(con=engine, schema=schema, df=df_multiindex2, table_name=table_name, dtype=dtype, if_row_exists='update')
     df_db = read_from_db()
     pd.testing.assert_frame_equal(df_db, pd.concat(objs=[df_multiindex, df_multiindex2]))
 
@@ -69,7 +69,7 @@ def test_create_and_insert_table_multiindex(engine, schema):
 def test_index_with_null(engine, schema):
     df = pd.DataFrame({'ix':[None, 0], 'test': [0, 1]}).set_index('ix')
     with pytest.raises(IntegrityError):
-        upsert(engine=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
+        upsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
         # don't test error for mysql since only a warning is raised and the line is skipped
         if 'mysql' in engine.dialect.dialect_description:
             pytest.skip()
@@ -85,7 +85,7 @@ def test_only_index(engine, schema, if_row_exists):
 
     # upsert df with only index
     df = pd.DataFrame({'ix':[1]}).set_index('ix')
-    upsert(engine=engine, schema=schema, df=df, table_name=table_name, if_row_exists=if_row_exists)
+    upsert(con=engine, schema=schema, df=df, table_name=table_name, if_row_exists=if_row_exists)
 
     # check data integrity
     namespace = get_table_namespace(schema=schema, table_name=table_name)

@@ -81,11 +81,11 @@ def test_end_to_end(engine, schema, create_table, if_row_exists, df_expected):
     read_table = lambda: read_example_table_from_db(engine=engine, schema=schema, table_name=table_name).sort_index()
 
     # 1. create table
-    upsert(engine=engine, schema=schema, df=df, create_table=True, **common_kwargs)
+    upsert(con=engine, schema=schema, df=df, create_table=True, **common_kwargs)
     pd.testing.assert_frame_equal(df, read_table())
 
     # 2. insert update/ignore
-    upsert(engine=engine, schema=schema, df=df2, create_table=create_table, **common_kwargs)
+    upsert(con=engine, schema=schema, df=df2, create_table=create_table, **common_kwargs)
     pd.testing.assert_frame_equal(df_expected, read_table())
 
 
@@ -93,7 +93,7 @@ def test_bad_value_if_row_exists(_):
     df = pd.DataFrame({'id':[0]}).set_index('id')
     engine = create_engine('sqlite:///')
     with pytest.raises(ValueError) as excinfo:
-        upsert(engine=engine, df=df, table_name=TableNames.NO_TABLE, if_row_exists='test')
+        upsert(con=engine, df=df, table_name=TableNames.NO_TABLE, if_row_exists='test')
     assert 'must be "ignore" or "update"' in str(excinfo.value)
 
 
@@ -105,7 +105,7 @@ def test_add_new_column(engine, schema):
     dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = pd.DataFrame({'id':['foo']}).set_index('id')
     # common kwargs for all the times we use upsert
-    common_kwargs = dict(engine=engine, schema=schema, df=df, table_name=table_name,
+    common_kwargs = dict(con=engine, schema=schema, df=df, table_name=table_name,
                          if_row_exists='update', dtype=dtype)
 
     # 1. create table
@@ -130,7 +130,7 @@ def test_adapt_column_type(engine, schema):
     dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = pd.DataFrame({'id':['foo'], 'empty_column':[None]}).set_index('id')
     # common kwargs for all the times we use upsert
-    common_kwargs = dict(engine=engine, schema=schema, df=df, table_name=table_name,
+    common_kwargs = dict(con=engine, schema=schema, df=df, table_name=table_name,
                          if_row_exists='update', dtype=dtype)
 
     # 1. create table
@@ -148,7 +148,7 @@ def test_cannot_insert_missing_table_no_create(engine, schema):
     """
     df = pd.DataFrame({'id':[0]}).set_index('id')
     with pytest.raises((OperationalError, ProgrammingError)) as excinfo:
-        upsert(engine=engine, schema=schema, df=df, table_name=TableNames.NO_TABLE,
+        upsert(con=engine, schema=schema, df=df, table_name=TableNames.NO_TABLE,
                if_row_exists='update', create_table=False)
     assert any(s in str(excinfo.value) for s in ('no such table', 'does not exist', "doesn't exist"))
 
@@ -161,7 +161,7 @@ def test_create_schema_none(engine, schema):
     support schemas
     """
     df = pd.DataFrame({'id':[0]}).set_index('id')
-    upsert(engine=engine, schema=None, df=df, if_row_exists='update', create_schema=True,
+    upsert(con=engine, schema=None, df=df, if_row_exists='update', create_schema=True,
             table_name=TableNames.CREATE_SCHEMA_NONE, create_table=True)
 
 
@@ -190,7 +190,7 @@ def test_create_schema_not_none(engine, schema):
         drop_schema()
 
     try:
-        upsert(engine=engine, schema=schema, df=df, if_row_exists='update', create_schema=True,
+        upsert(con=engine, schema=schema, df=df, if_row_exists='update', create_schema=True,
                table_name=table_name, create_table=True)
         if not is_postgres:
             raise AssertionError('Expected the upsert to fail when not using a postgres database')

@@ -9,38 +9,6 @@ Upsert with pandas DataFrames (<code>ON CONFLICT DO NOTHING</code> or <code>ON C
 Pangres also handles the creation of non existing SQL tables and schemas.
 
 
-___
-
-# **IMPORTANT**: upcoming changes for version 4.0
-
-The main function **`pangres.upsert`** is going to change in the next major release (v4.0).
-
-## Breaking changes
-
-1. The first argument **`engine`** will be **renamed** to **`con`** and will accept engines and connections
-2. The argument **`chunksize`** will **default** to **`None`**. Like in `pandas.DataFrame.to_sql` we will attempt to insert all rows by default. Previously the default was `10000` rows.
-3. There will **no more be any automatic adjustments to the given `chunksize`** even if we can predict that it will raise an Exception due to database limitations.
-
-E.g. inserting 100000 rows at once in a SQlite database with `pangres` will necessarily raise an Exception down the line because we need to pass NUMBER_OF_ROWS * NUMBER_OF_COLUMNS parameters and the maximum of parameters allowed in SQLite is 32766 (for version >= 3.32.0, otherwise it is 999).
-
-I have made a new utility function [**`pangres.adjust_chunksize`**](https://github.com/ThibTrip/pangres/wiki/Adjust-Chunksize) that you can use before calling **`pangres.upsert`** if you want to make sure the `chunksize` is not too big.
-
-## New Features
-
-Since the future version of `pangres.upsert` will accept connections, this will allow `pangres.upsert` to be used like any basic sqlalchemy operation (`connection.execute(...)`).
-
-This will give you more control over connections and transactions when using `pangres.upsert`.
-
-See [transaction control demo notebook](https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb).
-
-## Migration
-
-You can already try the changes by using the newly introduced [**`pangres.upsert_future`**](https://github.com/ThibTrip/pangres/wiki/Upsert-Future).
-
-In version **4.0** **`pangres.upsert_future`** will be **removed** because all of its functionalities will already be in the updated **`pangres.upsert`** function (and no further changes are planned that would still justify the existence of `pangres.upsert_future`).
-
-___
-
 # Features
 
 1. <i>(optional)</i> Automatical column creation (when a column exists in the DataFrame but not in the SQL table).

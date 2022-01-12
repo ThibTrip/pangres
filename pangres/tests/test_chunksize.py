@@ -20,7 +20,7 @@ def insert_chunks(engine, schema, chunksize, nb_rows):
     # MySQL does not want flexible text length in indices/PK
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     upsert(schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES, df=df, chunksize=chunksize,
-           engine=engine, if_row_exists='update', dtype=dtype)
+           con=engine, if_row_exists='update', dtype=dtype)
     df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES)
     # sort index (for MySQL...)
     pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())

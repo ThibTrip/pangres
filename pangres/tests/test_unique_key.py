@@ -63,7 +63,7 @@ def test_upsert_with_unique_keys(engine, schema):
     # config/local helpers
     # common kwargs for all the upsert commands below
     table_name = TableNames.UNIQUE_KEY
-    common_kwargs_upsert = dict(engine=engine, schema=schema, table_name=table_name,
+    common_kwargs_upsert = dict(con=engine, schema=schema, table_name=table_name,
                                 if_row_exists='update')
     namespace = get_table_namespace(schema=schema, table_name=table_name)
 
