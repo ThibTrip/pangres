@@ -17,7 +17,7 @@ class UpsertQuery:
 
     Examples
     --------
-    >>> from pangres.helpers import PandasSpecialEngine
+    >>> from pangres.engine import PandasSpecialEngine
     >>> from pangres.examples import DocsExampleTable
     >>> from sqlalchemy import create_engine
     >>>
@@ -112,7 +112,7 @@ class UpsertQuery:
         Examples
         --------
         >>> import pandas as pd
-        >>> from pangres.helpers import PandasSpecialEngine
+        >>> from pangres.engine import PandasSpecialEngine
         >>> from pangres.examples import DocsExampleTable
         >>> from sqlalchemy import create_engine
         >>>

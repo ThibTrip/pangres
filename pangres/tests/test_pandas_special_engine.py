@@ -13,7 +13,8 @@ from pangres.exceptions import (DuplicateLabelsException,
                                 HasNoSchemaSystemException,
                                 MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
-from pangres.helpers import PandasSpecialEngine, _sqla_gt14
+from pangres.engine import PandasSpecialEngine
+from pangres.helpers import _sqla_gt14
 from pangres.tests.conftest import (commit, drop_table_for_test,
                                     get_table_namespace,
                                     schema_for_testing_creation,

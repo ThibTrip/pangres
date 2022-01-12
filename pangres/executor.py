@@ -7,7 +7,7 @@ from sqlalchemy.engine.base import Connectable
 from typing import Union
 
 # local imports
-from pangres.helpers import PandasSpecialEngine
+from pangres.engine import PandasSpecialEngine
 from pangres.transaction import TransactionHandler
 
 
