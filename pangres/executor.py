@@ -33,7 +33,7 @@ class Executor:
     def __init__(self, df:pd.DataFrame, table_name:str, schema:Union[str, None],
                  create_schema:bool, create_table:bool,
                  add_new_columns:bool, adapt_dtype_of_empty_db_columns:bool,
-                 dtype:Union[dict, None]):
+                 dtype:Union[dict, None], auto_adjust_chunksize:bool):
         self.df = df
         self.schema = schema
         self.table_name = table_name
@@ -42,6 +42,7 @@ class Executor:
         self.create_table = create_table
         self.add_new_columns = add_new_columns
         self.adapt_dtype_of_empty_db_columns = adapt_dtype_of_empty_db_columns
+        self.auto_adjust_chunksize = auto_adjust_chunksize
 
     def _setup_objects(self, pse:PandasSpecialEngine):
         """
@@ -78,7 +79,7 @@ class Executor:
             # setup
             pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
                                       table_name=self.table_name, schema=self.schema,
-                                      dtype=self.dtype)
+                                      dtype=self.dtype, auto_adjust_chunksize=self.auto_adjust_chunksize)
             self._setup_objects(pse=pse)
 
             # upsert
@@ -97,7 +98,7 @@ class Executor:
             # setup
             pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
                                       table_name=self.table_name, schema=self.schema,
-                                      dtype=self.dtype)
+                                      dtype=self.dtype, auto_adjust_chunksize=self.auto_adjust_chunksize)
             self._setup_objects(pse=pse)
 
             # upsert
