@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from functools import wraps
 from inspect import signature
 from sqlalchemy import create_engine, text
+from typing import Union
 
 from pangres.helpers import _sqla_gt14
 
@@ -37,6 +38,25 @@ def table_exists(connection, schema, table_name) -> bool:
         return insp.has_table(schema=schema, table_name=table_name)
     else:
         return table_name in insp.get_table_names(schema=schema)
+
+
+def select_table(engine, schema, table_name,
+                 error_if_missing=True,
+                 **read_sql_kwargs) -> Union[pd.DataFrame, None]:
+    """
+    Does a simple SELECT * FROM {table} and returns a DataFrame from that.
+    Has an option to return None if the table does not exist and
+    `error_if_missing` is False.
+    """
+    ns = f'{schema}.{table_name}' if schema is not None else table_name
+    with engine.connect() as con:
+        # check if the table is present
+        if table_exists(connection=con, schema=schema, table_name=table_name):
+            return pd.read_sql(text(f'SELECT * FROM {ns}'), con=con, **read_sql_kwargs)
+        elif error_if_missing:
+            raise AssertionError(f'Table {ns} does not exist')
+        else:
+            return None
 
 
 def drop_table(engine, schema, table_name):
@@ -110,12 +130,15 @@ class TableNames:
     BAD_TEXT = 'test_bad_text'
     CHANGE_EMPTY_COL_TYPE = 'test_change_empty_col_type'
     COLUMN_NAMED_VALUES = 'test_column_named_values'
+    COMMIT_AS_YOU_GO = 'test_commit_as_you_go'
+    COMMIT_OR_ROLLBACK_TRANS = 'test_commit_or_rollback_trans'
     CREATE_SCHEMA_NONE = 'test_create_schema_none'
     CREATE_SCHEMA_NOT_NONE = 'test_create_schema_not_none'
     END_TO_END = 'test_end_to_end'
     INDEX_ONLY_INSERT = 'test_index_only_insert'
     INDEX_WITH_NULL = 'test_index_with_null'
     MULTIINDEX = 'test_multiindex'
+    REUSE_CONNECTION = 'test_reuse_connection'
     TABLE_CREATION = 'test_table_creation'
     UNIQUE_KEY = 'test_unique_key'
     VARIOUS_CHUNKSIZES = 'test_chunksize'
@@ -165,13 +188,14 @@ def pytest_generate_tests(metafunc):
         engine = create_engine(conn_string)
         schemas.append(schema)
         engines.append(engine)
-        ids.append(f'{engine.url.drivername}_{schema}')
+        schema_id = '' if schema is None else f'_schema:{schema}'
+        ids.append(f'{engine.url.drivername}{schema_id}')
         # for sqlalchemy 1.4+ use future=True to try the future sqlalchemy 2.0
         if _sqla_gt14():
             future_engine = create_engine(conn_string, future=True)
             schemas.append(schema)
             engines.append(future_engine)
-            ids.append(f'{engine.url.drivername}_{schema}_future')
+            ids.append(f'{engine.url.drivername}{schema_id}_future')
     assert len(engines) == len(schemas) == len(ids)
     if len(engines) == 0:
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')

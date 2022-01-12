@@ -8,6 +8,33 @@ _Thanks to [freesvg.org](https://freesvg.org/) for the logo assets_
 Upsert with pandas DataFrames (<code>ON CONFLICT DO NOTHING</code> or <code>ON CONFLICT DO UPDATE</code>) for PostgreSQL, MySQL, SQlite and potentially other databases behaving like SQlite (untested) with some additional optional features (see features). Upserting can be done with **primary keys** or **unique keys**.
 Pangres also handles the creation of non existing SQL tables and schemas.
 
+
+___
+
+# **IMPORTANT**: upcoming changes for version 4.0
+
+The main function **`pangres.upsert`** is going to change in the next major release (v4.0).
+
+## Breaking changes
+
+1. The first argument `engine` will be renamed `con` and will accept engines and connections
+
+## New Features
+
+Since the future version of `pangres.upsert` will accept connections, this will allow `pangres.upsert` to be used like any basic sqlalchemy operation (`connection.execute(...)`).
+
+This will give you more control over connections and transactions when using `pangres.upsert`.
+
+See [transaction control demo notebook](https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb).
+
+## Migration
+
+You can already try the changes by using the newly introduced [**`pangres.upsert_future`**](https://github.com/ThibTrip/pangres/wiki/Upsert-Future).
+
+In version **4.0** **`pangres.upsert_future`** will be **removed** because all of its functionalities will already be in the updated **`pangres.upsert`** function (and no further changes are planned that would still justify the existence of `pangres.upsert_future`).
+
+___
+
 # Features
 
 1. <i>(optional)</i> Automatical column creation (when a column exists in the DataFrame but not in the SQL table).
@@ -106,5 +133,11 @@ pip install -e .
 # -v prints test parameters
 # --cov=./pangres shows coverage only for pangres
 # --doctest-modules tests with doctest in all modules
-pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests
+# --benchmark-XXX : these are options for benchmarks tests (see https://pytest-benchmark.readthedocs.io/en/latest/usage.html)
+pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
 ```
+
+Additionally, the following flags could be of interest for you:
+* `-x` for stopping at the first failure
+* `--benchmark-only` for only testing benchmarks
+* `--benchmark-skip` for skipping benchmarks
