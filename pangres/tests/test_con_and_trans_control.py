@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import text, VARCHAR
 
 # local imports
-from pangres import upsert_future
+from pangres import upsert
 from pangres.transaction import TransactionHandler
 from pangres.tests.conftest import commit, drop_table_for_test, select_table, TableNames
 
@@ -23,9 +23,9 @@ def test_connection_usable_after_upsert(engine, schema):
     df = pd.DataFrame(index=pd.Index([0], name='ix'))
     with engine.connect() as con:
         # do some random upsert operation
-        upsert_future(con=con, df=df, schema=schema,
-                      table_name=TableNames.REUSE_CONNECTION,
-                      if_row_exists='update')
+        upsert(con=con, df=df, schema=schema,
+               table_name=TableNames.REUSE_CONNECTION,
+               if_row_exists='update')
         # attempt to reuse the connection
         result = con.execute(text('SELECT 1;')).scalar()
         assert result == 1
@@ -45,9 +45,9 @@ def test_transaction(engine, schema, trans_op):
         trans = con.begin()
         try:
             # do some random upsert operation
-            upsert_future(con=con, df=df, **common_kwargs)
+            upsert(con=con, df=df, **common_kwargs)
             # do some other operation that requires commit
-            upsert_future(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+            upsert(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
             getattr(trans, trans_op)()  # commit or rollback
         finally:
             trans.close()
@@ -83,11 +83,11 @@ def test_commit_as_you_go(engine, schema):
             pytest.skip()
 
         # do some random upsert operation and commit
-        upsert_future(con=con, df=df, **common_kwargs)
+        upsert(con=con, df=df, **common_kwargs)
         con.commit()
 
         # do some other operation that requires commit and then rollback
-        upsert_future(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+        upsert(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
         con.rollback()
 
     # the table in the db should be equal to the initial df as the second

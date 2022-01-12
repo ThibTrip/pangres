@@ -23,7 +23,7 @@ table_name = 'test_speed'
 def create_or_upsert_with_pangres(engine, schema, if_row_exists, df, chunksize, **kwargs):
     # MySQL does not want flexible text length in indices/PK
     dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-    upsert(engine=engine, df=df, schema=schema, chunksize=chunksize,
+    upsert(con=engine, df=df, schema=schema, chunksize=chunksize,
            table_name=table_name, if_row_exists=if_row_exists,
            dtype=dtype, **kwargs)
 
