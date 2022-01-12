@@ -186,7 +186,7 @@ def adjust_chunksize(con:Connectable, df:pd.DataFrame, chunksize:int):
 
     >>> # adjust chunksize: 100,000 is too big of a chunksize in general for given database
     >>> # SQlite only allows 32766 parameters (values) at once maximum in a query
-    >>> # since we have two columns (technically 1 column + 1 index level
+    >>> # since we have two columns (technically 1 column + 1 index level)
     >>> # we can only upsert in chunks of FLOOR(32766/2) rows maximum which is 16383
     >>> adjust_chunksize(con=engine, df=df, chunksize=100_000)
     16383
