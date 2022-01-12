@@ -31,9 +31,6 @@ def upsert(con:Connectable,
            dtype:Union[dict,None]=None,
            yield_chunks:bool=False):
     """
-    **This is the future version of `pangres.upsert`, it will take its place
-    in pangres version 4.0**
-
     Insert updates/ignores a pandas DataFrame into a SQL table (or
     creates a SQL table from the DataFrame if it does not exist).
 
