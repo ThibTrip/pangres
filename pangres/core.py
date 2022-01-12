@@ -11,6 +11,7 @@ from typing import Optional, Union
 
 # local imports
 from pangres.executor import Executor
+from pangres.helpers import validate_chunksize_param
 
 
 # -
@@ -261,7 +262,8 @@ def upsert(engine:Engine,
 
     executor = Executor(df=df, table_name=table_name, schema=schema, create_schema=create_schema,
                         create_table=create_table, dtype=dtype, add_new_columns=add_new_columns,
-                        adapt_dtype_of_empty_db_columns=adapt_dtype_of_empty_db_columns)
+                        adapt_dtype_of_empty_db_columns=adapt_dtype_of_empty_db_columns,
+                        auto_adjust_chunksize=True)  # IMPORTANT!
     if not yield_chunks:
         executor.execute(connectable=engine, if_row_exists=if_row_exists, chunksize=chunksize)
     else:
@@ -279,11 +281,11 @@ def upsert_future(con:Connectable,
                   create_table:bool=True,
                   add_new_columns:bool=False,
                   adapt_dtype_of_empty_db_columns:bool=False,
-                  chunksize:int=10000,
+                  chunksize:Optional[int]=None,
                   dtype:Union[dict,None]=None,
                   yield_chunks:bool=False):
     """
-    **This is the future version of `upsert`, it will take its place
+    **This is the future version of `pangres.upsert`, it will take its place
     in pangres version 4.0**
 
     Insert updates/ignores a pandas DataFrame into a SQL table (or
@@ -368,12 +370,9 @@ def upsert_future(con:Connectable,
         Data type conversion must be supported by the SQL flavor!
         E.g. for Postgres converting from BOOLEAN to TIMESTAMP
         will not work even if the column is empty.
-    chunksize : int
-        Number of rows to insert at once.
-        Please note that for SQlite a maximum of 999 parameters
-        per queries means that the chunksize will be automatically
-        reduced to math.floor(999/nb_columns) where nb_columns is
-        the number of columns + index levels in the DataFrame.
+    chunksize : int or None, default None
+        Specify the number of rows in each batch to be written at a time.
+        By default, all rows will be written at once.
     dtype : None or dict {str:SQL_TYPE}, default None
         Similar to pd.to_sql dtype argument.
         This is especially useful for MySQL where the length of
@@ -541,10 +540,18 @@ def upsert_future(con:Connectable,
     # verify arguments
     if if_row_exists not in ('ignore', 'update'):
         raise ValueError('if_row_exists must be "ignore" or "update"')
+    if chunksize is None:
+        chunksize = len(df)  # we'll attempt to insert the whole df at once
+    else:
+        validate_chunksize_param(chunksize=chunksize)
 
+    # create object that will execute all SQL operations
     executor = Executor(df=df, table_name=table_name, schema=schema, create_schema=create_schema,
                         create_table=create_table, dtype=dtype, add_new_columns=add_new_columns,
-                        adapt_dtype_of_empty_db_columns=adapt_dtype_of_empty_db_columns)
+                        adapt_dtype_of_empty_db_columns=adapt_dtype_of_empty_db_columns,
+                        auto_adjust_chunksize=False)  # IMPORTANT!
+
+    # execute SQL operations
     if not yield_chunks:
         executor.execute(connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)
     else:

@@ -1,7 +1,9 @@
 import pandas as pd
 import pytest
-from pangres.utils import fix_psycopg2_bad_cols
-from pangres.exceptions import DuplicateLabelsException, UnnamedIndexLevelsException
+from pangres.utils import adjust_chunksize, fix_psycopg2_bad_cols
+from pangres.exceptions import (DuplicateLabelsException,
+                                TooManyColumnsForUpsertException,
+                                UnnamedIndexLevelsException)
 
 
 # # Tests
@@ -53,3 +55,26 @@ def test_bad_replacements_for_pg_column_names_fix(_, replacements):
     e_str = str(exc_info.value)
     assert ('must be a dict' in e_str or
             'values of replacements must all be strings' in e_str)
+
+
+@pytest.mark.parametrize('nb_columns', [2, 10, 50_000])
+def test_adjust_chunksize(engine, schema, nb_columns):
+    chunksize = 100_000  # make this very high on purpose so that it gets reduced
+    # IMPORTANT: -1 because the index level counts as a column
+    df = (pd.DataFrame({i:[0] for i in range(nb_columns - 1)})
+          .rename_axis(index='profileid'))
+    # currently we only know of restrictions for SQlite
+    # todo: add condition for asyncpg when/if we add async support
+    if 'sqlite' not in engine.dialect.dialect_description:
+        pytest.skip()
+
+    # this is for not repeating ourselves too much
+    test_func = lambda: adjust_chunksize(con=engine, df=df, chunksize=chunksize)
+
+    if nb_columns == 50_000:
+        with pytest.raises(TooManyColumnsForUpsertException) as exc_info:
+            test_func()
+        assert 'allowed parameters' in str(exc_info)
+    else:
+        nb_columns_to_chunksize = {2:16383, 10:3276}
+        assert test_func() == nb_columns_to_chunksize[nb_columns]

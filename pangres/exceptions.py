@@ -57,3 +57,12 @@ class MissingIndexLevelInSqlException(Exception):
     to upsert data
     """
     pass
+
+
+class TooManyColumnsForUpsertException(Exception):
+    """
+    Raised when a DataFrame has so many columns, that an upsert
+    operation of even one row cannot succeed due to limitations
+    in the maximum number of SQL parameters of given database
+    """
+    pass
