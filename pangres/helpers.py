@@ -1,9 +1,27 @@
-from distutils.version import LooseVersion
-
-
 # # Versions checking
 
 # +
+def _py_gt3_10() -> bool:
+    """
+    Returns True if we are running Python >= 3.10 else return False.
+    We need that due to different implementations for checking
+    versions of other libraries
+    """
+    import sys
+    py_v = sys.version_info
+    # first condition is in case Python 4 comes out :P
+    return (py_v.major > 3) or ((py_v.major >= 3) and (py_v.minor >= 10))
+
+
+def _version_equal_or_greater_than(version_string, minimal_version_string) -> bool:
+    if _py_gt3_10():
+        from packaging import version
+        return version.parse(version_string) >= version.parse(minimal_version_string)
+    else:
+        from distutils.version import LooseVersion
+        return LooseVersion(version_string) >= LooseVersion(minimal_version_string)
+
+
 def _sqla_gt14() -> bool:
     """
     Checks if sqlalchemy.__version__ is at least 1.4.0, when several
@@ -13,7 +31,8 @@ def _sqla_gt14() -> bool:
     and has just 2 lines of code).
     """
     import sqlalchemy
-    return LooseVersion(sqlalchemy.__version__) >= LooseVersion("1.4.0")
+    return _version_equal_or_greater_than(version_string=sqlalchemy.__version__,
+                                          minimal_version_string='1.4.0')
 
 
 def _sqlite_gt3_32_0() -> bool:
@@ -23,7 +42,8 @@ def _sqlite_gt3_32_0() -> bool:
     See https://github.com/ThibTrip/pangres/issues/43
     """
     import sqlite3
-    return LooseVersion(sqlite3.sqlite_version) >= LooseVersion("3.32.0")
+    return _version_equal_or_greater_than(version_string=sqlite3.sqlite_version,
+                                          minimal_version_string='3.32.0')
 
 
 # -
