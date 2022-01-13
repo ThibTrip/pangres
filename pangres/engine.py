@@ -167,7 +167,7 @@ class PandasSpecialEngine:
 
         # change bindings of table (we want a sqlalchemy engine
         # not a pandas_sql_engine)
-        metadata = MetaData(bind=connection)
+        metadata = MetaData()
         table.metadata = metadata
 
         # add PK
@@ -211,31 +211,44 @@ class PandasSpecialEngine:
             raise HasNoSchemaSystemException('Cannot create schemas for given SQL flavor '
                                              '(AFAIK only PostgreSQL has this feature)')
 
-    def schema_exists(self) -> bool:
+    # DDL related operations
+    # in these methods we will add a `connection` parameter for passing a different type
+    # of connection. This will be very useful for asynchronous connections.
+    # AFAIK DDL operations do not support asynchronous execution. In the sqlalchemy
+    # guide as well as here we we'll use sync methods with the async connections
+    # using `connection.run_sync`
+    def schema_exists(self, connection=None) -> bool:
+        """
+        Returns True if the PostgreSQL defined in given instance
+        of PandasSpecialEngine exists else returns False.
+        """
         self._raise_no_schema_feature()
+        con = self.connection if connection is None else connection
         if _sqla_gt14():
-            insp = sa.inspect(self.connection)
+            insp = sa.inspect(con)
             return self.schema in insp.get_schema_names()
         else:
-            return self.connection.dialect.has_schema(self.connection, self.schema)
+            return con.dialect.has_schema(con, self.schema)
 
-    def table_exists(self) -> bool:
+    def table_exists(self, connection=None) -> bool:
         """
         Returns True if the table defined in given instance
         of PandasSpecialEngine exists else returns False.
         """
-        insp = sa.inspect(self.connection)
+        con = self.connection if connection is None else connection
+        insp = sa.inspect(con)
         if _sqla_gt14():
             return insp.has_table(schema=self.schema, table_name=self.table.name)
         else:
             # this is not particularly efficient but AFAIK it's the best we can do at connection level
             return self.table.name in insp.get_table_names(schema=self.schema)
 
-    def create_schema_if_not_exists(self):
+    def create_schema_if_not_exists(self, connection=None):
         """
         Creates the schema defined in given instance of
         PandasSpecialEngine if it does not exist.
         """
+        # verify schema can be created
         self._raise_no_schema_feature()
         if self.schema is None:
             raise AssertionError('Cannot create schema because it is None. '
@@ -244,35 +257,38 @@ class PandasSpecialEngine:
                                  '(AFAIK only PostgreSQL has this feature) and retry your operation '
                                  'after setting the default schema `public` yourself '
                                  '(if that is the schema you wish to use).')  # pragma: no cover
-        if not self.schema_exists():
-            self.connection.execute(CreateSchema(self.schema))
+        # acquire connection and create schema
+        con = self.connection if connection is None else connection
+        if not self.schema_exists(connection=con):
+            con.execute(CreateSchema(self.schema))
 
-    def create_table_if_not_exists(self):
+    def create_table_if_not_exists(self, connection=None):
         """
         Creates the table generated in given instance of
         PandasSpecialEngine if it does not exist.
         """
-        self.table.create(checkfirst=True)
+        con = self.connection if connection is None else connection
+        self.table.create(bind=con, checkfirst=True)
 
-    def get_db_columns_names(self) -> List[str]:
+    def get_db_columns_names(self, connection=None) -> List[str]:
         """
         Gets the column names of the SQL table defined
         in given instance of PandasSpecialEngine.
         """
+        con = self.connection if connection is None else connection
         if _sqla_gt14():
-            insp = sa.inspect(self.connection)
+            insp = sa.inspect(con)
             columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)
         else:
-            columns_info = self.connection.dialect.get_columns(connection=self.connection,
-                                                               schema=self.schema,
-                                                               table_name=self.table.name)
+            columns_info = con.dialect.get_columns(connection=con, schema=self.schema,
+                                                   table_name=self.table.name)
         db_columns_names = [col_info["name"] for col_info in columns_info]
         # handle case of SQlite where no errors are raised in case of a missing table
         # but instead 0 columns are returned by sqlalchemy
         assert len(db_columns_names) > 0
         return db_columns_names
 
-    def add_new_columns(self):
+    def add_new_columns(self, connection=None):
         """
         Adds columns present in df but not in the SQL table
         for given instance of PandasSpecialEngine.
@@ -281,8 +297,9 @@ class PandasSpecialEngine:
         -----
         Sadly, it seems that we cannot create JSON columns.
         """
+        con = self.connection if connection is None else connection
         # get column names in db
-        db_columns = self.get_db_columns_names()
+        db_columns = self.get_db_columns_names(connection=con)
         # create deepcopies of the column because we are going to unbound
         # them for the table model (otherwise alembic would think we add
         # a column that already exists in the database)
@@ -293,7 +310,7 @@ class PandasSpecialEngine:
                                                   "You'll have to update your table primary key or change your "
                                                   "df index")
 
-        ctx = MigrationContext.configure(self.connection)
+        ctx = MigrationContext.configure(con)
         op = Operations(ctx)
         for col in cols_to_add:
             col.table = None  # Important! unbound column from table
@@ -301,7 +318,7 @@ class PandasSpecialEngine:
             log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
                 f'(schema="{self.schema}")')
 
-    def get_db_table_schema(self) -> Table:
+    def get_db_table_schema(self, connection=None) -> Table:
         """
         Gets the sqlalchemy table model for the SQL table
         defined in given PandasSpecialEngine (using schema and
@@ -309,10 +326,10 @@ class PandasSpecialEngine:
         """
         table_name = self.table.name
         schema = self.schema
-        connection = self.connection
+        con = self.connection if connection is None else connection
 
-        metadata = MetaData(bind=connection, schema=schema)
-        metadata.reflect(bind=connection, schema=schema, only=[table_name])
+        metadata = MetaData(bind=con, schema=schema)
+        metadata.reflect(bind=con, schema=schema, only=[table_name])
         namespace = table_name if schema is None else f'{schema}.{table_name}'
         db_table = metadata.tables[namespace]
         return db_table
@@ -340,7 +357,7 @@ class PandasSpecialEngine:
                 empty_columns.append(col)
         return empty_columns
 
-    def adapt_dtype_of_empty_db_columns(self):
+    def adapt_dtype_of_empty_db_columns(self, empty_db_columns=None, connection=None, db_table=None):
         """
         Changes the data types of empty columns in the SQL table defined
         in given instance of a PandasSpecialEngine.
@@ -349,8 +366,9 @@ class PandasSpecialEngine:
         This means with columns for which the sqlalchemy table
         model for df and the model for the SQL table have different data types.
         """
-        empty_db_columns = self.get_empty_columns()
-        db_table = self.get_db_table_schema()
+        con = self.connection if connection is None else connection
+        empty_db_columns = self.get_empty_columns() if empty_db_columns is None else empty_db_columns
+        db_table = self.get_db_table_schema() if db_table is None else db_table
         # if column does not have value in db and there are values
         # in the frame then change the column type if needed
         for col in empty_db_columns:
@@ -358,8 +376,8 @@ class PandasSpecialEngine:
             if col.name not in self.df.columns:
                 continue
             # check same type
-            orig_type = db_table.columns[col.name].type.compile(self.connection.dialect)
-            dest_type = self.table.columns[col.name].type.compile(self.connection.dialect)
+            orig_type = db_table.columns[col.name].type.compile(con.dialect)
+            dest_type = self.table.columns[col.name].type.compile(con.dialect)
             # remove character count e.g. "VARCHAR(50)" -> "VARCHAR"
             orig_type = RE_CHARCOUNT_COL_TYPE.sub('', orig_type)
             dest_type = RE_CHARCOUNT_COL_TYPE.sub('', dest_type)
@@ -379,14 +397,14 @@ class PandasSpecialEngine:
                 # (SQLite does not support data type alteration)
                 if self._db_type == 'sqlite':
                     raise ValueError('SQlite does not support column data type alteration!')
-                ctx = MigrationContext.configure(self.connection)
+                ctx = MigrationContext.configure(con)
                 op = Operations(ctx)
                 new_col = self.table.columns[col.name]
                 # check if postgres (in which case we have to use "using" syntax
                 # to alter columns data types)
                 if self._db_type == 'postgres':
-                    escaped_col = str(new_col.compile(dialect=self.connection.dialect))
-                    compiled_type = new_col.type.compile(dialect=self.connection.dialect)
+                    escaped_col = str(new_col.compile(dialect=con.dialect))
+                    compiled_type = new_col.type.compile(dialect=con.dialect)
                     alter_kwargs = {'postgresql_using':f'{escaped_col}::{compiled_type}'}
                 else:
                     alter_kwargs = {}
