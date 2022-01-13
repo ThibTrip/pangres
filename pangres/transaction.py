@@ -46,7 +46,7 @@ class TransactionHandler:
     >>>
     >>> # display the table
     >>> with engine.connect() as con:
-    ...     df = pd.read_sql('SELECT * FROM test;', con=con)
+    ...     df = pd.read_sql(text('SELECT * FROM test;'), con=con)
     ...     print(df.to_markdown())
     |    |   id |
     |---:|-----:|
