@@ -146,6 +146,7 @@ def adjust_chunksize(con:Connectable, df:pd.DataFrame, chunksize:int):
 
     This function currently takes into account max parameters limitations for the following cases:
     * sqlite (32766 max for version >= 3.22.0 otherwise 999)
+    * asyncpg (32767 max)
 
     If you know about more parameter limitations relevant for this library (PostgreSQL, MySQL, SQlite
     or other databases I have not tested with this library that you managed to have working),
@@ -194,10 +195,11 @@ def adjust_chunksize(con:Connectable, df:pd.DataFrame, chunksize:int):
     validate_chunksize_param(chunksize=chunksize)
 
     # get maximum number of parameters depending on the database
-    # todo: when/if we add async support, add a rule for asyncpg with 32767 params max
     dialect = con.dialect.dialect_description
     if 'sqlite' in dialect:
         maximum = 32766 if _sqlite_gt3_32_0() else 999
+    elif 'asyncpg' in dialect:
+        maximum = 32767
     else:
         maximum = None
 
