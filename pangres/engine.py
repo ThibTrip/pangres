@@ -365,6 +365,10 @@ class PandasSpecialEngine:
         This should only happen in case of data type mismatches.
         This means with columns for which the sqlalchemy table
         model for df and the model for the SQL table have different data types.
+
+        The parameters `empty_db_columns` and `db_table` allow us to avoid synchronous operations
+        when passing an asynchronous connection via the `connection` parameter.
+        See async variant of this method: `aadapt_dtype_of_empty_db_columns`
         """
         con = self.connection if connection is None else connection
         empty_db_columns = self.get_empty_columns() if empty_db_columns is None else empty_db_columns
@@ -525,6 +529,59 @@ class PandasSpecialEngine:
         # yield chunks
         for chunk in chunks:
             yield upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
+
+    # ASYNC VARIANTS of methods above that we will prefix with "a"
+    # There is going to be some unfortunate repetition but I don't see a better way yet
+    # Note: I know I don't need to use lambdas here but that is a precaution to make sure the `connection` kwarg
+    # is here
+    async def atable_exists(self):
+        await self.connection.run_sync(lambda connection: self.table_exists(connection=connection))
+
+    async def acreate_table_if_not_exists(self):
+        await self.connection.run_sync(lambda connection: self.create_table_if_not_exists(connection=connection))
+
+    async def acreate_schema_if_not_exists(self):
+        await self.connection.run_sync(lambda connection: self.create_schema_if_not_exists(connection=connection))
+
+    async def aadd_new_columns(self):
+        await self.connection.run_sync(lambda connection: self.add_new_columns(connection=connection))
+
+    async def aget_empty_columns(self) -> list:
+        db_table = await self.connection.run_sync(lambda connection: self.get_db_table_schema(connection=connection))
+        empty_columns = []
+        for col in db_table.columns:
+            stmt = select(from_obj=db_table,
+                          columns=[col],
+                          whereclause=col.isnot(None)).limit(1)
+            proxy = await self.connection.execute(stmt)
+            results = proxy.fetchall()
+            if results == []:
+                empty_columns.append(col)
+        return empty_columns
+
+    async def aadapt_dtype_of_empty_db_columns(self):
+        empty_db_columns = await self.aget_empty_columns()
+        db_table = await self.connection.run_sync(lambda connection: self.get_db_table_schema(connection=connection))
+        ddl_func = lambda connection: self.adapt_dtype_of_empty_db_columns(connection=self.connection,
+                                                                           empty_db_columns=empty_db_columns,
+                                                                           db_table=db_table)
+        await self.connection.run_sync(ddl_func)
+
+    async def aupsert(self, if_row_exists:str, chunksize:int=10000):
+        assert if_row_exists in ('ignore', 'update')
+        values = self._get_values_to_insert()
+        chunks = self._create_chunks(values=values, chunksize=chunksize)
+        upq = UpsertQuery(connection=self.connection, table=self.table)
+        for chunk in chunks:
+            await upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
+
+    async def aupsert_yield(self, if_row_exists:str, chunksize:int=10000):
+        assert if_row_exists in ('ignore', 'update')
+        values = self._get_values_to_insert()
+        chunks = self._create_chunks(values=values, chunksize=chunksize)
+        upq = UpsertQuery(connection=self.connection, table=self.table)
+        for chunk in chunks:
+            yield await upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
     def __repr__(self):
         text = f"""PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
