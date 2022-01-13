@@ -13,8 +13,8 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 
 1. <i>(optional)</i> Automatical column creation (when a column exists in the DataFrame but not in the SQL table).
 2. <i>(optional)</i> Automatical column type alteration for columns that are empty in the SQL table (except for SQlite where alteration is limited).
-3. Creates the table if it is missing.
-4. Creates missing schemas in Postgres (and potentially other databases that have a schema system).
+3. <i>(optional)</i> Creates the table if it is missing.
+4. <i>(optional)</i> Creates missing schemas in Postgres (and potentially other databases that have a schema system).
 5. JSON is supported (with pd.to_sql it does not work) with some exceptions (see [Gotchas and caveats](#Gotchas-and-caveats)).
 6. Fast (except for SQlite where some help is needed).
 7. Will work even if not all columns defined in the SQL table are there.
@@ -52,7 +52,7 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 
 This is a library I was using in production in private with very good results and decided to publish.
 
-Ideally such features will be integrated into pandas since there is already a [PR on the way](https://github.com/pandas-dev/pandas/pull/29636)) and I would like to give the option to add columns via another PR.
+Ideally such features will be integrated into pandas since there is already a [PR on the way](https://github.com/pandas-dev/pandas/pull/29636) and I would like to give the option to add columns via another PR.
 
 There is also [pandabase](https://github.com/notsambeck/pandabase) which does almost the same thing (plus lots of extra features) but my implementation is different.
 Btw big thanks to pandabase and the sql part of pandas which helped a lot.
@@ -71,6 +71,11 @@ pip install psycopg2
 * MySQL
 ```
 pip install pymysql
+```
+
+* Postgres (asynchronous)
+```
+pip install asyncpg
 ```
 
 # Usage
