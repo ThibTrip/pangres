@@ -178,3 +178,10 @@ class UpsertQuery:
     def execute(self, db_type:str, values:list, if_row_exists:str):
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
         return self.connection.execute(query)
+
+    async def aexecute(self, db_type:str, values:list, if_row_exists:str):
+        """
+        Async variant of method execute
+        """
+        query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
+        return await self.connection.execute(query)
