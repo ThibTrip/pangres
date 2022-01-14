@@ -332,7 +332,17 @@ async def aupsert(con,
     This means that if you are passing an asynchronous connection you will have to commit yourself
     (manually via the connection or a transaction or context managers..., see Examples below).
 
-    **IMPORTANT**
+    **IMPORTANT info for IPYTHON/JUPYTER users**
+
+    You will need to run the following code before executing asynchronous code in an IPython context
+    (this includes Jupyter notebooks and also inside of Jupyter Lab). This is not specific to `pangres`.
+
+    ```
+    import nest_asyncio  # pip install nest_asyncio
+    nest_asyncio.apply()
+    ```
+
+    **IMPORTANT info about parallelism**
 
     Setting any of the following parameters to True will cause synchronous statements to be issued
     and many also lead to race conditions:
