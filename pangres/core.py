@@ -342,6 +342,12 @@ async def aupsert(con,
     nest_asyncio.apply()
     ```
 
+    Not doing this could result in the following exception occuring:
+
+    ```
+    RuntimeError: asyncio.run() cannot be called from a running event loop
+    ```
+
     **IMPORTANT info about parallelism**
 
     Setting any of the following parameters to True will cause synchronous statements to be issued
@@ -368,7 +374,7 @@ async def aupsert(con,
     >>> from sqlalchemy.ext.asyncio import create_async_engine # doctest: +SKIP
     >>>
     >>> # config
-    >>> engine = create_engine("postgresql+asyncpg://username:password@localhost:5432/postgres") # doctest: +SKIP
+    >>> engine = create_async_engine("postgresql+asyncpg://username:password@localhost:5432/postgres") # doctest: +SKIP
     >>>
     >>> # get some data
     >>> df = DocsExampleTable.df
@@ -402,6 +408,21 @@ async def aupsert(con,
     >>> coroutines = [execute_upsert()] # doctest: +SKIP
     >>> tasks = asyncio.gather(*coroutines) # doctest: +SKIP
     >>> results = loop.run_until_complete(tasks) # doctest: +SKIP
+
+    * alternative to the coroutine above but iterating over results of inserted chunks
+      so that we can for instance get the number of updated rows
+    >>> async def execute_upsert():
+    ...     async with engine.connect() as con:
+    ...         # this creates an async generator
+    ...         # IMPORTANT: no use of `await` here!
+    ...         async_gen = aupsert(con=engine, df=df,
+    ...                             table_name='example',
+    ...                             if_row_exists='update',
+    ...                             yield_chunks=True,  # <--- WE SET THIS TO TRUE for iterating
+    ...                             # make this to False (other DDL related parameters already default to False
+    ...                             create_table=False)
+    ...         async for result in async_gen:  # 
+    ...             print(f'{result.rowcount} updated rows')  # print the number of updated rows
     """
     # verify arguments
     if if_row_exists not in ('ignore', 'update'):
