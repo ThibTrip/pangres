@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+# +
 import datetime
 import logging
 import numpy as np
@@ -7,6 +8,8 @@ import pandas as pd
 import pytest
 from sqlalchemy import create_engine, text, VARCHAR
 from sqlalchemy.sql.elements import Null as SqlaNull
+
+# local imports
 from pangres.examples import _TestsExampleTable
 from pangres.exceptions import (DuplicateLabelsException,
                                 DuplicateValuesInIndexException,
@@ -15,19 +18,25 @@ from pangres.exceptions import (DuplicateLabelsException,
                                 UnnamedIndexLevelsException)
 from pangres.engine import PandasSpecialEngine
 from pangres.helpers import _sqla_gt14
-from pangres.tests.conftest import (commit, drop_table_for_test,
+from pangres.tests.conftest import (async_engine_to_sync_engine,
+                                    commit, drop_table_for_test,
+                                    drop_schema,
                                     get_table_namespace,
+                                    parameterize_async,
                                     schema_for_testing_creation,
+                                    sync_async_connect_switch,
                                     TableNames)
 
 
-# # Test methods and attributes
+# -
+
+# # Test repr and attributes
 
 # +
 @drop_table_for_test(TableNames.NO_TABLE)
 def test_repr(engine, schema):
     dummy_df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
-    with engine.connect() as connection:
+    with sync_async_connect_switch(engine) as connection:
         pse = PandasSpecialEngine(connection=connection, schema=schema,
                                   table_name=TableNames.NO_TABLE, df=dummy_df)
         # make sure it is printable without errors
@@ -44,7 +53,7 @@ def test_table_attr(engine, schema):
     # generate a somewhat complex table model via the _TestsExampleTable class
     df = _TestsExampleTable.create_example_df(nb_rows=10)
     table_name = TableNames.NO_TABLE
-    with engine.connect() as connection:
+    with sync_async_connect_switch(engine) as connection:
         pse = PandasSpecialEngine(connection=connection, schema=schema,
                                   table_name=table_name, df=df)
         # make sure columns and table name match
@@ -255,7 +264,7 @@ def test_detect_db_type(_, connection_string, expected):
 def test_error_index_level_named(engine, schema):
     df = pd.DataFrame({'test':[0]})
     with pytest.raises(UnnamedIndexLevelsException) as excinfo:
-        with engine.connect() as connection:
+        with sync_async_connect_switch(engine) as connection:
             PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
     assert "All index levels must be named" in str(excinfo.value)
 
@@ -275,7 +284,7 @@ def test_duplicated_names(engine, schema, option):
         raise AssertionError(f'Unexpected value for param `option`: {option}')
 
     with pytest.raises(DuplicateLabelsException) as excinfo:
-        with engine.connect() as connection:
+        with sync_async_connect_switch(engine) as connection:
             PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
     assert "Found duplicates across index and columns" in str(excinfo.value)
 
@@ -284,7 +293,7 @@ def test_duplicated_names(engine, schema, option):
 def test_non_unique_index(engine, schema):
     df = pd.DataFrame(index=pd.Index(data=[0, 0], name='ix'))
     with pytest.raises(DuplicateValuesInIndexException) as excinfo:
-        with engine.connect() as connection:
+        with sync_async_connect_switch(engine) as connection:
             PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
     assert "The index must be unique" in str(excinfo.value)
 
@@ -294,7 +303,7 @@ def test_non_unique_index(engine, schema):
 def test_bad_chunksize(engine, schema, bad_chunksize_value):
     df = pd.DataFrame({'test':[0]})
     df.index.name = 'id'
-    with engine.connect() as connection:
+    with sync_async_connect_switch(engine) as connection:
         pse = PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
         with pytest.raises(ValueError) as excinfo:
             pse._create_chunks(values=[0], chunksize=bad_chunksize_value)
