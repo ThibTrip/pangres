@@ -274,6 +274,11 @@ def parameterize_async(params_names, params_values):
     return sub_decorator
 
 
+# -
+
+# ## SQL
+
+# +
 def table_exists(connection, schema, table_name) -> bool:
     insp = sa.inspect(connection)
     if _sqla_gt14():
@@ -290,6 +295,7 @@ def select_table(engine, schema, table_name,
     Has an option to return None if the table does not exist and
     `error_if_missing` is False.
     """
+    engine = async_engine_to_sync_engine(engine)
     ns = f'{schema}.{table_name}' if schema is not None else table_name
     with engine.connect() as con:
         # check if the table is present
@@ -302,6 +308,9 @@ def select_table(engine, schema, table_name,
 
 
 def drop_table(engine, schema, table_name):
+    # temporarily create a synchronous engine if in presence if an asynchronous engine
+    # (e.g. asyncpg -> psycopg2)
+    engine = async_engine_to_sync_engine(engine)
     namespace = f'{schema}.{table_name}' if schema is not None else table_name
     with engine.connect() as connection:
         # instead of using `DROP TABLE IF EXISTS` which produces warnings
