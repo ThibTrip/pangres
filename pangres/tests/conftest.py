@@ -538,6 +538,7 @@ def pytest_generate_tests(metafunc):
 # We need to apply a few modification for comparing DataFrames we get back from the DB and DataFrames we expect e.g. for JSON (with SQlite pandas reads it as string).
 
 def read_example_table_from_db(engine, schema, table_name):
+    engine = async_engine_to_sync_engine(engine)
     def load_json_if_needed(obj):
         """
         For SQlite we receive strings back (or None) for a JSON column.
