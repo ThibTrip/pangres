@@ -155,5 +155,6 @@ class Executor:
             if len(self.df) == 0:
                 return
                 yield
+            # IMPORTANT! NO `await`
             async for result in pse.aupsert_yield(if_row_exists=if_row_exists, chunksize=chunksize):
-                yield await result
+                yield result

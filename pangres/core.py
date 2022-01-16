@@ -441,4 +441,5 @@ async def aupsert(con,
     if not yield_chunks:
         await executor.aexecute(async_connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)
     else:
-        return await executor.aexecute_yield(async_connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)
+        # IMPORTANT! NO `await` because this returns an asynchronous generator
+        return executor.aexecute_yield(async_connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)
