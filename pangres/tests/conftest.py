@@ -307,6 +307,16 @@ def select_table(engine, schema, table_name,
             return None
 
 
+def drop_schema(engine, schema):
+    # temporarily create a synchronous engine if in presence if an asynchronous engine
+    # (e.g. asyncpg -> psycopg2)
+    engine = async_engine_to_sync_engine(engine)
+    with engine.connect() as connection:
+        connection.execute(text(f'DROP SCHEMA IF EXISTS {schema};'))
+        if hasattr(connection, 'commit'):
+            connection.commit()
+
+
 def drop_table(engine, schema, table_name):
     # temporarily create a synchronous engine if in presence if an asynchronous engine
     # (e.g. asyncpg -> psycopg2)
