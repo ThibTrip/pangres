@@ -386,6 +386,11 @@ def commit(connection):
         connection.commit()
 
 
+# -
+
+# ## Variables for tests
+
+# +
 class TableNames:
     ADD_NEW_COLUMN = 'test_add_new_column'
     BAD_COLUMN_NAMES = 'test_bad_column_names'
@@ -417,9 +422,50 @@ schema_for_testing_creation = 'pangres_create_schema_test'
 
 # -
 
-# ## Class TestDB
+# # Tests generation
 
 # +
+class TestFunctionInfo:
+    """
+    Provides some kind of metadata/info for test functions
+
+    Examples
+    --------
+    >>> # whether a test function has an async equivalent
+    >>> module_namespace = 'pangres.tests.test_yield_chunks'
+    >>> TestFunctionInfo(module_namespace=module_namespace,
+    ...                  function_name='test_get_nb_rows').has_async_variant
+    True
+    >>> TestFunctionInfo(module_namespace=module_namespace,
+    ...                  function_name='test_get_nb_rows_async').is_async
+    True
+    >>> TestFunctionInfo(module_namespace=module_namespace,
+    ...                  function_name='test_get_nb_rows').is_async
+    False
+    """
+
+    def __init__(self, module_namespace, function_name):
+        self.module_namespace = module_namespace
+        self.function_name = function_name
+
+    @property
+    def is_async(self):
+        # do not ask if it is a coroutine, this is
+        # a convention where a test function will
+        # have an asynchronous variant with the suffix `async`
+        # sync engines will only go through the sync variant
+        # while async engines will only go through the async variant
+        return self.function_name.endswith('_async')
+
+    @property
+    def has_async_variant(self):
+        # makes no sense to ask this if we are already refering to the async variant
+        if self.is_async:
+            raise AssertionError('This is the async variant')
+        m = importlib.import_module(self.module_namespace)
+        return hasattr(m, f'{self.function_name}_async')
+
+
 def pytest_addoption(parser):
     parser.addoption('--sqlite_conn', action="store", type=str, default=None)
     parser.addoption('--pg_conn', action="store", type=str, default=None)
