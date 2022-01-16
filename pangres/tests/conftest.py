@@ -188,6 +188,10 @@ def sync_async_connect_switch(engine):
             connection.close()
 
 
+# -
+
+# ## Misc
+
 # +
 def _get_function_param_value(sig, param_name, args, kwargs):
     """
@@ -199,6 +203,75 @@ def _get_function_param_value(sig, param_name, args, kwargs):
         return args[param_ix]
     else:
         return kwargs[param_name]
+
+
+def parse_params_parameterize(params_names, params_values):
+    """
+    Parses parameters similarly to pytest.mark.parameterize.
+    This is a helper for function `parameterize_async` (see below).
+
+    Examples
+    --------
+    >>> parse_params_parameterize("a", ['foo', 'bar', ['foo', 'bar'], {0:'foo'}])
+    [{'a': 'foo'}, {'a': 'bar'}, {'a': ['foo', 'bar']}, {'a': {0: 'foo'}}]
+
+    >>> parse_params_parameterize("a, b", [['foo', 'bar'], [{0:'foo'}, 'foo']])
+    [{'a': 'foo', 'b': 'bar'}, {'a': {0: 'foo'}, 'b': 'foo'}]
+    """
+    assert isinstance(params_values, list)
+    names = params_names.replace(' ', '').split(',')
+    assert len(names) > 0
+    # handle easy case of just one name
+    if len(names) == 1:
+        return [{names[0]:val} for val in params_values]
+    else:
+        l = []
+        for values in params_values:
+            assert isinstance(values, list)
+            assert len(values) == len(names)
+            l.append({name:value for name, value in zip(names, values)})
+        return l
+
+
+def parameterize_async(params_names, params_values):
+    """
+    This is a dumbed down version of parameterize for async tests because
+    I could not get this to work otherwise (the first iteration of an async
+    test would work but not the second and further iterations because the same
+    event loop is reused).
+
+    Thanks to https://stackoverflow.com/a/42581103 for making decorators with arguments
+
+    Unlike pytest.mark.parameterize this will not print different tests :(.
+    Also this is quite hacky and I am not happy about it... But at least it works.
+
+    **IMPORTANT**
+
+    Arguments that need to be parameterized need to be set to `None`!
+    Otherwise pytest will look for fixtures and such and complain it cannot
+    find a value for a given argument.
+    """
+    def sub_decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # make sure param names are in the func
+            sig = signature(func)
+            names = params_names.replace(' ', '').split(',')
+            for name in names:
+                assert name in sig.parameters
+
+            # get params
+            params = parse_params_parameterize(params_names=params_names,
+                                               params_values=params_values)
+
+            # execute func
+            for kwargs_modifications in params:
+                new_kwargs = kwargs.copy()
+                new_kwargs.update(kwargs_modifications)
+                sync_async_exec_switch(func, *args, **new_kwargs)
+            return
+        return wrapper
+    return sub_decorator
 
 
 def table_exists(connection, schema, table_name) -> bool:
