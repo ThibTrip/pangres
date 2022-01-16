@@ -537,6 +537,9 @@ class PandasSpecialEngine:
     async def atable_exists(self):
         return await self.connection.run_sync(lambda connection: self.table_exists(connection=connection))
 
+    async def aschema_exists(self):
+        return await self.connection.run_sync(lambda connection: self.schema_exists(connection=connection))
+
     async def acreate_table_if_not_exists(self):
         await self.connection.run_sync(lambda connection: self.create_table_if_not_exists(connection=connection))
 
