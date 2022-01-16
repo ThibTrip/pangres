@@ -4,20 +4,189 @@
 """
 Configuration and helpers for the tests of pangres with pytest.
 """
+import asyncio
+import importlib
+import inspect
 import json
 import pandas as pd
 import sqlalchemy as sa
+from contextlib import contextmanager
 from functools import wraps
 from inspect import signature
 from sqlalchemy import create_engine, text
-from typing import Union
+#from sqlalchemy.engine import URL
+from sqlalchemy.engine.url import URL
+from typing import Optional, Union
 
+# local imports
+from pangres import aupsert, upsert
 from pangres.helpers import _sqla_gt14
 
 
 # -
 
 # # Helpers for other test modules
+
+# ## Async/Sync detection and handling
+
+# +
+def execute_coroutine_sync(coro):
+    # for pytest we have to create a new event loop
+    # otherwise it says there is no event loop for the main thread
+    # and if I am not mistaken, after it has been created we will
+    # use `get_event_loop` to retrieve it afterwards instead of
+    # each time recreating an event loop which would cause problems
+    # with distinct futures?
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop=loop)
+    task = asyncio.ensure_future(coro, loop=loop)
+    return loop.run_until_complete(task)
+
+
+def sync_async_exec_switch(func, *args, **kwargs):
+    """
+    Executes given function with given parameters
+    synchronously even if it is a coroutine.
+    This allows a coroutine to be used in a synchronous function
+    """
+    if inspect.iscoroutine(func) or inspect.iscoroutinefunction(func):
+        return execute_coroutine_sync(func(*args, **kwargs))
+    elif callable(func):
+        return func(*args, **kwargs)
+    else:
+        raise TypeError('Expected a coroutine or callable')
+
+
+def is_async_sqla_obj(obj):
+    """
+    Returns True if `obj` is an asynchronous sqlalchemy connectable (engine or connection)
+    otherwise False.
+    """
+    # sqla < 1.4 does not support asynchronous connectables
+    if not _sqla_gt14():
+        return False
+    from sqlalchemy.ext.asyncio.engine import AsyncConnection, AsyncEngine
+    return isinstance(obj, (AsyncConnection, AsyncEngine))
+
+
+# repeat all arguments even if it's stupid, this is the last thing I want to troubleshoot :|...
+# todo: is there a way I can compare equality of parameters? in case I change parameters the parameters of
+# `upsert` (which are the same as `aupsert`) I want to get an error if I don't change them here as well
+def upsert_or_aupsert(con,
+                      df:pd.DataFrame,
+                      table_name:str,
+                      if_row_exists:str,
+                      schema:Optional[str]=None,
+                      create_schema:bool=False,
+                      create_table:bool=True,
+                      add_new_columns:bool=False,
+                      adapt_dtype_of_empty_db_columns:bool=False,
+                      chunksize:Optional[int]=None,
+                      dtype:Union[dict,None]=None,
+                      yield_chunks:bool=False):
+    """
+    Detects if given connectable is asynchronous and automatically
+    executes the appropriate upsert function (`pangres.upsert` if
+    synchronous and `pangres.aupsert` if asynchronous).
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from pangres import DocsExampleTable
+    >>>
+    >>> df = DocsExampleTable.df
+    >>>
+    >>> # sync engine
+    >>> from sqlalchemy import create_engine
+    >>> engine = create_engine("sqlite://")
+    >>> upsert_or_aupsert(con=engine, df=df, table_name='example', if_row_exists='update')
+    >>>
+    >>> # async engine
+    >>> from sqlalchemy.ext.asyncio import create_async_engine  # doctest: +SKIP
+    >>> engine = create_async_engine("postgresql+asyncpg://username:password@localhost:5432/postgres")  # doctest: +SKIP
+    >>> upsert_or_aupsert(con=engine, df=df, table_name='example', if_row_exists='update')  # doctest: +SKIP
+    """
+    f = aupsert if is_async_sqla_obj(con) else upsert
+    return sync_async_exec_switch(func=f, con=con, df=df, table_name=table_name, if_row_exists=if_row_exists,
+                                  schema=schema, create_schema=create_schema, create_table=create_table,
+                                  add_new_columns=add_new_columns,
+                                  adapt_dtype_of_empty_db_columns=adapt_dtype_of_empty_db_columns,
+                                  chunksize=chunksize, dtype=dtype, yield_chunks=yield_chunks)
+
+
+def create_sync_or_async_engine(conn_string, **kwargs):
+    """
+    Automatically creates an appropriate engine for given connection string
+    (synchronous or asynchronous).
+
+    Examples
+    --------
+    >>> # sync
+    >>> engine = create_sync_or_async_engine("sqlite://")
+    >>> # async
+    >>> engine = create_sync_or_async_engine("postgresql+asyncpg://username:password@localhost:5432/postgres")  # doctest: +SKIP
+    """
+    if not _sqla_gt14():
+        return create_engine(conn_string)
+    else:
+        if 'asyncpg' in conn_string.split('/')[0]:
+            from sqlalchemy.ext.asyncio import create_async_engine
+            return create_async_engine(conn_string)
+        else:
+            return create_engine(conn_string)
+
+
+def async_engine_to_sync_engine(engine):
+    """
+    If an engine is async, creates a new engine that is synchronous.
+    It does that by switching to a synchronous driver for given database:
+    * asyncpg -> psycopg2
+
+    This is probably not super elegant but it saves a lot of hassle for
+    everything that "surround" tests like setups, verifications, cleaning up...
+
+    For the "proper" testing part though this should obviously not be used
+    as it would defeat the purpose! E.g. in the presence of an engine using
+    `asyncpg` we will want to test it with `aupsert`. We are not going to convert
+    it to a synchronous engine and pass it to `upsert`...
+    """
+    u = engine.url
+    params = {attr:getattr(u, attr) for attr in ('drivername', 'username', 'password', 'host', 'port', 'database', 'query')}
+    if 'asyncpg' in params['drivername']:
+        params['drivername'] = 'postgresql+psycopg2'
+        new_u = URL.create(**params)
+        return create_engine(str(new_u))
+    else:
+        if is_async_sqla_obj(engine):
+            raise NotImplementedError('Could not "convert" this asynchronous engine to a sync engine: {engine}')
+        return engine
+
+
+@contextmanager
+def sync_async_connect_switch(engine):
+    """
+    Context manager for connecting to an engine synchronously
+    even if it is of asynchronous type
+    """
+    # I thought I could use `pangres.tests.conftest.sync_async_exec_switch`
+    # but `engine.connect()` with an asynchronous engine
+    # is not recognized by inspect as a coroutine :|
+    if is_async_sqla_obj(engine):
+        try:
+            connection = execute_coroutine_sync(engine.connect())
+            yield connection
+        finally:
+            execute_coroutine_sync(connection.close())
+    else:
+        try:
+            connection = engine.connect()
+            yield connection
+        finally:
+            connection.close()
+
 
 # +
 def _get_function_param_value(sig, param_name, args, kwargs):
