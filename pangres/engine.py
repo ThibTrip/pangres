@@ -535,7 +535,7 @@ class PandasSpecialEngine:
     # Note: I know I don't need to use lambdas here but that is a precaution to make sure the `connection` kwarg
     # is here
     async def atable_exists(self):
-        await self.connection.run_sync(lambda connection: self.table_exists(connection=connection))
+        return await self.connection.run_sync(lambda connection: self.table_exists(connection=connection))
 
     async def acreate_table_if_not_exists(self):
         await self.connection.run_sync(lambda connection: self.create_table_if_not_exists(connection=connection))
@@ -562,7 +562,7 @@ class PandasSpecialEngine:
     async def aadapt_dtype_of_empty_db_columns(self):
         empty_db_columns = await self.aget_empty_columns()
         db_table = await self.connection.run_sync(lambda connection: self.get_db_table_schema(connection=connection))
-        ddl_func = lambda connection: self.adapt_dtype_of_empty_db_columns(connection=self.connection,
+        ddl_func = lambda connection: self.adapt_dtype_of_empty_db_columns(connection=connection,
                                                                            empty_db_columns=empty_db_columns,
                                                                            db_table=db_table)
         await self.connection.run_sync(ddl_func)
