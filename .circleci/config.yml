@@ -40,7 +40,7 @@ jobs:
           # install package (fetches setup.py in current directory)
           pip install .
           # we need cryptography for MySQL
-          pip install codecov coverage numpy pytest pytest-benchmark pytest-cov
+          pip install codecov coverage numpy pytest pytest-benchmark pytest-cov pytest-asyncio
           pip install asyncpg psycopg2 pymysql cx_Oracle cryptography tabulate npdoc_to_md
           # use pytest
           ## first test with sqlalchemy latest i.e. sqlalchemy>=1.4 (after API changes, notably engine.has_table being deprecated)
