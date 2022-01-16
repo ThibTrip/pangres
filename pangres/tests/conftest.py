@@ -335,7 +335,7 @@ def drop_table(engine, schema, table_name):
             connection.commit()
 
 
-# thanks to https://stackoverflow.com/a/42581103
+# thanks to https://stackoverflow.com/a/42581103 for making decorators with arguments
 def drop_table_for_test(table_name, drop_before_test=True, drop_after_test=True):
     """
     Decorator for wrapping our tests functions. Expects the tests function
@@ -366,7 +366,8 @@ def drop_table_for_test(table_name, drop_before_test=True, drop_after_test=True)
                 drop_table(engine=engine, schema=schema, table_name=table_name)
 
             # test
-            function(*args, **kwargs)
+            # note that this could be a coroutine :|
+            sync_async_exec_switch(function, *args, **kwargs)
 
             # after test
             if drop_after_test:
