@@ -5,10 +5,11 @@ import pytest
 from math import floor
 from sqlalchemy import VARCHAR
 
-from pangres import upsert
+# local imports
 from pangres.helpers import _sqlite_gt3_32_0
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import drop_table_for_test, drop_table
+from pangres.tests.conftest import (drop_table_for_test, drop_table,
+                                    is_async_sqla_obj, upsert_or_aupsert)
 # -
 
 
@@ -23,9 +24,9 @@ table_name = 'test_speed'
 def create_or_upsert_with_pangres(engine, schema, if_row_exists, df, chunksize, **kwargs):
     # MySQL does not want flexible text length in indices/PK
     dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-    upsert(con=engine, df=df, schema=schema, chunksize=chunksize,
-           table_name=table_name, if_row_exists=if_row_exists,
-           dtype=dtype, **kwargs)
+    upsert_or_aupsert(con=engine, df=df, schema=schema, chunksize=chunksize,
+                      table_name=table_name, if_row_exists=if_row_exists,
+                      dtype=dtype, **kwargs)
 
 
 def create_with_pandas(engine, schema, df):
@@ -61,6 +62,10 @@ pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 
 @pytest.mark.parametrize(**pytest_params)
 @drop_table_for_test(table_name=table_name)
 def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
+    # skip async engines with pandas
+    if is_async_sqla_obj(engine) and library == 'pandas':
+        pytest.skip()
+
     # get a df
     # we don't test JSON as this is problematic with pandas
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
@@ -83,6 +88,10 @@ def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, ro
 @drop_table_for_test(table_name=table_name)
 def test_upsert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations, if_row_exists):
     assert library == 'pangres'  # in case pandas changes and we forget to update the tests
+
+    # skip async engines with pandas
+    if is_async_sqla_obj(engine) and library == 'pandas':
+        pytest.skip()
 
     # get a df
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])

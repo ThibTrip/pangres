@@ -4,9 +4,9 @@ import pandas as pd
 import pytest
 import random
 
-from pangres import upsert, fix_psycopg2_bad_cols
+from pangres import fix_psycopg2_bad_cols
 from pangres.exceptions import BadColumnNamesException
-from pangres.tests.conftest import drop_table_for_test, TableNames
+from pangres.tests.conftest import drop_table_for_test, TableNames, upsert_or_aupsert
 # -
 
 # # Helpers
@@ -24,8 +24,8 @@ def test_bad_text_insert(engine, schema):
     create_random_text = lambda: ''.join(random.choice(bad_char_seq) for i in range(10))
     df_test = (pd.DataFrame({'text': [create_random_text() for i in range(10)]})
                .rename_axis(['profileid'], axis='index', inplace=False))
-    upsert(con=engine, schema=schema, table_name=TableNames.BAD_TEXT, df=df_test,
-           if_row_exists='update')
+    upsert_or_aupsert(con=engine, schema=schema, table_name=TableNames.BAD_TEXT, df=df_test,
+                      if_row_exists='update')
 
 
 # do the next test multiple times to try different combinations of bad characters
@@ -44,7 +44,7 @@ def test_bad_column_names(engine, schema, iteration):
     # psycopg2 can't process columns with "%" or "(" or ")" so we will need `fix_psycopg2_bad_cols`
     if 'postgres' in engine.dialect.dialect_description:
         df_test = fix_psycopg2_bad_cols(df_test)
-    upsert(con=engine, schema=schema, df=df_test, table_name=TableNames.BAD_COLUMN_NAMES, if_row_exists='update')
+    upsert_or_aupsert(con=engine, schema=schema, df=df_test, table_name=TableNames.BAD_COLUMN_NAMES, if_row_exists='update')
 
 
 @drop_table_for_test(TableNames.BAD_COLUMN_NAMES)
@@ -53,7 +53,7 @@ def test_bad_column_name_postgres_raises(engine, schema):
         pytest.skip()
     df = pd.DataFrame({'id':[0], '(test)':[0]}).set_index('id')
     with pytest.raises(BadColumnNamesException) as exc_info:
-        upsert(con=engine, schema=schema, df=df, table_name=TableNames.BAD_COLUMN_NAMES, if_row_exists='update')
+        upsert_or_aupsert(con=engine, schema=schema, df=df, table_name=TableNames.BAD_COLUMN_NAMES, if_row_exists='update')
     assert 'does not seem to support column names with' in str(exc_info.value)
 
 
@@ -64,4 +64,4 @@ def test_bad_column_name_postgres_raises(engine, schema):
 @drop_table_for_test(TableNames.COLUMN_NAMED_VALUES)
 def test_column_named_values(engine, schema):
     df = pd.DataFrame({'values': range(5, 9)}, index=pd.Index(range(1, 5), name='idx'))
-    upsert(con=engine, schema=schema, df=df, if_row_exists='update', table_name=TableNames.COLUMN_NAMED_VALUES)
+    upsert_or_aupsert(con=engine, schema=schema, df=df, if_row_exists='update', table_name=TableNames.COLUMN_NAMED_VALUES)

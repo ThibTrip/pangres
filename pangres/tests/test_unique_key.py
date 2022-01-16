@@ -10,10 +10,11 @@ import pandas as pd
 from sqlalchemy import INTEGER, VARCHAR, Column, text, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
-from pangres import upsert
-from pangres.tests.conftest import (drop_table_for_test,
-                                    get_table_namespace,
-                                    TableNames)
+# local imports
+from pangres.tests.conftest import (async_engine_to_sync_engine,
+                                    drop_table_for_test, get_table_namespace,
+                                    select_table, TableNames,
+                                    upsert_or_aupsert)
 
 
 # -
@@ -23,6 +24,7 @@ from pangres.tests.conftest import (drop_table_for_test,
 # ## Table model
 
 def create_test_table(engine, schema):
+    engine = async_engine_to_sync_engine(engine)
     Base = declarative_base(bind=engine)
 
     class TestUniqueKey(Base):
@@ -65,24 +67,22 @@ def test_upsert_with_unique_keys(engine, schema):
     table_name = TableNames.UNIQUE_KEY
     common_kwargs_upsert = dict(con=engine, schema=schema, table_name=table_name,
                                 if_row_exists='update')
-    namespace = get_table_namespace(schema=schema, table_name=table_name)
 
     def read_from_db():
-        with engine.connect() as connection:
-            return pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection,
-                               index_col='row_id')
+        return select_table(engine=engine, schema=schema,
+                            table_name=table_name, index_col='row_id')
 
     # create table
     create_test_table(engine=engine, schema=schema)
 
     # add initial data (df_old)
-    upsert(df=df_old, **common_kwargs_upsert)
+    upsert_or_aupsert(df=df_old, **common_kwargs_upsert)
     df = read_from_db()
     df_expected = df_old.assign(row_id=range(1, 4)).reset_index().set_index('row_id')
     pd.testing.assert_frame_equal(df, df_expected)
 
     # add new data (df_new)
-    upsert(df=df_new, **common_kwargs_upsert)
+    upsert_or_aupsert(df=df_new, **common_kwargs_upsert)
     df = read_from_db()
     # before creating our expected df we need to implement the special case of postgres
     # where the id of the last row will be 7 instead of 4. I suppose that PG's ON
