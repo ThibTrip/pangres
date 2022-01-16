@@ -469,6 +469,7 @@ class TestFunctionInfo:
 def pytest_addoption(parser):
     parser.addoption('--sqlite_conn', action="store", type=str, default=None)
     parser.addoption('--pg_conn', action="store", type=str, default=None)
+    parser.addoption('--async_pg_conn', action="store", type=str, default=None)
     parser.addoption('--mysql_conn', action="store", type=str, default=None)
     parser.addoption('--pg_schema', action='store', type=str, default=None)
 
@@ -486,27 +487,48 @@ def pytest_generate_tests(metafunc):
 
     # tests that we need to repeat for each engine + options (e.g. future)
     conn_strings = {'sqlite':metafunc.config.option.sqlite_conn,
+                    'asyncpg':metafunc.config.option.async_pg_conn,
                     'pg':metafunc.config.option.pg_conn,
                     'mysql':metafunc.config.option.mysql_conn}
+    if not any(v is not None for v in conn_strings.values()):
+        raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
+
     engines, schemas, ids = [], [], []
     for db_type, conn_string in conn_strings.items():
+
+        # cases where we don't skip tests generation
         if conn_string is None:
             continue
-        schema = metafunc.config.option.pg_schema if db_type == 'pg' else None
-        engine = create_engine(conn_string)
+
+        # get engine and schema
+        schema = metafunc.config.option.pg_schema if db_type in ('pg', 'asyncpg') else None
+        engine = create_sync_or_async_engine(conn_string)
+
+        # skip async tests for sync engines
+        test_func_info = TestFunctionInfo(module_namespace=metafunc.module.__name__,
+                                          function_name=metafunc.function.__name__)
+        is_async_engine = is_async_sqla_obj(engine)
+        if test_func_info.is_async:
+            if not is_async_engine:
+                continue
+
+        # skip sync tests for async engines when a tests module has an async variant
+        elif test_func_info.has_async_variant and is_async_engine:
+            continue
+
+        # generate tests
         schemas.append(schema)
         engines.append(engine)
         schema_id = '' if schema is None else f'_schema:{schema}'
         ids.append(f'{engine.url.drivername}{schema_id}')
         # for sqlalchemy 1.4+ use future=True to try the future sqlalchemy 2.0
-        if _sqla_gt14():
+        # do not do this for async engines which already implement 2.0 functionalities
+        if _sqla_gt14() and not is_async_engine:
             future_engine = create_engine(conn_string, future=True)
             schemas.append(schema)
             engines.append(future_engine)
             ids.append(f'{engine.url.drivername}{schema_id}_future')
     assert len(engines) == len(schemas) == len(ids)
-    if len(engines) == 0:
-        raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
     metafunc.parametrize("engine, schema", list(zip(engines, schemas)), ids=ids, scope='module')
 
 
