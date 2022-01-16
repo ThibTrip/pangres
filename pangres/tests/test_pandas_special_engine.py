@@ -62,20 +62,20 @@ def test_table_attr(engine, schema):
         assert pse.table.name == table_name
 
 
+# -
+
+# # Test creating a PostgreSQL schema
+
+# +
 @drop_table_for_test(TableNames.NO_TABLE)
 def test_schema_creation(engine, schema):
     # overwrite schema
     schema = schema_for_testing_creation
-
-    # local helper
-    def drop_schema():
-        if 'postgres' in engine.dialect.dialect_description:
-            with engine.connect() as connection:
-                connection.execute(text(f'DROP SCHEMA IF EXISTS {schema};'))
-                commit(connection)
+    table_name = TableNames.NO_TABLE
 
     # schema may already exist before testing
-    drop_schema()
+    if 'postgres' in engine.dialect.dialect_description:
+        drop_schema(engine=engine, schema=schema)
 
     # then try to create a schema from a PandasSpecialEngine instance
     dummy_df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
@@ -94,9 +94,45 @@ def test_schema_creation(engine, schema):
                 raise e
         finally:
             if pse._db_type == 'postgres':
-                drop_schema()
+                drop_schema(engine=engine, schema=schema)
 
 
+# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
+@pytest.mark.asyncio
+@drop_table_for_test(TableNames.NO_TABLE)
+async def test_schema_creation_async(engine, schema):
+    # overwrite schema
+    schema = schema_for_testing_creation
+
+    # schema may already exist before testing
+    if 'postgres' in engine.dialect.dialect_description:
+        drop_schema(engine=engine, schema=schema)
+
+    # then try to create a schema from a PandasSpecialEngine instance
+    dummy_df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
+    async with engine.connect() as connection:
+        try:
+            pse = PandasSpecialEngine(connection=connection, schema=schema,
+                                      table_name=TableNames.NO_TABLE, df=dummy_df)
+            # this should raise HasNoSchemaSystemException
+            # if we are not on a postgres engine
+            assert not await pse.aschema_exists()
+            await pse.acreate_schema_if_not_exists()
+            await connection.commit()
+            assert await pse.aschema_exists()
+        except Exception as e:
+            if pse._db_type == 'postgres' or not isinstance(e, HasNoSchemaSystemException):
+                raise e
+        finally:
+            if pse._db_type == 'postgres':
+                drop_schema(engine=engine, schema=schema)
+
+
+# -
+
+# # Test creating a table
+
+# +
 @drop_table_for_test(TableNames.TABLE_CREATION)
 def test_table_creation(engine, schema):
     dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
@@ -110,6 +146,26 @@ def test_table_creation(engine, schema):
         assert pse.table_exists()
 
 
+# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
+@pytest.mark.asyncio
+@drop_table_for_test(TableNames.TABLE_CREATION)
+async def test_table_creation_async(engine, schema):
+    dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = _TestsExampleTable.create_example_df(nb_rows=10)
+    async with engine.connect() as connection:
+        pse = PandasSpecialEngine(connection=connection, schema=schema, dtype=dtype,
+                                  table_name=TableNames.TABLE_CREATION, df=df)
+        assert not await pse.atable_exists()
+        await pse.acreate_table_if_not_exists()
+        await connection.commit()
+        assert await pse.atable_exists()
+
+
+# -
+
+# # Test adding new columns
+
+# +
 @pytest.mark.parametrize('axis', ['index', 'column'])
 @drop_table_for_test(TableNames.ADD_NEW_COLUMN)
 def test_add_new_columns(engine, schema, axis):
@@ -175,6 +231,79 @@ def test_add_new_columns(engine, schema, axis):
         assert set(df.columns) == set(df_db.columns)
 
 
+# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
+@pytest.mark.asyncio
+@parameterize_async('axis', ['index', 'column'])
+@drop_table_for_test(TableNames.ADD_NEW_COLUMN)
+async def test_add_new_columns_async(engine, schema, axis=None):
+    # store arguments we will use for multiple PandasSpecialEngine instances
+    table_name = TableNames.ADD_NEW_COLUMN
+    common_kwargs = dict(schema=schema, table_name=table_name)
+    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+
+    # create our example table
+    df = _TestsExampleTable.create_example_df(nb_rows=10)
+    async with engine.connect() as connection:
+        pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
+        await pse.acreate_table_if_not_exists()
+        await connection.commit()
+        assert await pse.atable_exists()
+
+    # we need to recreate an instance of PandasSpecialEngine
+    # so that a new table model with the new columns is created then add columns
+    async with engine.connect() as connection:
+        # error message if we get unexpected values for "axis"
+        # or we make a typo in our if/elif statements
+        err_msg = f'Expected axis to be one of index, columns. Got {axis}'
+        # add a new index level or new columns (no JSON ones,
+        # it's not supported by sqlalchemy compilers :( )
+        if axis == 'index':
+            df['new_index_col'] = 'foo'
+            df.set_index('new_index_col', append=True, inplace=True)
+        elif axis == 'column':
+            df = df.assign(new_text_col='test',
+                           new_int_col=0,
+                           new_float_col=1.1,
+                           new_bool_col=False,
+                           new_dt_col=pd.Timestamp('2020-01-01'),
+                           # create this col for later
+                           empty_col=None)
+        else:
+            raise AssertionError(err_msg)
+
+        # recreate PandasSpecialEngine
+        pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
+
+        # check if we get an error when trying to add an index level
+        if axis == 'index':
+            with pytest.raises(MissingIndexLevelInSqlException) as exc_info:
+                await pse.aadd_new_columns()
+            assert 'Cannot add' in str(exc_info.value)
+            return
+        elif axis == 'column':
+            await pse.aadd_new_columns()
+            await connection.commit()
+        else:
+            raise AssertionError(err_msg)
+
+    # check if the columns were correctly added
+    # since we issued a return for 'index' earlier
+    # the axis must now be 'columns'
+    assert axis == 'column'
+    # check the columns where added
+    sync_engine = async_engine_to_sync_engine(engine)
+    with sync_engine.connect() as connection:
+        ns = get_table_namespace(schema=schema, table_name=table_name)
+        df_db = pd.read_sql(text(f'SELECT * FROM {ns} LIMIT 0;'), con=connection,
+                            index_col='profileid')
+        assert set(df.columns) == set(df_db.columns)
+
+
+# -
+
+# # Test changing data type for empty columns
+
+# +
 @pytest.mark.parametrize("new_empty_column_value", [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'),
                                                     {'foo':'bar'}, ['foo'], True])
 @drop_table_for_test(TableNames.CHANGE_EMPTY_COL_TYPE)
@@ -210,6 +339,50 @@ def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_co
         assert 'Changed type of column empty_col' in caplog.text
 
 
+# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
+@pytest.mark.asyncio
+@parameterize_async("new_empty_column_value", [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'),
+                                               {'foo':'bar'}, ['foo'], True])
+@drop_table_for_test(TableNames.CHANGE_EMPTY_COL_TYPE)
+async def test_change_column_type_if_column_empty_async(engine, schema, caplog, new_empty_column_value=None):
+    print(new_empty_column_value)
+    # store arguments we will use for multiple PandasSpecialEngine instances
+    table_name = TableNames.CHANGE_EMPTY_COL_TYPE
+    common_kwargs = dict(schema=schema, table_name=table_name)
+    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+
+    # json like will not work for sqlalchemy < 1.4
+    # also skip sqlite as it does not support such alteration
+    json_like = isinstance(new_empty_column_value, (dict, list)) and not _sqla_gt14()
+    if json_like or 'sqlite' in engine.dialect.dialect_description:
+        pytest.skip()
+
+    # create our example table
+    df = pd.DataFrame({'profileid':['foo'], 'empty_col':[None]}).set_index('profileid')
+    async with engine.connect() as connection:
+        pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
+        await pse.acreate_table_if_not_exists()
+        await connection.commit()
+        assert await pse.atable_exists()
+
+    # recreate an instance of PandasSpecialEngine with a new df (so the model gets refreshed)
+    # the line below is a "hack" to set any type of element as a column value
+    # without pandas trying to broadcast it. This is useful when passing a list or such
+    df['empty_col'] = df.index.map(lambda x: new_empty_column_value)
+    async with engine.connect() as connection:
+        pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
+        with caplog.at_level(logging.INFO, logger='pangres'):
+            await pse.aadapt_dtype_of_empty_db_columns()
+        assert len(caplog.records) == 1
+        assert 'Changed type of column empty_col' in caplog.text
+    caplog.clear()
+
+
+# -
+
+# # Various SQL flavor agnostic tests
+
+# +
 def test_values_conversion(_):
     engine = create_engine('sqlite:///')
     row = {'id':0,
