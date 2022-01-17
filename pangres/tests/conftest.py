@@ -390,6 +390,7 @@ def drop_table_for_test(table_name, drop_before_test=True, drop_after_test=True)
             # after test
             if drop_after_test:
                 drop_table(engine=engine, schema=schema, table_name=table_name)
+            engine.dispose()
             return
         return wrapper
     return sub_decorator
