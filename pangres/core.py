@@ -350,21 +350,17 @@ async def aupsert(con,
 
     **IMPORTANT info about parallelism**
 
-    Setting any of the following parameters to True will cause synchronous statements to be issued
-    and many also lead to race conditions:
-    * create_schema
-    * create_table
-    * add_new_columns
-    * adapt_dtype_of_empty_db_columns
+    `aupsert` is subject to race conditions due to its asynchronous nature. For instance,
+    imagine the following scenario:
 
-    The reason for synchronous statements is that DDL related operations (basically anything that
-    has to do with the "setup" of the table) need to run synchronously.
-
-    As for race conditions, imagine the following scenario:
-    1. coroutines (parallel functions in Python) A and B both do an upsert operation
+    1. 2 coroutines (parallel functions in Python) A and B both do an upsert operation
     2. A and B check if the table does not exist at roughly the same time
     3. The database tells both coroutines that the table does not exist
-    4. Both coroutines try to create the table at roughly the same time -> ERROR
+    4. Both coroutines try to create the table at roughly the same time:
+       one coroutine should succeed but the other one will raise an Exception
+
+    For examples of what kind of race conditions can occur, see this notebook:
+    https://github.com/ThibTrip/pangres/blob/master/demos/gotchas_asynchronous_pangres.ipynb
 
     Examples
     --------
