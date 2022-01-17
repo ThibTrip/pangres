@@ -75,7 +75,8 @@ def test_index_with_null(engine, schema):
         upsert_or_aupsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
         # don't test error for mysql since only a warning is raised and the line is skipped
         if 'mysql' in engine.dialect.dialect_description:
-            pytest.skip()
+            pytest.skip('not tested with mysql as only a warning is issued and the line is skipped. '
+                        "Perhaps we could capture the warning with pytest?")
 
 
 # ## Test only index

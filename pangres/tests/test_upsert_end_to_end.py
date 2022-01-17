@@ -116,7 +116,7 @@ def test_add_new_column(engine, schema):
 def test_adapt_column_type(engine, schema):
     # skip for sqlite as it does not support such alteration
     if 'sqlite' in engine.dialect.dialect_description:
-        pytest.skip()
+        pytest.skip('such column alteration is not possible with SQlite')
 
     # config
     table_name = TableNames.CHANGE_EMPTY_COL_TYPE

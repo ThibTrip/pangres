@@ -3,7 +3,7 @@
 # +
 import pytest
 from math import floor
-from sqlalchemy import create_engine, VARCHAR
+from sqlalchemy import VARCHAR
 
 # local imports
 from pangres.helpers import _sqlite_gt3_32_0
@@ -61,7 +61,7 @@ pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 
 def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
     # skip async engines with pandas
     if is_async_sqla_obj(engine) and library == 'pandas':
-        pytest.skip()
+        pytest.skip('async engines will not work with pandas')
 
     # get a df
     # we don't test JSON as this is problematic with pandas
@@ -87,7 +87,7 @@ def test_upsert_speed(engine, schema, benchmark, library, nb_rows, rounds, itera
 
     # skip async engines with pandas
     if is_async_sqla_obj(engine) and library == 'pandas':
-        pytest.skip()
+        pytest.skip('async engines will not work with pandas')
 
     # get a df
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])

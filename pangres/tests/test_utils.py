@@ -66,7 +66,7 @@ def test_adjust_chunksize(engine, schema, nb_columns):
     # currently we only know of restrictions for SQlite and asyncpg
     has_limitations = any(s in engine.dialect.dialect_description for s in ('sqlite', 'asyncpg'))
     if not has_limitations:
-        pytest.skip()
+        pytest.skip('no known limitations for the number of SQL parameters in a statement for this engine')
 
     # this is for not repeating ourselves too much
     test_func = lambda: adjust_chunksize(con=engine, df=df, chunksize=chunksize)

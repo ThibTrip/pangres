@@ -35,7 +35,7 @@ def test_bad_column_names(engine, schema, iteration):
     # add columns with bad names
     # don't do this for MySQL which has more strict rules for column names
     if 'mysql' in engine.dialect.dialect_description:
-        pytest.skip()
+        pytest.skip('MySQL has very strict rules for column names so we do not even test it')
 
     random_bad_col_name = ''.join(random.choice(bad_char_seq) for i in range(50))
     df_test = (pd.DataFrame({random_bad_col_name: ['test', None]})
@@ -50,7 +50,7 @@ def test_bad_column_names(engine, schema, iteration):
 @drop_table_for_test(TableNames.BAD_COLUMN_NAMES)
 def test_bad_column_name_postgres_raises(engine, schema):
     if 'postgres' not in engine.dialect.dialect_description:
-        pytest.skip()
+        pytest.skip('This test is only relevant for PostgreSQL')
     df = pd.DataFrame({'id':[0], '(test)':[0]}).set_index('id')
     with pytest.raises(BadColumnNamesException) as exc_info:
         upsert_or_aupsert(con=engine, schema=schema, df=df, table_name=TableNames.BAD_COLUMN_NAMES, if_row_exists='update')

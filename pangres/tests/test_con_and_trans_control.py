@@ -147,7 +147,7 @@ def test_commit_as_you_go(engine, schema):
         # when this is the case there is no attribute commit or rollback for
         # the connection
         if not hasattr(con, 'commit'):
-            pytest.skip()
+            pytest.skip('test not possible because there is no attribute "commit" (most likely sqlalchemy < 2)')
 
         # do some random upsert operation and commit
         upsert(con=con, df=df, **common_kwargs)
@@ -179,7 +179,7 @@ async def test_commit_as_you_go_async(engine, schema):
         # when this is the case there is no attribute commit or rollback for
         # the connection
         if not hasattr(con, 'commit'):
-            pytest.skip()
+            pytest.skip('test not possible because there is no attribute "commit" (most likely sqlalchemy < 2)')
 
         # do some random upsert operation and commit
         await aupsert(con=con, df=df, **common_kwargs)

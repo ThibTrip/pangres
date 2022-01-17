@@ -315,9 +315,11 @@ def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_co
 
     # json like will not work for sqlalchemy < 1.4
     # also skip sqlite as it does not support such alteration
-    json_like = isinstance(new_empty_column_value, (dict, list)) and not _sqla_gt14()
-    if json_like or 'sqlite' in engine.dialect.dialect_description:
-        pytest.skip()
+    json_like = isinstance(new_empty_column_value, (dict, list))
+    if json_like and not _sqla_gt14():
+        pytest.skip('JSON like values will not work for sqlalchemy < 1.4')
+    elif 'sqlite' in engine.dialect.dialect_description:
+        pytest.skip('such column alteration is not possible with SQlite')
 
     # create our example table
     df = pd.DataFrame({'profileid':['foo'], 'empty_col':[None]}).set_index('profileid')
@@ -353,9 +355,11 @@ async def test_change_column_type_if_column_empty_async(engine, schema, caplog, 
 
     # json like will not work for sqlalchemy < 1.4
     # also skip sqlite as it does not support such alteration
-    json_like = isinstance(new_empty_column_value, (dict, list)) and not _sqla_gt14()
-    if json_like or 'sqlite' in engine.dialect.dialect_description:
-        pytest.skip()
+    json_like = isinstance(new_empty_column_value, (dict, list))
+    if json_like and not _sqla_gt14():
+        pytest.skip('JSON like values will not work for sqlalchemy < 1.4')
+    elif 'sqlite' in engine.dialect.dialect_description:
+        pytest.skip('such column alteration is not possible with SQlite')
 
     # create our example table
     df = pd.DataFrame({'profileid':['foo'], 'empty_col':[None]}).set_index('profileid')
