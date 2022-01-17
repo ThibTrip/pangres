@@ -211,7 +211,7 @@ def test_mysql_pk_not_auto_incremented(engine, schema):
     upsert_or_aupsert(con=engine, df=df2, table_name=table_name, if_row_exists='update')
 
     # read df back
-    df_db = select_table(engine=engine, schema=schema, table_name=table_name)
+    df_db = select_table(engine=engine, schema=schema, table_name=table_name, index_col='id')
 
     # check mysql got that correctly
     pd.testing.assert_frame_equal(df_db.sort_index(), pd.concat((df1, df2)).sort_index())
