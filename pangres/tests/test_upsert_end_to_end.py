@@ -205,3 +205,27 @@ def test_create_schema_not_none(engine, schema):
         if is_postgres:
             drop_table(engine=engine, schema=schema, table_name=table_name)
             drop_schema()
+
+
+# see https://github.com/ThibTrip/pangres/issues/56
+@drop_table_for_test(TableNames.PK_MYSQL)
+def test_mysql_pk_not_auto_incremented(engine, schema):
+    if 'mysql' not in engine.dialect.dialect_description:
+        pytest.skip('This test is only relevant for MySQL')
+
+    table_name = TableNames.PK_MYSQL
+
+    # upsert first df using pangres which creates the table automatically
+    df1 = pd.DataFrame({'id':[0, 1], 'name':['foo', 'bar']}).set_index('id')
+    upsert(con=engine, df=df1, table_name=table_name, if_row_exists='update')
+
+    # upsert second df
+    df2 = pd.DataFrame({'id':[100, 200], 'name':['baz', 'qux']}).set_index('id')
+    upsert(con=engine, df=df2, table_name=table_name, if_row_exists='update')
+
+    # read df back
+    with engine.connect() as connection:
+        df_db = pd.read_sql(text(f'SELECT *FROM {table_name};'), con=connection, index_col='id')
+
+    # check mysql got that correctly
+    pd.testing.assert_frame_equal(df_db.sort_index(), pd.concat((df1, df2)).sort_index())

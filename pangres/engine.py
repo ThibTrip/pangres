@@ -160,20 +160,27 @@ class PandasSpecialEngine:
 
         # create sqlalchemy table model via pandas
         pandas_sql_engine = pd.io.sql.SQLDatabase(engine=connection, schema=schema)
-        table = pd.io.sql.SQLTable(name=table_name,
-                                   pandas_sql_engine=pandas_sql_engine,
-                                   frame=df,
-                                   dtype=new_dtype).table
+        pandas_table = pd.io.sql.SQLTable(name=table_name,
+                                          pandas_sql_engine=pandas_sql_engine,
+                                          frame=df,
+                                          dtype=new_dtype)
 
-        # change bindings of table (we want a sqlalchemy engine
-        # not a pandas_sql_engine)
+        # turn pandas table into a pure sqlalchemy table
+        # inspired from https://github.com/pandas-dev/pandas/blob/main/pandas/io/sql.py#L815-L821
         metadata = MetaData(bind=connection)
-        table.metadata = metadata
+        if _sqla_gt14():
+            table = pandas_table.table.to_metadata(metadata)
+        else:
+            table = pandas_table.table.tometadata(metadata)
 
         # add PK
-        constraint = PrimaryKeyConstraint(*[table.columns[name]
-                                            for name in df.index.names])
+        constraint = PrimaryKeyConstraint(*[table.columns[name] for name in df.index.names])
         table.append_constraint(constraint)
+
+        # FIX: make sure there is no autoincrement
+        # see https://docs.sqlalchemy.org/en/14/dialects/mysql.html#auto-increment-behavior
+        for name in df.index.names:
+            table.columns[name].autoincrement = False
 
         # add remaining attributes
         self.connection = connection
@@ -520,4 +527,3 @@ class PandasSpecialEngine:
                    else str(self.df.head().to_markdown()))
         text += f'\n* df.head():\n{df_repr}'
         return text
-

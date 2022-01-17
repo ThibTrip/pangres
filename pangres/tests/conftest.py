@@ -138,6 +138,7 @@ class TableNames:
     INDEX_ONLY_INSERT = 'test_index_only_insert'
     INDEX_WITH_NULL = 'test_index_with_null'
     MULTIINDEX = 'test_multiindex'
+    PK_MYSQL = 'test_pk_mysql'  # for checking if autoincrement is disabled in MySQL
     REUSE_CONNECTION = 'test_reuse_connection'
     TABLE_CREATION = 'test_table_creation'
     UNIQUE_KEY = 'test_unique_key'
