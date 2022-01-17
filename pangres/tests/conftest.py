@@ -138,14 +138,16 @@ def create_sync_or_async_engine(conn_string, **kwargs):
     >>> # async
     >>> engine = create_sync_or_async_engine("postgresql+asyncpg://username:password@localhost:5432/postgres")  # doctest: +SKIP
     """
-    if not _sqla_gt14():
-        return create_engine(conn_string)
+    # if we see any known async drivers we will create an async engine
+    if any(s in conn_string.split('/')[0] for s in async_to_sync_drivers_dict):
+        if not _sqla_gt14():
+            raise NotImplementedError('Asynchronous engines require sqlalchemy >= 1.4')
+
+        from sqlalchemy.ext.asyncio import create_async_engine
+        return create_async_engine(conn_string)
+    # otherwise we will just assume we have to create a sync engine
     else:
-        if any(s in conn_string.split('/')[0] for s in async_to_sync_drivers_dict):
-            from sqlalchemy.ext.asyncio import create_async_engine
-            return create_async_engine(conn_string)
-        else:
-            return create_engine(conn_string)
+        return create_engine(conn_string)
 
 
 def async_engine_to_sync_engine(engine):

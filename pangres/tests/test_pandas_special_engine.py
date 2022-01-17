@@ -19,7 +19,9 @@ from pangres.exceptions import (DuplicateLabelsException,
 from pangres.engine import PandasSpecialEngine
 from pangres.helpers import _sqla_gt14
 from pangres.tests.conftest import (async_engine_to_sync_engine,
-                                    commit, drop_table_for_test,
+                                    commit,
+                                    create_sync_or_async_engine,
+                                    drop_table_for_test,
                                     drop_schema,
                                     get_table_namespace,
                                     parameterize_async,
@@ -430,7 +432,12 @@ params_db_type_tests = [('sqlite://', 'sqlite'),
 
 @pytest.mark.parametrize("connection_string, expected", params_db_type_tests)
 def test_detect_db_type(_, connection_string, expected):
-    engine = create_engine(connection_string)
+    # there are some engines that we will not be able to create because they are asynchronous
+    # and this requires sqlalchemy >= 1.4
+    try:
+        engine = create_sync_or_async_engine(connection_string)
+    except NotImplementedError as e:
+        pytest.skip(str(e))
     assert PandasSpecialEngine._detect_db_type(connectable=engine) == expected
 
 
