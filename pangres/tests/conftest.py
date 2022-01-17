@@ -21,13 +21,22 @@ from typing import Optional, Union
 # local imports
 from pangres import aupsert, upsert
 from pangres.helpers import _sqla_gt14
-
-
 # -
 
 # # Helpers for other test modules
 
 # ## Async/Sync detection and handling
+
+# dict where the keys are patterns to find async drivers
+# (not regex patterns we'll just use the Python `in` operator)
+# and the values are sync dialect names for sqlalchemy
+# this will allow us to detect connection strings that require an async engine
+# and convert async engines to sync engines temporarily for tests setup operations
+# and such
+async_to_sync_drivers_dict = {'asyncpg':'postgresql+psycopg2',
+                              'aiosqlite':'sqlite',
+                              'aiomysql':'mysql+pymysql'}
+
 
 # +
 def execute_coroutine_sync(coro):
@@ -132,7 +141,7 @@ def create_sync_or_async_engine(conn_string, **kwargs):
     if not _sqla_gt14():
         return create_engine(conn_string)
     else:
-        if 'asyncpg' in conn_string.split('/')[0]:
+        if any(s in conn_string.split('/')[0] for s in async_to_sync_drivers_dict):
             from sqlalchemy.ext.asyncio import create_async_engine
             return create_async_engine(conn_string)
         else:
@@ -144,6 +153,10 @@ def async_engine_to_sync_engine(engine):
     If an engine is async, creates a new engine that is synchronous.
     It does that by switching to a synchronous driver for given database:
     * asyncpg -> psycopg2
+    * aiosqlite -> sqlite3
+    * ...
+
+    See variable `async_to_sync_drivers_dict` in this module.
 
     This is probably not super elegant but it saves a lot of hassle for
     everything that "surround" tests like setups, verifications, cleaning up...
@@ -155,14 +168,19 @@ def async_engine_to_sync_engine(engine):
     """
     u = engine.url
     params = {attr:getattr(u, attr) for attr in ('drivername', 'username', 'password', 'host', 'port', 'database', 'query')}
-    if 'asyncpg' in params['drivername']:
-        params['drivername'] = 'postgresql+psycopg2'
-        new_u = URL.create(**params)
-        return create_engine(str(new_u))
-    else:
-        if is_async_sqla_obj(engine):
-            raise NotImplementedError('Could not "convert" this asynchronous engine to a sync engine: {engine}')
+    # case where it is already sync
+    if not is_async_sqla_obj(engine):
         return engine
+    # case where it is async but we don't recognize the driver
+    if not any(s in params['drivername'] for s in async_to_sync_drivers_dict):
+        raise NotImplementedError(f'Cannot create a sync engine from this unknown async engine: {engine}')
+    #  convert to a sync engine
+    for s in async_to_sync_drivers_dict:
+        if s in params['drivername']:
+            params['drivername'] = async_to_sync_drivers_dict[s]
+            break
+    new_u = URL.create(**params)
+    return create_engine(str(new_u))
 
 
 @contextmanager
