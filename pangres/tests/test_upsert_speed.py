@@ -71,8 +71,6 @@ def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, ro
     switch = {'pangres':lambda: create_or_upsert_with_pangres(engine=engine, schema=schema, if_row_exists='update',
                                                               df=df, chunksize=nb_rows),
               'pandas':lambda: create_with_pandas(engine=engine, schema=schema, df=df)}
-    benchmark.pedantic(switch[library], setup=lambda: drop_table(engine=engine, schema=schema, table_name=TableNames.BENCHMARK),
-                       rounds=rounds, iterations=iterations)
 
     try:
         benchmark.pedantic(switch[library], setup=lambda: drop_table(engine=engine, schema=schema,
