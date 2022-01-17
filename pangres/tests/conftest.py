@@ -488,9 +488,11 @@ class TestFunctionInfo:
 
 def pytest_addoption(parser):
     parser.addoption('--sqlite_conn', action="store", type=str, default=None)
+    parser.addoption('--async_sqlite_conn', action="store", type=str, default=None)
     parser.addoption('--pg_conn', action="store", type=str, default=None)
     parser.addoption('--async_pg_conn', action="store", type=str, default=None)
     parser.addoption('--mysql_conn', action="store", type=str, default=None)
+    parser.addoption('--async_mysql_conn', action="store", type=str, default=None)
     parser.addoption('--pg_schema', action='store', type=str, default=None)
 
 
@@ -507,9 +509,11 @@ def pytest_generate_tests(metafunc):
 
     # tests that we need to repeat for each engine + options (e.g. future)
     conn_strings = {'sqlite':metafunc.config.option.sqlite_conn,
-                    'asyncpg':metafunc.config.option.async_pg_conn,
+                    'async_sqlite_conn':metafunc.config.option.async_sqlite_conn,
                     'pg':metafunc.config.option.pg_conn,
-                    'mysql':metafunc.config.option.mysql_conn}
+                    'asyncpg':metafunc.config.option.async_pg_conn,
+                    'mysql':metafunc.config.option.mysql_conn,
+                    'async_mysql_conn':metafunc.config.option.async_mysql_conn}
     if not any(v is not None for v in conn_strings.values()):
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
 
