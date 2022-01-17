@@ -74,6 +74,15 @@ def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, ro
     benchmark.pedantic(switch[library], setup=lambda: drop_table(engine=engine, schema=schema, table_name=TableNames.BENCHMARK),
                        rounds=rounds, iterations=iterations)
 
+    try:
+        benchmark.pedantic(switch[library], setup=lambda: drop_table(engine=engine, schema=schema,
+                                                                     table_name=TableNames.BENCHMARK),
+                           rounds=rounds, iterations=iterations)
+    except NotImplementedError as e:
+        if 'not implemented for SQLAlchemy 2' in str(e):
+            pytest.skip('in Python 3.6 there is some kind of problem with engines created with '
+                        '`future=True` flag and pandas')
+
 
 # ## Upsert overwrite speed
 
