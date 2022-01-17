@@ -27,11 +27,6 @@ from pangres.tests.conftest import (drop_table, drop_table_for_test, drop_schema
 
 utc_ts = lambda s: pd.Timestamp(s, tz='UTC')
 
-# # Config
-
-table_name = 'test_upsert_or_aupsert_end_to_end'
-
-
 # # Test data
 
 # +

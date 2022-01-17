@@ -395,6 +395,7 @@ class TableNames:
     ADD_NEW_COLUMN = 'test_add_new_column'
     BAD_COLUMN_NAMES = 'test_bad_column_names'
     BAD_TEXT = 'test_bad_text'
+    BENCHMARK = 'test_speed'
     CHANGE_EMPTY_COL_TYPE = 'test_change_empty_col_type'
     COLUMN_NAMED_VALUES = 'test_column_named_values'
     COMMIT_AS_YOU_GO = 'test_commit_as_you_go'

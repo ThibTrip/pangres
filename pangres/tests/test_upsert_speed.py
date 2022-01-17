@@ -3,19 +3,16 @@
 # +
 import pytest
 from math import floor
-from sqlalchemy import VARCHAR
+from sqlalchemy import create_engine, VARCHAR
 
 # local imports
 from pangres.helpers import _sqlite_gt3_32_0
 from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import (drop_table_for_test, drop_table,
-                                    is_async_sqla_obj, upsert_or_aupsert)
+                                    is_async_sqla_obj, TableNames, upsert_or_aupsert)
+
+
 # -
-
-
-# # Config
-
-table_name = 'test_speed'
 
 
 # # Helpers
@@ -25,7 +22,7 @@ def create_or_upsert_with_pangres(engine, schema, if_row_exists, df, chunksize, 
     # MySQL does not want flexible text length in indices/PK
     dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     upsert_or_aupsert(con=engine, df=df, schema=schema, chunksize=chunksize,
-                      table_name=table_name, if_row_exists=if_row_exists,
+                      table_name=TableNames.BENCHMARK, if_row_exists=if_row_exists,
                       dtype=dtype, **kwargs)
 
 
@@ -42,7 +39,7 @@ def create_with_pandas(engine, schema, df):
         chunksize = None
 
     # create table
-    df.to_sql(con=engine, schema=schema, name=table_name, method='multi',
+    df.to_sql(con=engine, schema=schema, name=TableNames.BENCHMARK, method='multi',
               chunksize=chunksize, dtype=dtype)
 
 
@@ -60,7 +57,7 @@ pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 
 
 @pytest.mark.parametrize('library', ['pandas', 'pangres'])
 @pytest.mark.parametrize(**pytest_params)
-@drop_table_for_test(table_name=table_name)
+@drop_table_for_test(table_name=TableNames.BENCHMARK)
 def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
     # skip async engines with pandas
     if is_async_sqla_obj(engine) and library == 'pandas':
@@ -74,8 +71,7 @@ def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, ro
     switch = {'pangres':lambda: create_or_upsert_with_pangres(engine=engine, schema=schema, if_row_exists='update',
                                                               df=df, chunksize=nb_rows),
               'pandas':lambda: create_with_pandas(engine=engine, schema=schema, df=df)}
-
-    benchmark.pedantic(switch[library], setup=lambda: drop_table(engine=engine, schema=schema, table_name=table_name),
+    benchmark.pedantic(switch[library], setup=lambda: drop_table(engine=engine, schema=schema, table_name=TableNames.BENCHMARK),
                        rounds=rounds, iterations=iterations)
 
 
@@ -85,7 +81,7 @@ def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, ro
 @pytest.mark.parametrize('library', ['pangres'])
 @pytest.mark.parametrize('if_row_exists', ['update', 'ignore'])
 @pytest.mark.parametrize(**pytest_params)
-@drop_table_for_test(table_name=table_name)
+@drop_table_for_test(table_name=TableNames.BENCHMARK)
 def test_upsert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations, if_row_exists):
     assert library == 'pangres'  # in case pandas changes and we forget to update the tests
 
