@@ -419,10 +419,12 @@ def test_values_conversion(_):
 
 
 # dummy connection string to test our categorization for databases
-params_db_type_tests = [('sqlite:///', 'sqlite'),
+params_db_type_tests = [('sqlite://', 'sqlite'),
+                        ('sqlite+aiosqlite://', 'sqlite'),
                         ('postgresql+psycopg2://username:password@localhost:5432/postgres', 'postgres'),
                         ('postgresql://username:password@localhost:5432/postgres', 'postgres'),
                         ('mysql+pymysql://username:password@localhost:3306/db', 'mysql'),
+                        ('mysql+aiomysql://username:password@localhost:3306/db', 'mysql'),
                         ('oracle+cx_oracle://username:password@localhost', 'other')]
 
 
