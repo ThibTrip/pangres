@@ -11,14 +11,15 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 
 # Features
 
-1. <i>(optional)</i> Automatical column creation (when a column exists in the DataFrame but not in the SQL table).
-2. <i>(optional)</i> Automatical column type alteration for columns that are empty in the SQL table (except for SQlite where alteration is limited).
-3. <i>(optional)</i> Creates the table if it is missing.
-4. <i>(optional)</i> Creates missing schemas in Postgres (and potentially other databases that have a schema system).
-5. JSON is supported (with pd.to_sql it does not work) with some exceptions (see [Gotchas and caveats](#Gotchas-and-caveats)).
-6. Fast (except for SQlite where some help is needed).
-7. Will work even if not all columns defined in the SQL table are there.
-8. SQL injection safe (schema, table and column names are escaped and values are given as parameters).
+1. <i>(optional)</i> Automatical column creation (when a column exists in the DataFrame but not in the SQL table)
+2. <i>(optional)</i> Automatical column type alteration for columns that are empty in the SQL table (except for SQlite where alteration is limited)
+3. <i>(optional)</i> Creates the table if it is missing
+4. <i>(optional)</i> Creates missing schemas in Postgres (and potentially other databases that have a schema system)
+5. JSON is supported (with pd.to_sql it does not work) with some exceptions (see [Gotchas and caveats](#Gotchas-and-caveats))
+6. Fast (except for SQlite where some help is needed)
+7. Will work even if not all columns defined in the SQL table are there
+8. SQL injection safe (schema, table and column names are escaped and values are given as parameters)
+9. _New in version 4.1_: **asynchronous support**. Tested using `aiosqlite` for SQlite, `asyncpg` for PostgreSQL and `aiomysql` for MySQL
 
 # Requirements
 
@@ -97,9 +98,12 @@ NOTE: in one of the tests of `pangres` we will try to drop and then create a Pos
 
 Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. You will have to replace the following variables in those commands:
 * SQLITE_CONNECTION_STRING: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
-* POSTGRES_CONNECTION_STRING: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public).
-* PG_SCHEMA (optional): schema for postgres (defaults to public)
+* ASYNC_SQLITE_CONNECTION_STRING: replace with an asynchronous SQlite sqlalchemy connection string (e.g. "sqlite+aiosqlite:///test.db")
+* POSTGRES_CONNECTION_STRING: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public)
+* ASYNC_POSTGRES_CONNECTION_STRING: replace with an asynchronous Postgres sqlalchemy connection string (e.g. "postgres+asyncpg:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public)
 * MYSQL_CONNECTION_STRING: replace with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database")
+* ASYNC_MYSQL_CONNECTION_STRING: replace with an asynchronous MySQL sqlalchemy connection string (e.g. "mysql+aiomysql:///user:password@localhost:3306/database")
+* PG_SCHEMA (optional): schema for postgres (defaults to public)
 
 ```shell
 # 1. Create and activate the build environment
@@ -113,7 +117,7 @@ pip install -e .
 # --cov=./pangres shows coverage only for pangres
 # --doctest-modules tests with doctest in all modules
 # --benchmark-XXX : these are options for benchmarks tests (see https://pytest-benchmark.readthedocs.io/en/latest/usage.html)
-pytest -s -v pangres --cov=pangres --doctest-modules --sqlite_conn=$SQLITE_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
+pytest -s -v pangres --cov=pangres --doctest-modules --async_sqlite_conn=$ASYNC_SQLITE_CONNECTION_STRING --sqlite_conn=$SQLITE_CONNECTION_STRING --async_pg_conn=$ASYNC_POSTGRES_CONNECTION_STRING --pg_conn=$POSTGRES_CONNECTION_STRING --async_mysql_conn=$ASYNC_MYSQL_CONNECTION_STRING --mysql_conn=$MYSQL_CONNECTION_STRING --pg_schema=tests --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
 ```
 
 Additionally, the following flags could be of interest for you:
