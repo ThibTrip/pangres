@@ -20,11 +20,11 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 7. Will work even if not all columns defined in the SQL table are there.
 8. SQL injection safe (schema, table and column names are escaped and values are given as parameters).
 
-# Tested with
-* Python 3.7.3 and Python 3.8.0
-* MySQL 5.7.29 using pymysql 0.9.3
-* PostgreSQL 9.6.17 using psycopg2 2.8.4
-* SQlite 3.28.0 using sqlite3 2.6.0
+# Requirements
+
+* SQlite >= 3.24.4
+* Python >= 3.6
+* See also ./pangres/requirements.txt
 
 # Gotchas and caveats
 
