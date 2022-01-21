@@ -63,10 +63,10 @@ def test_adjust_chunksize(engine, schema, nb_columns):
     # IMPORTANT: -1 because the index level counts as a column
     df = (pd.DataFrame({i:[0] for i in range(nb_columns - 1)})
           .rename_axis(index='profileid'))
-    # currently we only know of restrictions for SQlite
-    # todo: add condition for asyncpg when/if we add async support
-    if 'sqlite' not in engine.dialect.dialect_description:
-        pytest.skip()
+    # currently we only know of restrictions for SQlite and asyncpg
+    has_limitations = any(s in engine.dialect.dialect_description for s in ('sqlite', 'asyncpg'))
+    if not has_limitations:
+        pytest.skip('no known limitations for the number of SQL parameters in a statement for this engine')
 
     # this is for not repeating ourselves too much
     test_func = lambda: adjust_chunksize(con=engine, df=df, chunksize=chunksize)
@@ -76,5 +76,7 @@ def test_adjust_chunksize(engine, schema, nb_columns):
             test_func()
         assert 'allowed parameters' in str(exc_info)
     else:
-        nb_columns_to_chunksize = {2:16383, 10:3276}
-        assert test_func() == nb_columns_to_chunksize[nb_columns]
+        # we may need to implement different expectations depending on dialect someday
+        # but currently in the case of SQlite or asyncpg we end up with the same number
+        expectations = {2:16383, 10:3276}  # {nb_columns:expected_chunksize}
+        assert test_func() == expectations[nb_columns]

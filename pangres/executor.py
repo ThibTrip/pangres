@@ -108,3 +108,53 @@ class Executor:
                 yield
             for result in pse.upsert_yield(if_row_exists=if_row_exists, chunksize=chunksize):
                 yield result
+
+    # ASYNC VARIANTS of methods above that we will prefix with "a"
+    async def _asetup_objects(self, pse:PandasSpecialEngine):
+        if self.create_schema and pse.schema is not None:
+            await pse.acreate_schema_if_not_exists()
+
+        # create table if not exists
+        if self.create_table:
+            await pse.acreate_table_if_not_exists()
+
+        # change dtype of empty columns in db
+        if self.adapt_dtype_of_empty_db_columns:
+            table_exists = await pse.atable_exists()
+            if table_exists:
+                await pse.aadapt_dtype_of_empty_db_columns()
+
+        # add new columns from frame
+        if self.add_new_columns:
+            table_exists = await pse.atable_exists()
+            if table_exists:
+                await pse.aadd_new_columns()
+
+    async def aexecute(self, async_connectable, if_row_exists:str, chunksize:int) -> None:
+        async with TransactionHandler(connectable=async_connectable) as trans:
+            # setup
+            pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
+                                      table_name=self.table_name, schema=self.schema,
+                                      dtype=self.dtype)
+            await self._asetup_objects(pse=pse)
+
+            # upsert
+            if len(self.df) == 0:
+                return
+            await pse.aupsert(if_row_exists=if_row_exists, chunksize=chunksize)
+
+    async def aexecute_yield(self, async_connectable, if_row_exists:str, chunksize:int):
+        async with TransactionHandler(connectable=async_connectable) as trans:
+            # setup
+            pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
+                                      table_name=self.table_name, schema=self.schema,
+                                      dtype=self.dtype)
+            await self._asetup_objects(pse=pse)
+
+            # upsert
+            if len(self.df) == 0:
+                return
+                yield
+            # IMPORTANT! NO `await`
+            async for result in pse.aupsert_yield(if_row_exists=if_row_exists, chunksize=chunksize):
+                yield result

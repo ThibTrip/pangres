@@ -1,9 +1,15 @@
+# +
 """
 Tools for handling transactions in pangres
 """
 from sqlalchemy.engine.base import Connectable, Connection, Engine, Transaction
 from typing import Union
 
+# local imports
+from pangres.helpers import _sqla_gt14
+
+
+# -
 
 # # Transaction Handler
 
@@ -27,7 +33,8 @@ class TransactionHandler:
     ----------
     connectable
         If a sqlalchemy Engine is passed we create a connection,
-        otherwise we raise an error if `connectable` is not  a sqlalchemy Connection
+        otherwise we raise an error if `connectable` is not  a sqlalchemy Connection.
+        AsyncConnectable (sqlalchemy version >= 1.4) is also accepted.
 
     Examples
     --------
@@ -54,7 +61,7 @@ class TransactionHandler:
     |  1 |    2 |
     """
 
-    def __init__(self, connectable:Connectable):
+    def __init__(self, connectable):
         # set attrs
         self.connectable = connectable
         # we will set this when we enter the context
@@ -119,4 +126,65 @@ class TransactionHandler:
             self._rollback_or_commit(exception_occured=exception_occured)
         finally:
             self._close_resources()
+        return not exception_occured  # will be reraised if False
+
+    # ASYNC VARIANTS of methods above that we will prefix with "a"
+    # (note that __aenter__ and __aexit__ are special names for
+    # async context managers in Python)
+    async def _aclose_resources(self):
+        from sqlalchemy.ext.asyncio.engine import AsyncEngine
+
+        try:
+            # close transaction if we created one
+            if self.transaction is not None:
+                await self.transaction.close()
+        finally:
+            # close connection if we created one
+            if self.connection is not None and isinstance(self.connectable, AsyncEngine):
+                await self.connection.close()
+
+    async def __aenter__(self):
+        # make sure the sqlalchemy version allows for async usage
+        # we only need to do this on entry of the context manager
+        if not _sqla_gt14():
+            raise NotImplementedError('Async usage of sqlalchemy requires version >= 1.4')
+        from sqlalchemy.ext.asyncio.engine import AsyncEngine, AsyncConnection, AsyncConnectable
+
+        # similar procedure to __enter__ with different object types
+        if isinstance(self.connectable, AsyncEngine):
+            self.connection = await self.connectable.connect()
+        elif isinstance(self.connectable, AsyncConnection):
+            self.connection = self.connectable
+        else:
+            raise TypeError(f'Expected an async sqlalchemy connectable object ({AsyncConnectable}). '
+                            f'Got {type(self.connectable)}')
+
+        if isinstance(self.connectable, AsyncEngine):
+            try:
+                self.transaction = await self.connection.begin()
+            except Exception as e:  # pragma: no cover
+                self._close_resources()
+                raise e
+        return self
+
+    async def _arollback_or_commit(self, exception_occured:bool):
+        # case where we were inside a transaction from the user
+        # the user will have to handle rollback and commit
+        if self.transaction is None:
+            return
+
+        # case where we created the transaction
+        if exception_occured:
+            await self.transaction.rollback()
+        else:
+            await self.transaction.commit()
+
+    async def __aexit__(self, ex_type, exc, tb):
+        if self.connection is None:  # pragma: no cover
+            raise AssertionError('No active connection. Perhaps the context manager was not properly entered?')
+        exception_occured = ex_type is not None
+        try:
+            await self._arollback_or_commit(exception_occured=exception_occured)
+        finally:
+            await self._aclose_resources()
         return not exception_occured  # will be reraised if False

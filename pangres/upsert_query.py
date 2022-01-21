@@ -1,3 +1,4 @@
+# +
 """
 Functions for preparing/compiling and executing upsert statements
 in different SQL flavors.
@@ -8,6 +9,12 @@ from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.compiler import SQLCompiler
+
+# local imports
+from pangres.helpers import _sqla_gt14
+
+
+# -
 
 # # Main class `UpsertQuery`
 
@@ -28,9 +35,25 @@ class UpsertQuery:
     """
 
     def __init__(self, connection:Connection, table:Table):
-        assert isinstance(connection, Connection)
+        self._verify_connection_like_object(connection=connection)
         self.connection = connection
         self.table = table
+
+    @staticmethod
+    def _verify_connection_like_object(connection):
+        # handle easy cases first
+        if isinstance(connection, Connection):
+            return True
+
+        # maybe we are in presence of an asynchronous connection
+        is_connection = False  # until proven otherwise
+        if _sqla_gt14():
+            from sqlalchemy.ext.asyncio.engine import AsyncConnection
+            is_connection = isinstance(connection, AsyncConnection)
+
+        # raise if not connection like
+        if not is_connection:
+            raise TypeError(f'Expected a Connection or AsyncConnection object. Got {type(connection)} instead')
 
     def _create_pg_query(self, values:list, if_row_exists:str) -> str:
         insert_stmt = pg_insert(self.table).values(values)
@@ -155,3 +178,10 @@ class UpsertQuery:
     def execute(self, db_type:str, values:list, if_row_exists:str):
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
         return self.connection.execute(query)
+
+    async def aexecute(self, db_type:str, values:list, if_row_exists:str):
+        """
+        Async variant of method execute
+        """
+        query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
+        return await self.connection.execute(query)

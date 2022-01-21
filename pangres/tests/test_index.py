@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+# +
 """
 Here we test different indices:
 1. MultiIndex
@@ -12,8 +13,11 @@ import pandas as pd
 import pytest
 from sqlalchemy import VARCHAR, text
 from sqlalchemy.exc import IntegrityError
-from pangres import upsert
-from pangres.tests.conftest import drop_table_for_test, get_table_namespace, TableNames
+
+# local imports
+from pangres.tests.conftest import (drop_table_for_test, get_table_namespace,
+                                    select_table, TableNames, upsert_or_aupsert)
+# -
 
 
 # # Config
@@ -44,21 +48,20 @@ def test_create_and_insert_table_multiindex(engine, schema):
     namespace = get_table_namespace(schema=schema, table_name=table_name)
 
     def read_from_db():
-        with engine.connect() as connection:
-            df = pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection)
-            df['ix3'] = pd.to_datetime(df['ix3'])
-            return df.set_index(index_col)
+        df_db = select_table(engine=engine, schema=schema, table_name=table_name)
+        df_db['ix3'] = pd.to_datetime(df_db['ix3'])
+        return df_db.set_index(index_col)
 
     # dtype for index for MySQL... (can't have flexible text length)
     dtype = {'ix2':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # create
-    upsert(con=engine, schema=schema, df=df_multiindex, table_name=table_name, dtype=dtype, if_row_exists='update')
+    upsert_or_aupsert(con=engine, schema=schema, df=df_multiindex, table_name=table_name, dtype=dtype, if_row_exists='update')
     df_db = read_from_db()
     pd.testing.assert_frame_equal(df_db, df_multiindex)
 
     # insert
-    upsert(con=engine, schema=schema, df=df_multiindex2, table_name=table_name, dtype=dtype, if_row_exists='update')
+    upsert_or_aupsert(con=engine, schema=schema, df=df_multiindex2, table_name=table_name, dtype=dtype, if_row_exists='update')
     df_db = read_from_db()
     pd.testing.assert_frame_equal(df_db, pd.concat(objs=[df_multiindex, df_multiindex2]))
 
@@ -69,10 +72,11 @@ def test_create_and_insert_table_multiindex(engine, schema):
 def test_index_with_null(engine, schema):
     df = pd.DataFrame({'ix':[None, 0], 'test': [0, 1]}).set_index('ix')
     with pytest.raises(IntegrityError):
-        upsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
+        upsert_or_aupsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
         # don't test error for mysql since only a warning is raised and the line is skipped
         if 'mysql' in engine.dialect.dialect_description:
-            pytest.skip()
+            pytest.skip('not tested with mysql as only a warning is issued and the line is skipped. '
+                        "Perhaps we could capture the warning with pytest?")
 
 
 # ## Test only index
@@ -85,12 +89,10 @@ def test_only_index(engine, schema, if_row_exists):
 
     # upsert df with only index
     df = pd.DataFrame({'ix':[1]}).set_index('ix')
-    upsert(con=engine, schema=schema, df=df, table_name=table_name, if_row_exists=if_row_exists)
+    upsert_or_aupsert(con=engine, schema=schema, df=df, table_name=table_name, if_row_exists=if_row_exists)
 
     # check data integrity
-    namespace = get_table_namespace(schema=schema, table_name=table_name)
-    with engine.connect() as connection:
-        df_db = pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection)
+    df_db = select_table(engine=engine, schema=schema, table_name=table_name)
     assert 'ix' in df_db.columns
     assert len(df_db) > 0
     assert df_db['ix'].iloc[0] == 1
