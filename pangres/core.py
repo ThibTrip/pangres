@@ -6,7 +6,7 @@ This module contains the functions of pangres
 that will be directly exposed to its users.
 """
 import pandas as pd
-from sqlalchemy.engine.base import Connectable, Engine
+from sqlalchemy.engine.base import Connectable
 from typing import Optional, Union
 
 # local imports
@@ -388,10 +388,13 @@ async def aupsert(con,
     >>> # get some data
     >>> df = DocsExampleTable.df
     >>>
-    >>> # I recommend first uploading the structure of the table to the database by using `df.head(0)`
-    >>> # (this selects 0 rows but still holds all information about columns, index levels and data types)
-    >>> # and in a second step (see coroutine `execute_upsert` that we define after)
-    >>> # we will set all DDL related parameters to False so we can run queries in parallel!
+    >>> # Create table before inserting! This will avoid race conditions mentionned above
+    >>> # (here we are lazy so we'll use pangres to do that but we could also use a sqlalchemy ORM model)
+    >>> # By using `df.head(0)` we get 0 rows but we have all the information about columns, index levels
+    >>> # and data types that we need for creating the table.
+    >>> # And in a second step (see coroutine `execute_upsert` that we define after)
+    >>> # we will set all parameters that could cause structure changes
+    >>> # to False so we can run queries in parallel without worries!
     >>> async def setup():
     ...     await aupsert(con=engine, df=df.head(0),
     ...                   table_name='example',
@@ -411,26 +414,25 @@ async def aupsert(con,
     ...         await aupsert(con=engine, df=df,
     ...                       table_name='example',
     ...                       if_row_exists='update',
-    ...                       # make this to False (other DDL related parameters already default to False
+    ...                       # set this to False (other structure related parameters are False by default)
     ...                       create_table=False)
     >>> loop = asyncio.get_event_loop() # doctest: +SKIP
     >>> coroutines = [execute_upsert()] # doctest: +SKIP
     >>> tasks = asyncio.gather(*coroutines) # doctest: +SKIP
-    >>> results = loop.run_until_complete(tasks) # doctest: +SKIP
+    >>> loop.run_until_complete(tasks) # doctest: +SKIP
 
     * alternative to the coroutine above but iterating over results of inserted chunks
       so that we can for instance get the number of updated rows
     >>> async def execute_upsert():
     ...     async with engine.connect() as con:
     ...         # this creates an async generator
-    ...         # IMPORTANT: no use of `await` here!
-    ...         async_gen = aupsert(con=engine, df=df,
-    ...                             table_name='example',
-    ...                             if_row_exists='update',
-    ...                             yield_chunks=True,  # <--- WE SET THIS TO TRUE for iterating
-    ...                             # make this to False (other DDL related parameters already default to False
-    ...                             create_table=False)
-    ...         async for result in async_gen:  # 
+    ...         async_gen = await aupsert(con=engine, df=df,
+    ...                                   table_name='example',
+    ...                                   if_row_exists='update',
+    ...                                   yield_chunks=True,  # <--- WE SET THIS TO TRUE for iterating
+    ...                                   # set this to False (other structure related parameters are False by default)
+    ...                                   create_table=False)
+    ...         async for result in async_gen:
     ...             print(f'{result.rowcount} updated rows')  # print the number of updated rows
     """
     # verify arguments
