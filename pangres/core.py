@@ -325,7 +325,20 @@ async def aupsert(con,
     will require an asynchronous connectable (asynchronous engine or asynchronous connection).
 
     For example you can use PostgreSQL asynchronously with `sqlalchemy` thanks to
-    the library/driver `asyncpg`.
+    the library/driver `asyncpg`, or SQLite with `aiosqlite` or Mysql with `aiomysql`.
+
+    **WARNING**
+
+    Although this has been well tested in `pangres` you should read this warning from
+    `sqlalchemy` (underlying library we use):
+
+    > The asyncio extension as of SQLAlchemy 1.4.3 can now be considered to be beta level software.
+    > API details are subject to change however at this point it is unlikely for
+    > there to be significant backwards-incompatible changes.
+    >
+    > Source: https://docs.sqlalchemy.org/en/14/orm/extensions/asyncio.html
+
+    **IMPORTANT NOTES ON CONNECTIONS AND TRANSACTIONS**:
 
     The notes on transactions in the docstring `pangres.upsert` apply here as well
     but async connections do **not autocommit** even prior to sqlalchemy 2.0.
