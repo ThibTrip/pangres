@@ -447,6 +447,28 @@ schema_for_testing_creation = 'pangres_create_schema_test'
 
 # -
 
+# ## Function to read back from database data we inserted
+# We need to apply a few modification for comparing DataFrames we get back from the DB and DataFrames we expect e.g. for JSON (with SQlite pandas reads it as string).
+
+def read_example_table_from_db(engine, schema, table_name):
+    engine = async_engine_to_sync_engine(engine)
+    def load_json_if_needed(obj):
+        """
+        For SQlite we receive strings back (or None) for a JSON column.
+        For Postgres we receive lists or dicts (or None) back.
+        """
+        if isinstance(obj, str):
+            return json.loads(obj)
+        return obj
+    namespace = f'{schema}.{table_name}' if schema is not None else table_name
+    with engine.connect() as connection:
+        df_db = (pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='profileid')
+                 .astype({'likes_pizza':bool})
+                 .assign(timestamp=lambda df: pd.to_datetime(df['timestamp'], utc=True))
+                 .assign(favorite_colors= lambda df: df['favorite_colors'].map(load_json_if_needed)))
+    return df_db
+
+
 # # Tests generation
 
 # +
@@ -559,27 +581,3 @@ def pytest_generate_tests(metafunc):
             ids.append(f'{engine.url.drivername}{schema_id}_future')
     assert len(engines) == len(schemas) == len(ids)
     metafunc.parametrize("engine, schema", list(zip(engines, schemas)), ids=ids, scope='module')
-
-
-# -
-
-# ## Function to read back from database data we inserted
-# We need to apply a few modification for comparing DataFrames we get back from the DB and DataFrames we expect e.g. for JSON (with SQlite pandas reads it as string).
-
-def read_example_table_from_db(engine, schema, table_name):
-    engine = async_engine_to_sync_engine(engine)
-    def load_json_if_needed(obj):
-        """
-        For SQlite we receive strings back (or None) for a JSON column.
-        For Postgres we receive lists or dicts (or None) back.
-        """
-        if isinstance(obj, str):
-            return json.loads(obj)
-        return obj
-    namespace = f'{schema}.{table_name}' if schema is not None else table_name
-    with engine.connect() as connection:
-        df_db = (pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection, index_col='profileid')
-                 .astype({'likes_pizza':bool})
-                 .assign(timestamp=lambda df: pd.to_datetime(df['timestamp'], utc=True))
-                 .assign(favorite_colors= lambda df: df['favorite_colors'].map(load_json_if_needed)))
-    return df_db
