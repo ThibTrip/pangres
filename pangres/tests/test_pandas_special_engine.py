@@ -438,6 +438,8 @@ def test_detect_db_type(_, connection_string, expected):
         engine = create_sync_or_async_engine(connection_string)
     except NotImplementedError as e:
         pytest.skip(str(e))
+    except ModuleNotFoundError as e:
+        pytest.skip(f'Could not find module for connection string: {connection_string}. Error was: {e}')
     assert PandasSpecialEngine._detect_db_type(connectable=engine) == expected
 
 
