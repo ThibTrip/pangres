@@ -1,12 +1,16 @@
 name: pangres-dev
 dependencies:
+  - pip
   - pytest
   - pytest-cov
   - pytest-benchmark
   - psycopg2
   - pymysql
   - tabulate
-  - pip
   - pip:
-    - npdoc_to_md
+    - asyncpg
+    - aiosqlite
+    - aiomysql
     - cx_Oracle
+    - npdoc_to_md
+    - pytest-asyncio
