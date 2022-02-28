@@ -3,10 +3,11 @@
 # +
 import pytest
 from math import floor
-from sqlalchemy import VARCHAR
+from pandas import __version__ as pandas_version
+from sqlalchemy import __version__ as sqla_version, VARCHAR
 
 # local imports
-from pangres.helpers import _sqlite_gt3_32_0
+from pangres.helpers import _sqlite_gt3_32_0, _version_equal_or_greater_than
 from pangres.examples import _TestsExampleTable
 from pangres.tests.conftest import (drop_table_for_test, drop_table,
                                     is_async_sqla_obj, TableNames, upsert_or_aupsert)
@@ -27,6 +28,11 @@ def create_or_upsert_with_pangres(engine, schema, if_row_exists, df, chunksize, 
 
 
 def create_with_pandas(engine, schema, df):
+    # pandas >= 1.4.0 requires sqlalchemy >= 1.4.0
+    if (_version_equal_or_greater_than(pandas_version, '1.4.0') and
+        not _version_equal_or_greater_than(sqla_version, '1.4.0')):
+        pytest.skip(f'pandas >= 1.4.0 requires sqlalchemy >= 1.4.0 (we have sqlalchemy v{sqla_version})')
+
     dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
     # we need this for SQlite when using pandas table creation
