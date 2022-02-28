@@ -15,9 +15,7 @@ python fix_changelog.py $PATH_TO_CHANGELOG
 """
 import argparse
 import re
-import requests  # pip install requests
 import sys
-from loguru import logger  # pip install loguru
 from pathlib import Path
 
 # # Helpers
@@ -40,6 +38,8 @@ def adjust_levels_release_notes(body):
 
 
 def get_release_notes(github_token=None):
+    import requests  # pip install requests
+
     kwargs = dict(headers={'Authorization': f'token {github_token}'}) if github_token else {}
     response = requests.get('https://api.github.com/repos/ThibTrip/pangres/releases', **kwargs)
     response.raise_for_status()
@@ -47,6 +47,8 @@ def get_release_notes(github_token=None):
 
 
 def add_release_notes_to_changelog(filepath, github_token=None, dryrun=False):
+    from loguru import logger  # pip install loguru
+
     # open original file
     with open(filepath, mode='r', encoding='utf-8') as fh:
         ch = fh.read()
@@ -68,7 +70,7 @@ def add_release_notes_to_changelog(filepath, github_token=None, dryrun=False):
         try:
             notes = release_notes[version]
             logger.info(f'Adding release notes for version {version}')
-            new_ch.extend([line, '\n', '**Release Notes**', '\n', '___', release_notes[version], '___', '\n'])
+            new_ch.extend([line, '\n', '**Release Notes**', '\n', '___', notes, '___', '\n'])
         except KeyError:
             logger.warning(f'No release notes found for version {version}!')
             continue
@@ -95,6 +97,7 @@ def main():
     args = parser.parse_args()
     add_release_notes_to_changelog(filepath=Path(args.filepath_change_log).resolve(), github_token=args.github_token,
                                    dryrun=args.dryrun)
+
 
 if __name__ == '__main__':
     main()
