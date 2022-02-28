@@ -93,7 +93,6 @@ def main():
     parser.add_argument('--github_token', action="store", type=str, default=None, help='Optional github token for higher API quota')
     parser.add_argument('--dryrun', action="store_true", default=False, help='If True, simply prints what we would save otherwise overwrites the changelog')
     args = parser.parse_args()
-    output_path = 
     add_release_notes_to_changelog(filepath=Path(args.filepath_change_log).resolve(), github_token=args.github_token,
                                    dryrun=args.dryrun)
 
