@@ -13,4 +13,3 @@ dependencies:
     - aiomysql
     - cx_Oracle
     - npdoc_to_md
-    - pytest-asyncio
