@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pytest
-from sqlalchemy import create_engine, text, VARCHAR
+from sqlalchemy import create_engine, VARCHAR
 from sqlalchemy.sql.elements import Null as SqlaNull
 
 # local imports
@@ -18,62 +18,27 @@ from pangres.exceptions import (DuplicateLabelsException,
                                 UnnamedIndexLevelsException)
 from pangres.engine import PandasSpecialEngine
 from pangres.helpers import _sqla_gt14
-from pangres.tests.conftest import (async_engine_to_sync_engine,
-                                    commit,
-                                    create_sync_or_async_engine,
-                                    drop_table_for_test,
-                                    drop_schema,
-                                    get_table_namespace,
-                                    parameterize_async,
+from pangres.tests.conftest import (adrop_schema, adrop_table_between_tests,
+                                    commit, create_sync_or_async_engine,
+                                    drop_table_between_tests, drop_schema,
                                     schema_for_testing_creation,
-                                    sync_async_connect_switch,
-                                    TableNames)
+                                    sync_or_async_test, TableNames)
 
 
 # -
 
-# # Test repr and attributes
+# # Sync and async variants for tests
+#
+# (`run_test_foo`|`run_test_foo_async`) -> `test_foo`
+
+# ## Schema creation
+#
+# We do not create any table here
 
 # +
-@drop_table_for_test(TableNames.NO_TABLE)
-def test_repr(engine, schema):
-    dummy_df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
-    with sync_async_connect_switch(engine) as connection:
-        pse = PandasSpecialEngine(connection=connection, schema=schema,
-                                  table_name=TableNames.NO_TABLE, df=dummy_df)
-        # make sure it is printable without errors
-        txt = str(pse)
-        print(txt)
-        # test some strings we expect to find in the repr
-        for s in ('PandasSpecialEngine', 'id ', 'hexid', 'connection',
-                  'schema', 'table', 'SQLalchemy table model'):
-            assert s in txt
-
-
-@drop_table_for_test(TableNames.NO_TABLE)
-def test_table_attr(engine, schema):
-    # generate a somewhat complex table model via the _TestsExampleTable class
-    df = _TestsExampleTable.create_example_df(nb_rows=10)
-    table_name = TableNames.NO_TABLE
-    with sync_async_connect_switch(engine) as connection:
-        pse = PandasSpecialEngine(connection=connection, schema=schema,
-                                  table_name=table_name, df=df)
-        # make sure columns and table name match
-        expected_cols = list(df.index.names) + df.columns.tolist()
-        assert all((col in pse.table.columns for col in expected_cols))
-        assert pse.table.name == table_name
-
-
-# -
-
-# # Test creating a PostgreSQL schema
-
-# +
-@drop_table_for_test(TableNames.NO_TABLE)
-def test_schema_creation(engine, schema):
+def run_test_schema_creation(engine, schema):
     # overwrite schema
     schema = schema_for_testing_creation
-    table_name = TableNames.NO_TABLE
 
     # schema may already exist before testing
     if 'postgres' in engine.dialect.dialect_description:
@@ -99,16 +64,13 @@ def test_schema_creation(engine, schema):
                 drop_schema(engine=engine, schema=schema)
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@drop_table_for_test(TableNames.NO_TABLE)
-async def test_schema_creation_async(engine, schema):
+async def run_test_schema_creation_async(engine, schema):
     # overwrite schema
     schema = schema_for_testing_creation
 
     # schema may already exist before testing
     if 'postgres' in engine.dialect.dialect_description:
-        drop_schema(engine=engine, schema=schema)
+        await adrop_schema(engine=engine, schema=schema)
 
     # then try to create a schema from a PandasSpecialEngine instance
     dummy_df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
@@ -127,16 +89,16 @@ async def test_schema_creation_async(engine, schema):
                 raise e
         finally:
             if pse._db_type == 'postgres':
-                drop_schema(engine=engine, schema=schema)
+                await adrop_schema(engine=engine, schema=schema)
 
 
 # -
 
-# # Test creating a table
+# ## Table creation
 
 # +
-@drop_table_for_test(TableNames.TABLE_CREATION)
-def test_table_creation(engine, schema):
+@drop_table_between_tests(table_name=TableNames.TABLE_CREATION)
+def run_test_table_creation(engine, schema):
     dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=10)
     with engine.connect() as connection:
@@ -148,10 +110,8 @@ def test_table_creation(engine, schema):
         assert pse.table_exists()
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@drop_table_for_test(TableNames.TABLE_CREATION)
-async def test_table_creation_async(engine, schema):
+@adrop_table_between_tests(table_name=TableNames.TABLE_CREATION)
+async def run_test_table_creation_async(engine, schema):
     dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=10)
     async with engine.connect() as connection:
@@ -165,12 +125,11 @@ async def test_table_creation_async(engine, schema):
 
 # -
 
-# # Test adding new columns
+# ## Adding new columns
 
 # +
-@pytest.mark.parametrize('axis', ['index', 'column'])
-@drop_table_for_test(TableNames.ADD_NEW_COLUMN)
-def test_add_new_columns(engine, schema, axis):
+@drop_table_between_tests(table_name=TableNames.ADD_NEW_COLUMN)
+def run_test_add_new_columns(engine, schema, on_index:bool):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.ADD_NEW_COLUMN
     common_kwargs = dict(schema=schema, table_name=table_name)
@@ -187,15 +146,12 @@ def test_add_new_columns(engine, schema, axis):
     # we need to recreate an instance of PandasSpecialEngine
     # so that a new table model with the new columns is created then add columns
     with engine.connect() as connection:
-        # error message if we get unexpected values for "axis"
-        # or we make a typo in our if/elif statements
-        err_msg = f'Expected axis to be one of index, columns. Got {axis}'
         # add a new index level or new columns (no JSON ones,
         # it's not supported by sqlalchemy compilers :( )
-        if axis == 'index':
+        if on_index:
             df['new_index_col'] = 'foo'
             df.set_index('new_index_col', append=True, inplace=True)
-        elif axis == 'column':
+        else:
             df = df.assign(new_text_col='test',
                            new_int_col=0,
                            new_float_col=1.1,
@@ -203,41 +159,29 @@ def test_add_new_columns(engine, schema, axis):
                            new_dt_col=pd.Timestamp('2020-01-01'),
                            # create this col for later
                            empty_col=None)
-        else:
-            raise AssertionError(err_msg)
 
         # recreate PandasSpecialEngine
         pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
 
         # check if we get an error when trying to add an index level
-        if axis == 'index':
+        if on_index:
             with pytest.raises(MissingIndexLevelInSqlException) as exc_info:
                 pse.add_new_columns()
             assert 'Cannot add' in str(exc_info.value)
             return
-        elif axis == 'column':
+        else:
             pse.add_new_columns()
             commit(connection)
-        else:
-            raise AssertionError(err_msg)
 
     # check if the columns were correctly added
-    # since we issued a return for 'index' earlier
-    # the axis must now be 'columns'
-    assert axis == 'column'
-    # check the columns where added
+    assert not on_index
     with engine.connect() as connection:
-        ns = get_table_namespace(schema=schema, table_name=table_name)
-        df_db = pd.read_sql(text(f'SELECT * FROM {ns} LIMIT 0;'), con=connection,
-                            index_col='profileid')
+        df_db = _TestsExampleTable.read_from_db(engine=engine, schema=schema, table_name=table_name)
         assert set(df.columns) == set(df_db.columns)
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@parameterize_async('axis', ['index', 'column'])
-@drop_table_for_test(TableNames.ADD_NEW_COLUMN)
-async def test_add_new_columns_async(engine, schema, axis=None):
+@adrop_table_between_tests(table_name=TableNames.ADD_NEW_COLUMN)
+async def run_test_add_new_columns_async(engine, schema, on_index:bool):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.ADD_NEW_COLUMN
     common_kwargs = dict(schema=schema, table_name=table_name)
@@ -254,15 +198,12 @@ async def test_add_new_columns_async(engine, schema, axis=None):
     # we need to recreate an instance of PandasSpecialEngine
     # so that a new table model with the new columns is created then add columns
     async with engine.connect() as connection:
-        # error message if we get unexpected values for "axis"
-        # or we make a typo in our if/elif statements
-        err_msg = f'Expected axis to be one of index, columns. Got {axis}'
         # add a new index level or new columns (no JSON ones,
         # it's not supported by sqlalchemy compilers :( )
-        if axis == 'index':
+        if on_index:
             df['new_index_col'] = 'foo'
             df.set_index('new_index_col', append=True, inplace=True)
-        elif axis == 'column':
+        else:
             df = df.assign(new_text_col='test',
                            new_int_col=0,
                            new_float_col=1.1,
@@ -270,46 +211,34 @@ async def test_add_new_columns_async(engine, schema, axis=None):
                            new_dt_col=pd.Timestamp('2020-01-01'),
                            # create this col for later
                            empty_col=None)
-        else:
-            raise AssertionError(err_msg)
 
-        # recreate PandasSpecialEngine
+        # recreate PandasSpecialEngine with the new df
         pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
 
         # check if we get an error when trying to add an index level
-        if axis == 'index':
+        if on_index:
             with pytest.raises(MissingIndexLevelInSqlException) as exc_info:
                 await pse.aadd_new_columns()
             assert 'Cannot add' in str(exc_info.value)
             return
-        elif axis == 'column':
+        else:
             await pse.aadd_new_columns()
             await connection.commit()
-        else:
-            raise AssertionError(err_msg)
 
     # check if the columns were correctly added
-    # since we issued a return for 'index' earlier
-    # the axis must now be 'columns'
-    assert axis == 'column'
-    # check the columns where added
-    sync_engine = async_engine_to_sync_engine(engine)
-    with sync_engine.connect() as connection:
-        ns = get_table_namespace(schema=schema, table_name=table_name)
-        df_db = pd.read_sql(text(f'SELECT * FROM {ns} LIMIT 0;'), con=connection,
-                            index_col='profileid')
+    assert not on_index
+    async with engine.connect() as connection:
+        df_db = await _TestsExampleTable.aread_from_db(engine=engine, schema=schema, table_name=table_name)
         assert set(df.columns) == set(df_db.columns)
 
 
 # -
 
-# # Test changing data type for empty columns
+# ## Changing data type for empty columns
 
 # +
-@pytest.mark.parametrize("new_empty_column_value", [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'),
-                                                    {'foo':'bar'}, ['foo'], True])
-@drop_table_for_test(TableNames.CHANGE_EMPTY_COL_TYPE)
-def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_column_value):
+@drop_table_between_tests(table_name=TableNames.CHANGE_EMPTY_COL_TYPE)
+def run_test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_column_value):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.CHANGE_EMPTY_COL_TYPE
     common_kwargs = dict(schema=schema, table_name=table_name)
@@ -341,15 +270,11 @@ def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_co
             pse.adapt_dtype_of_empty_db_columns()
         assert len(caplog.records) == 1
         assert 'Changed type of column empty_col' in caplog.text
+    caplog.clear()
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@parameterize_async("new_empty_column_value", [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'),
-                                               {'foo':'bar'}, ['foo'], True])
-@drop_table_for_test(TableNames.CHANGE_EMPTY_COL_TYPE)
-async def test_change_column_type_if_column_empty_async(engine, schema, caplog, new_empty_column_value=None):
-    print(new_empty_column_value)
+@adrop_table_between_tests(table_name=TableNames.CHANGE_EMPTY_COL_TYPE)
+async def run_test_change_column_type_if_column_empty_async(engine, schema, caplog, new_empty_column_value):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.CHANGE_EMPTY_COL_TYPE
     common_kwargs = dict(schema=schema, table_name=table_name)
@@ -386,7 +311,46 @@ async def test_change_column_type_if_column_empty_async(engine, schema, caplog, 
 
 # -
 
-# # Various SQL flavor agnostic tests
+# # Actual tests
+
+# ## SQL flavor dependant tests
+
+# +
+def test_schema_creation(engine, schema):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_schema_creation_async,
+                       f_sync=run_test_schema_creation)
+
+
+def test_table_creation(engine, schema):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_table_creation_async,
+                       f_sync=run_test_table_creation)
+
+
+@pytest.mark.parametrize('on_index', [True, False], ids=['in df index', 'not in df index'])
+def test_add_new_columns(engine, schema, on_index):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_add_new_columns_async,
+                       f_sync=run_test_add_new_columns,
+                       on_index=on_index)
+
+
+params_new_value_empty_col = [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'), {'foo':'bar'}, ['foo'], True]
+
+
+@pytest.mark.parametrize(argnames="new_empty_column_value", argvalues=params_new_value_empty_col,
+                         ids=[f'new_value={p}' for p in params_new_value_empty_col])
+def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_column_value):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_change_column_type_if_column_empty_async,
+                       f_sync=run_test_change_column_type_if_column_empty,
+                       caplog=caplog, new_empty_column_value=new_empty_column_value)
+
+
+# -
+
+# ## SQL flavor agnostic tests
 
 # +
 def test_values_conversion(_):
@@ -420,7 +384,7 @@ def test_values_conversion(_):
             assert isinstance(v_converted, SqlaNull)
 
 
-# dummy connection string to test our categorization for databases
+# dummy connection strings to test our categorization for databases
 params_db_type_tests = [('sqlite://', 'sqlite'),
                         ('sqlite+aiosqlite://', 'sqlite'),
                         ('postgresql+psycopg2://username:password@localhost:5432/postgres', 'postgres'),
@@ -436,30 +400,57 @@ def test_detect_db_type(_, connection_string, expected):
     # and this requires sqlalchemy >= 1.4
     try:
         engine = create_sync_or_async_engine(connection_string)
-    except NotImplementedError as e:
+    except NotImplementedError as e:  # pragma: no cover
         pytest.skip(str(e))
-    except ModuleNotFoundError as e:
-        pytest.skip(f'Could not find module for connection string: {connection_string}. Error was: {e}')
+    except ModuleNotFoundError as e:  # pragma: no cover
+        raise ModuleNotFoundError('There seems to be a dependency missing for this test. Please install it.') from e
     assert PandasSpecialEngine._detect_db_type(connectable=engine) == expected
+
+
+def test_repr(_):
+    engine = create_engine('sqlite://')
+    dummy_df = pd.DataFrame(index=pd.Index(data=[0], name='id'))
+    with engine.connect() as connection:
+        pse = PandasSpecialEngine(connection=connection, table_name=TableNames.NO_TABLE, df=dummy_df)
+        # make sure it is printable without errors
+        txt = str(pse)
+        print(txt)
+        # test some strings we expect to find in the repr
+        for s in ('PandasSpecialEngine', 'id ', 'hexid', 'connection',
+                  'schema', 'table', 'SQLalchemy table model'):
+            assert s in txt
+
+
+def test_table_attr(_):
+    engine = create_engine('sqlite://')
+    # generate a somewhat complex table model via the _TestsExampleTable class
+    df = _TestsExampleTable.create_example_df(nb_rows=10)
+    table_name = TableNames.NO_TABLE
+    with engine.connect() as connection:
+        pse = PandasSpecialEngine(connection=connection, table_name=table_name, df=df)
+        # make sure columns and table name match
+        expected_cols = list(df.index.names) + df.columns.tolist()
+        assert all((col in pse.table.columns for col in expected_cols))
+        assert pse.table.name == table_name
 
 
 # -
 
-# # Test errors
+# ### Test errors
 
 # +
-@drop_table_for_test(TableNames.NO_TABLE)
-def test_error_index_level_named(engine, schema):
+def run_test_error_index_level_no_name(_):
+    engine = create_engine('sqlite://')
     df = pd.DataFrame({'test':[0]})
     with pytest.raises(UnnamedIndexLevelsException) as excinfo:
-        with sync_async_connect_switch(engine) as connection:
-            PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
+        with engine.connect() as connection:
+            PandasSpecialEngine(connection=connection, table_name=TableNames.NO_TABLE, df=df)
     assert "All index levels must be named" in str(excinfo.value)
 
 
 @pytest.mark.parametrize("option", ['index and column collision', 'columns duplicated', 'index duplicated'])
-@drop_table_for_test(TableNames.NO_TABLE)
-def test_duplicated_names(engine, schema, option):
+def test_duplicated_names(_, option):
+    engine = create_engine('sqlite://')
     df = pd.DataFrame({'test':[0]})
     if option == 'index and column collision':
         df.index.name = 'test'
@@ -472,27 +463,27 @@ def test_duplicated_names(engine, schema, option):
         raise AssertionError(f'Unexpected value for param `option`: {option}')
 
     with pytest.raises(DuplicateLabelsException) as excinfo:
-        with sync_async_connect_switch(engine) as connection:
-            PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
+        with engine.connect() as connection:
+            PandasSpecialEngine(connection=connection, table_name=TableNames.NO_TABLE, df=df)
     assert "Found duplicates across index and columns" in str(excinfo.value)
 
 
-@drop_table_for_test(TableNames.NO_TABLE)
-def test_non_unique_index(engine, schema):
+def test_non_unique_index(_):
+    engine = create_engine('sqlite://')
     df = pd.DataFrame(index=pd.Index(data=[0, 0], name='ix'))
     with pytest.raises(DuplicateValuesInIndexException) as excinfo:
-        with sync_async_connect_switch(engine) as connection:
-            PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
+        with engine.connect() as connection:
+            PandasSpecialEngine(connection=connection, table_name=TableNames.NO_TABLE, df=df)
     assert "The index must be unique" in str(excinfo.value)
 
 
 @pytest.mark.parametrize("bad_chunksize_value", [0, -1, 1.2])
-@drop_table_for_test(TableNames.NO_TABLE)
-def test_bad_chunksize(engine, schema, bad_chunksize_value):
+def test_bad_chunksize(_, bad_chunksize_value):
+    engine = create_engine('sqlite://')
     df = pd.DataFrame({'test':[0]})
     df.index.name = 'id'
-    with sync_async_connect_switch(engine) as connection:
-        pse = PandasSpecialEngine(connection=connection, schema=schema, table_name=TableNames.NO_TABLE, df=df)
+    with engine.connect() as connection:
+        pse = PandasSpecialEngine(connection=connection, table_name=TableNames.NO_TABLE, df=df)
         with pytest.raises(ValueError) as excinfo:
             pse._create_chunks(values=[0], chunksize=bad_chunksize_value)
         assert "integer strictly above 0" in str(excinfo.value)
