@@ -2,15 +2,16 @@
 # coding: utf-8
 # +
 import pytest
-from math import floor
 from pandas import __version__ as pandas_version
 from sqlalchemy import __version__ as sqla_version, VARCHAR
 
 # local imports
-from pangres.helpers import _sqlite_gt3_32_0, _version_equal_or_greater_than
+from pangres import aupsert, upsert
+from pangres.helpers import _version_equal_or_greater_than
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import (drop_table_for_test, drop_table,
-                                    is_async_sqla_obj, TableNames, upsert_or_aupsert)
+from pangres.tests.conftest import (adrop_table, adrop_table_between_tests, drop_table_between_tests,
+                                    drop_table, execute_coroutine_sync, sync_or_async_test, TableNames)
+from pangres.utils import adjust_chunksize
 
 
 # -
@@ -18,40 +19,32 @@ from pangres.tests.conftest import (drop_table_for_test, drop_table,
 
 # # Helpers
 
-# +
-def create_or_upsert_with_pangres(engine, schema, if_row_exists, df, chunksize, **kwargs):
-    # MySQL does not want flexible text length in indices/PK
-    dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-    upsert_or_aupsert(con=engine, df=df, schema=schema, chunksize=chunksize,
-                      table_name=TableNames.BENCHMARK, if_row_exists=if_row_exists,
-                      dtype=dtype, **kwargs)
-
-
-def create_with_pandas(engine, schema, df):
+def skip_if_sqlalchemy_pandas_conflict():
+    """
+    pandas >= 1.4.0 requires sqlalchemy >= 1.4.0. We will
+    skip tests where pandas is required if these conditions
+    are not met
+    """
     # pandas >= 1.4.0 requires sqlalchemy >= 1.4.0
-    if (_version_equal_or_greater_than(pandas_version, '1.4.0') and
-        not _version_equal_or_greater_than(sqla_version, '1.4.0')):
-        pytest.skip(f'pandas >= 1.4.0 requires sqlalchemy >= 1.4.0 (we have sqlalchemy v{sqla_version})')
-
-    dtype={'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
-
-    # we need this for SQlite when using pandas table creation
-    # since we cannot use more than X parameters in a parameterized query
-    if 'sqlite' in engine.dialect.dialect_description:
-        max_params = 32766 if _sqlite_gt3_32_0() else 999
-        col_len = len(df.columns) + len(df.index.names)
-        chunksize = floor(max_params / col_len)
-    else:
-        chunksize = None
-
-    # create table
-    df.to_sql(con=engine, schema=schema, name=TableNames.BENCHMARK, method='multi',
-              chunksize=chunksize, dtype=dtype)
+    pd_1_4_0 = _version_equal_or_greater_than(pandas_version, '1.4.0')
+    sqla_1_4_0 = _version_equal_or_greater_than(sqla_version, '1.4.0')
+    if pd_1_4_0 and not sqla_1_4_0:
+        pytest.skip('pandas >= 1.4.0 requires sqlalchemy >= 1.4.0 '
+                    f'(installed: sqlalchemy v{sqla_version}, pandas v{pandas_version})')
 
 
-# -
-
-# # Tests
+# # Sync and async variants for tests
+#
+# Note that we cannot use the same strategy ((`run_test_foo`|`run_test_foo_async`) -> `test_foo`) as usual here
+# because `pytest-benchmark` which is used inside of both sync and async tests must run sync.
+#
+# If we were to use the event loop for the async test then we would have to create nested event loops for running
+# asynchronous benchmark subfunctions (we cannot use the already running loop).
+#
+# This is possible with `nest_asyncio` but that just complicates things.
+#
+# What we will then do is use synchronous functions for testing asynchronous engines. And we will make
+# synchronous versions of the benchmark subfunctions.
 
 pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 1], [1_000, 1, 1]],
                      ids=['many_little_inserts', 'big_insert'])
@@ -61,58 +54,183 @@ pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 
 # Case where the table does not exist yet so there is no pk to compare.
 
 
-@pytest.mark.parametrize('library', ['pandas', 'pangres'])
-@pytest.mark.parametrize(**pytest_params)
-@drop_table_for_test(table_name=TableNames.BENCHMARK)
-def test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
-    # skip async engines with pandas
-    if is_async_sqla_obj(engine) and library == 'pandas':
-        pytest.skip('async engines will not work with pandas')
-
-    # get a df
-    # we don't test JSON as this is problematic with pandas
+# +
+@drop_table_between_tests(table_name=TableNames.BENCHMARK_INSERT)
+def run_test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
+    # get a df (we don't test JSON as this is problematic with pandas)
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
+    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
-    # prepare funcs for benchmark and then do the benchmark
-    switch = {'pangres':lambda: create_or_upsert_with_pangres(engine=engine, schema=schema, if_row_exists='update',
-                                                              df=df, chunksize=nb_rows),
-              'pandas':lambda: create_with_pandas(engine=engine, schema=schema, df=df)}
+    # prepare setup function
+    table_name = TableNames.BENCHMARK_INSERT
 
+    def setup():
+        drop_table(engine=engine, schema=schema, table_name=table_name)
+
+    # prepare func for benchmark
+    chunksize = adjust_chunksize(con=engine, df=df, chunksize=nb_rows)
+    if library == 'pangres':
+        def benchmark_func():  # pragma: no cover
+            upsert(con=engine, df=df, schema=schema, chunksize=chunksize, table_name=table_name,
+                   if_row_exists='update', dtype=dtype)
+
+    elif library == 'pandas':
+        skip_if_sqlalchemy_pandas_conflict()
+
+        def benchmark_func():  # pragma: no cover
+            # create table
+            df.to_sql(con=engine, schema=schema, name=table_name, method='multi',
+                      chunksize=chunksize, dtype=dtype)
+
+    # benchmark
     try:
-        benchmark.pedantic(switch[library], setup=lambda: drop_table(engine=engine, schema=schema,
-                                                                     table_name=TableNames.BENCHMARK),
-                           rounds=rounds, iterations=iterations)
-    except NotImplementedError as e:
+        benchmark.pedantic(benchmark_func, setup=setup, rounds=rounds, iterations=iterations)
+    except NotImplementedError as e:  # pragma: no cover
         if 'not implemented for SQLAlchemy 2' in str(e):
             pytest.skip('in Python 3.6 there is some kind of problem with engines created with '
                         '`future=True` flag and pandas')
 
 
-# ## Upsert overwrite speed
-
-# this feature is not available in pandas yet
-@pytest.mark.parametrize('library', ['pangres'])
-@pytest.mark.parametrize('if_row_exists', ['update', 'ignore'])
-@pytest.mark.parametrize(**pytest_params)
-@drop_table_for_test(table_name=TableNames.BENCHMARK)
-def test_upsert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations, if_row_exists):
-    assert library == 'pangres'  # in case pandas changes and we forget to update the tests
-
-    # skip async engines with pandas
-    if is_async_sqla_obj(engine) and library == 'pandas':
+# IMPORTANT1: not "async def"!
+# IMPORTANT2: no decorator for dropping table!
+def run_test_create_and_insert_speed_async(engine, schema, benchmark, library, nb_rows, rounds, iterations):
+    if library == 'pandas':
         pytest.skip('async engines will not work with pandas')
+
+    # get a df (we don't test JSON as this is problematic with pandas)
+    df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
+    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
+
+    # prepare setup function (make it synchronous even if the engine is asynchronous)
+    table_name = TableNames.BENCHMARK_INSERT
+
+    def drop_table_sync():
+        execute_coroutine_sync(adrop_table(engine=engine, schema=schema, table_name=table_name))
+
+    setup = drop_table_sync
+
+    # prepare func for benchmark and its synchronous alternative
+    chunksize = adjust_chunksize(con=engine, df=df, chunksize=nb_rows)
+    if library == 'pangres':
+
+        async def abenchmark_func():  # pragma: no cover
+            await aupsert(con=engine, df=df, schema=schema, chunksize=chunksize,
+                          table_name=table_name, if_row_exists='update',
+                          dtype=dtype)
+
+        def benchmark_func():  # pragma: no cover
+            execute_coroutine_sync(abenchmark_func())
+
+    else:
+        raise AssertionError('This test can only work for the `pangres` library')
+
+    # benchmark
+    try:
+        benchmark.pedantic(benchmark_func, setup=setup, rounds=rounds, iterations=iterations)
+    except NotImplementedError as e:  # pragma: no cover
+        if 'not implemented for SQLAlchemy 2' in str(e):
+            pytest.skip('in Python 3.6 there is some kind of problem with engines created with '
+                        '`future=True` flag and pandas')
+        else:
+            raise e
+    finally:
+        drop_table_sync()
+
+
+# -
+
+# ## Upsert overwrite speed
+#
+# This feature is not available in pandas yet
+
+# +
+@drop_table_between_tests(table_name=TableNames.BENCHMARK_UPSERT)
+def run_test_upsert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations, if_row_exists):
+    assert library == 'pangres'  # in case pandas changes and we forget to update the tests
 
     # get a df
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
+    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
-    # setup for test (create table with no rows)
+    # prepare setup function
+    chunksize = adjust_chunksize(con=engine, df=df, chunksize=nb_rows)
+    table_name = TableNames.BENCHMARK_UPSERT
+    common_kwargs_upsert = dict(con=engine, df=df, schema=schema, chunksize=chunksize, dtype=dtype,
+                                table_name=table_name, if_row_exists=if_row_exists)
+
     def setup():
-        create_or_upsert_with_pangres(engine=engine, schema=schema, if_row_exists=if_row_exists,
-                                      df=df.head(0), chunksize=nb_rows)
+        drop_table(engine=engine, schema=schema, table_name=table_name)
+        # create with data so that we can measure the impact of looking up and overwriting or
+        # ignoring records based on primary keys
+        upsert(**common_kwargs_upsert, create_table=True)
 
-    # test func
+    # prepare func for benchmark
     # insert update/ignore with `create_table=False` to maximise speed
-    func = lambda: create_or_upsert_with_pangres(engine=engine, schema=schema, if_row_exists=if_row_exists,
-                                                 df=df, chunksize=nb_rows, create_table=False)
+    def benchmark_func():  # pragma: no cover
+        upsert(**common_kwargs_upsert, create_table=False)
 
-    benchmark.pedantic(func, setup=setup, rounds=rounds, iterations=iterations)
+    # benchmark
+    benchmark.pedantic(benchmark_func, setup=setup, rounds=rounds, iterations=iterations)
+
+
+# IMPORTANT1: not "async def"!
+# IMPORTANT2: no decorator for dropping table!
+def run_test_upsert_speed_async(engine, schema, benchmark, library, nb_rows, rounds, iterations, if_row_exists):
+    assert library == 'pangres'  # in case pandas changes and we forget to update the tests
+
+    # get a df
+    df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
+    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
+
+    # prepare setup function (make it synchronous even if the engine is asynchronous)
+    chunksize = adjust_chunksize(con=engine, df=df, chunksize=nb_rows)
+    table_name = TableNames.BENCHMARK_UPSERT
+    common_kwargs_upsert = dict(con=engine, df=df, schema=schema, chunksize=chunksize, dtype=dtype,
+                                table_name=table_name, if_row_exists=if_row_exists)
+
+    def drop_table_sync():
+        execute_coroutine_sync(adrop_table(engine=engine, schema=schema, table_name=table_name))
+
+    def setup():
+        drop_table_sync()
+        # create with data so that we can measure the impact of looking up and overwriting or
+        # ignoring records based on primary keys
+        execute_coroutine_sync(aupsert(**common_kwargs_upsert, create_table=True))
+
+    # prepare func for benchmark
+    # insert update/ignore with `create_table=False` to maximise speed
+    def benchmark_func():  # pragma: no cover
+        execute_coroutine_sync(aupsert(**common_kwargs_upsert, create_table=False))
+
+    # benchmark
+    try:
+        benchmark.pedantic(benchmark_func, setup=setup, rounds=rounds, iterations=iterations)
+    finally:
+        drop_table_sync()
+
+
+# -
+
+# # Actual tests
+
+# +
+@pytest.mark.parametrize('library', ['pandas', 'pangres'])
+@pytest.mark.parametrize(**pytest_params)
+def test_create_and_insert(engine, schema, benchmark, library, nb_rows, rounds, iterations):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_create_and_insert_speed_async,
+                       f_sync=run_test_create_and_insert_speed,
+                       benchmark=benchmark, library=library,
+                       nb_rows=nb_rows, rounds=rounds, iterations=iterations)
+
+
+@pytest.mark.parametrize('library', ['pangres'])
+@pytest.mark.parametrize('if_row_exists', ['update', 'ignore'])
+@pytest.mark.parametrize(**pytest_params)
+def test_upsert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations, if_row_exists):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_upsert_speed_async,
+                       f_sync=run_test_upsert_speed,
+                       benchmark=benchmark, library=library,
+                       nb_rows=nb_rows, rounds=rounds, iterations=iterations,
+                       if_row_exists=if_row_exists)
