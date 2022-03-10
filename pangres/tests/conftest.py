@@ -449,6 +449,7 @@ def sync_or_async_test(engine, schema, f_async, f_sync, **kwargs):
     >>> # sync
     >>> from sqlalchemy import create_engine
     >>> engine = create_engine('sqlite://')
+    >>> schema = None
     >>> test_connect(engine=engine, schema=schema)
     >>>
     >>> # async
