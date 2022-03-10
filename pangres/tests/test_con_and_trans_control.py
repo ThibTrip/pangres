@@ -10,19 +10,21 @@ from sqlalchemy import text, VARCHAR
 # local imports
 from pangres import aupsert, upsert
 from pangres.transaction import TransactionHandler
-from pangres.tests.conftest import (commit, drop_table_for_test,
-                                    select_table, TableNames, parameterize_async)
+from pangres.tests.conftest import (aselect_table, adrop_table_between_tests, commit, drop_table_between_tests,
+                                    select_table, sync_or_async_test, TableNames)
 
 
 # -
 
-# # Tests
+# # Sync and async variants for tests
+#
+# (`run_test_foo`|`run_test_foo_async`) -> `test_foo`
 
 # ## Reusing a connection
 
 # +
-@drop_table_for_test(TableNames.REUSE_CONNECTION)
-def test_connection_usable_after_upsert(engine, schema):
+@drop_table_between_tests(table_name=TableNames.REUSE_CONNECTION)
+def run_test_connection_usable_after_upsert(engine, schema):
     df = pd.DataFrame(index=pd.Index([0], name='ix'))
     with engine.connect() as con:
         # do some random upsert operation
@@ -35,10 +37,8 @@ def test_connection_usable_after_upsert(engine, schema):
         commit(con)
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@drop_table_for_test(TableNames.REUSE_CONNECTION)
-async def test_connection_usable_after_upsert_async(engine, schema):
+@adrop_table_between_tests(table_name=TableNames.REUSE_CONNECTION)
+async def run_test_connection_usable_after_upsert_async(engine, schema):
     df = pd.DataFrame(index=pd.Index([0], name='ix'))
     async with engine.connect() as con:
         # do some random upsert operation
@@ -57,22 +57,21 @@ async def test_connection_usable_after_upsert_async(engine, schema):
 # ## Using our own transaction
 
 # +
-@pytest.mark.parametrize("trans_op", ['commit', 'rollback'])
-@drop_table_for_test(TableNames.COMMIT_OR_ROLLBACK_TRANS)
-def test_transaction(engine, schema, trans_op):
+@drop_table_between_tests(table_name=TableNames.COMMIT_OR_ROLLBACK_TRANS)
+def run_test_transaction(engine, schema, trans_op):
     df = pd.DataFrame(index=pd.Index(['foo'], name='ix'))
     table_name = TableNames.COMMIT_OR_ROLLBACK_TRANS
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
                          if_row_exists='update', dtype={'ix':VARCHAR(3)})
 
-    with engine.connect() as con:
-        trans = con.begin()
+    with engine.connect() as connection:
+        trans = connection.begin()
         try:
             # do some random upsert operation
-            upsert(con=con, df=df, **common_kwargs)
+            upsert(con=connection, df=df, **common_kwargs)
             # do some other operation that requires commit
-            upsert(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+            upsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
             getattr(trans, trans_op)()  # commit or rollback
         finally:
             trans.close()
@@ -91,24 +90,21 @@ def test_transaction(engine, schema, trans_op):
         assert df_db is None or len(df_db) == 0
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@parameterize_async("trans_op", ['commit', 'rollback'])
-@drop_table_for_test(TableNames.COMMIT_OR_ROLLBACK_TRANS)
-async def test_transaction_async(engine, schema, trans_op=None):
+@adrop_table_between_tests(table_name=TableNames.COMMIT_OR_ROLLBACK_TRANS)
+async def run_test_transaction_async(engine, schema, trans_op):
     df = pd.DataFrame(index=pd.Index(['foo'], name='ix'))
     table_name = TableNames.COMMIT_OR_ROLLBACK_TRANS
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
                          if_row_exists='update', dtype={'ix':VARCHAR(3)})
 
-    async with engine.connect() as con:
-        trans = await con.begin()
+    async with engine.connect() as connection:
+        trans = await connection.begin()
         try:
             # do some random upsert operation
-            await aupsert(con=con, df=df, **common_kwargs)
+            await aupsert(con=connection, df=df, **common_kwargs)
             # do some other operation that requires commit
-            await aupsert(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+            await aupsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
             coro = getattr(trans, trans_op)  # commit or rollback
             await coro()
         finally:
@@ -119,11 +115,11 @@ async def test_transaction_async(engine, schema, trans_op=None):
     # or that the table was not even created (what is rolled back
     # depends on the database type and other factors)
     if trans_op == 'commit':
-        df_db = select_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
+        df_db = await aselect_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
         pd.testing.assert_frame_equal(df_db.sort_index(),
                                       pd.DataFrame(index=pd.Index(['bar', 'foo'], name='ix')))
     elif trans_op == 'rollback':
-        df_db = select_table(engine=engine, schema=schema, table_name=table_name, error_if_missing=False)
+        df_db = await aselect_table(engine=engine, schema=schema, table_name=table_name, error_if_missing=False)
         # no table or an empty table
         assert df_db is None or len(df_db) == 0
 
@@ -133,29 +129,29 @@ async def test_transaction_async(engine, schema, trans_op=None):
 # ## Commit-as-you-go or ROLLBACK
 
 # +
-@drop_table_for_test(TableNames.COMMIT_AS_YOU_GO)
-def test_commit_as_you_go(engine, schema):
+@drop_table_between_tests(table_name=TableNames.COMMIT_AS_YOU_GO)
+def run_test_commit_as_you_go(engine, schema):
     df = pd.DataFrame(index=pd.Index(['foo'], name='ix'))
     table_name = TableNames.COMMIT_AS_YOU_GO
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
                          if_row_exists='update', dtype={'ix':VARCHAR(3)})
 
-    with engine.connect() as con:
+    with engine.connect() as connection:
         # skip for sqlalchemy < 2.0 or when future=True flag is not passed
         # during engine creation (commit-as-you-go is a new feature)
         # when this is the case there is no attribute commit or rollback for
         # the connection
-        if not hasattr(con, 'commit'):
+        if not hasattr(connection, 'commit'):
             pytest.skip('test not possible because there is no attribute "commit" (most likely sqlalchemy < 2)')
 
         # do some random upsert operation and commit
-        upsert(con=con, df=df, **common_kwargs)
-        con.commit()
+        upsert(con=connection, df=df, **common_kwargs)
+        connection.commit()
 
         # do some other operation that requires commit and then rollback
-        upsert(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
-        con.rollback()
+        upsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+        connection.rollback()
 
     # the table in the db should be equal to the initial df as the second
     # operation was rolled back
@@ -163,41 +159,60 @@ def test_commit_as_you_go(engine, schema):
     pd.testing.assert_frame_equal(df_db, df)
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@drop_table_for_test(TableNames.COMMIT_AS_YOU_GO)
-async def test_commit_as_you_go_async(engine, schema):
+@adrop_table_between_tests(table_name=TableNames.COMMIT_AS_YOU_GO)
+async def run_test_commit_as_you_go_async(engine, schema):
     df = pd.DataFrame(index=pd.Index(['foo'], name='ix'))
     table_name = TableNames.COMMIT_AS_YOU_GO
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
                          if_row_exists='update', dtype={'ix':VARCHAR(3)})
 
-    async with engine.connect() as con:
+    async with engine.connect() as connection:
         # skip for sqlalchemy < 2.0 or when future=True flag is not passed
         # during engine creation (commit-as-you-go is a new feature)
         # when this is the case there is no attribute commit or rollback for
         # the connection
-        if not hasattr(con, 'commit'):
+        if not hasattr(connection, 'commit'):
             pytest.skip('test not possible because there is no attribute "commit" (most likely sqlalchemy < 2)')
 
         # do some random upsert operation and commit
-        await aupsert(con=con, df=df, **common_kwargs)
-        await con.commit()
+        await aupsert(con=connection, df=df, **common_kwargs)
+        await connection.commit()
 
         # do some other operation that requires commit and then rollback
-        await aupsert(con=con, df=df.rename(index={'foo':'bar'}), **common_kwargs)
-        await con.rollback()
+        await aupsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+        await connection.rollback()
 
     # the table in the db should be equal to the initial df as the second
     # operation was rolled back
-    df_db = select_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
+    df_db = await aselect_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
     pd.testing.assert_frame_equal(df_db, df)
 
 
 # -
 
-# # Test errors
+# # Actual tests
+
+# +
+def test_connection_usable_after_upsert(engine, schema):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_connection_usable_after_upsert_async,
+                       f_sync=run_test_connection_usable_after_upsert)
+
+
+@pytest.mark.parametrize("trans_op", ['commit', 'rollback'])
+def test_transaction(engine, schema, trans_op):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_transaction_async,
+                       f_sync=run_test_transaction,
+                       trans_op=trans_op)
+
+
+def test_commit_as_you_go(engine, schema):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_commit_as_you_go_async,
+                       f_sync=run_test_commit_as_you_go)
+
 
 def test_non_connectable_transaction_handler(_):
     with pytest.raises(TypeError) as exc_info:

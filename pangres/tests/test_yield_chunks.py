@@ -14,22 +14,26 @@ from sqlalchemy import VARCHAR, INT
 # local imports
 from pangres import aupsert, upsert
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import (drop_table_for_test, read_example_table_from_db,
-                                    TableNames)
+from pangres.tests.conftest import (adrop_table_between_tests, drop_table_between_tests,
+                                    sync_or_async_test, TableNames)
 
 
 # -
 
-# # Insert values one by one
+# # Sync and async variants for tests
+#
+# (`run_test_foo`|`run_test_foo_async`) -> `test_foo`
+
+# ## Insert values one by one
 
 # +
-@drop_table_for_test(TableNames.WITH_YIELD)
-def test_get_nb_rows(engine, schema):
+@drop_table_between_tests(table_name=TableNames.WITH_YIELD)
+def run_test_get_nb_rows(engine, schema):
     # config
     table_name = TableNames.WITH_YIELD
     nb_rows, chunksize = 20, 3
     nb_last_chunk = nb_rows % chunksize
-    nb_chunks = math.ceil(nb_rows/chunksize)
+    nb_chunks = math.ceil(nb_rows / chunksize)
     # MySQL does not want flexible text length in indices/PK
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
@@ -40,23 +44,21 @@ def test_get_nb_rows(engine, schema):
                       schema=schema, chunksize=chunksize, dtype=dtype, yield_chunks=True)
 
     for ix, result in enumerate(iterator):
-        assert result.rowcount == (chunksize if ix != nb_chunks-1 else nb_last_chunk)
+        assert result.rowcount == (chunksize if ix != (nb_chunks - 1) else nb_last_chunk)
 
     # verify the inserted data is as expected
     # we sort the index for MySQL
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    df_db = _TestsExampleTable.read_from_db(engine=engine, schema=schema, table_name=table_name)
     pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@drop_table_for_test(TableNames.WITH_YIELD)
-async def test_get_nb_rows_async(engine, schema):
+@adrop_table_between_tests(table_name=TableNames.WITH_YIELD)
+async def run_test_get_nb_rows_async(engine, schema):
     # config
     table_name = TableNames.WITH_YIELD
     nb_rows, chunksize = 20, 3
     nb_last_chunk = nb_rows % chunksize
-    nb_chunks = math.ceil(nb_rows/chunksize)
+    nb_chunks = math.ceil(nb_rows / chunksize)
     # MySQL does not want flexible text length in indices/PK
     dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
@@ -69,22 +71,22 @@ async def test_get_nb_rows_async(engine, schema):
     # unlike the equivalent synchronous test, enumerate(async_generator) will not work
     ix = 0
     async for result in async_gen:
-        assert result.rowcount == (chunksize if ix != nb_chunks-1 else nb_last_chunk)
+        assert result.rowcount == (chunksize if ix != (nb_chunks - 1) else nb_last_chunk)
         ix += 1
 
     # verify the inserted data is as expected
     # we sort the index for MySQL
-    df_db = read_example_table_from_db(engine=engine, schema=schema, table_name=table_name)
+    df_db = await _TestsExampleTable.aread_from_db(engine=engine, schema=schema, table_name=table_name)
     pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())
 
 
 # -
 
-# # Test of an empty DataFrame
+# ## Test of an empty DataFrame
 
 # +
-@drop_table_for_test(TableNames.WITH_YIELD_EMPTY)
-def test_yield_empty_df(engine, schema):
+@drop_table_between_tests(table_name=TableNames.WITH_YIELD_EMPTY)
+def run_test_yield_empty_df(engine, schema):
     df = pd.DataFrame({'id':[], 'value':[]}).set_index('id')
 
     # we should get an empty generator back
@@ -96,10 +98,8 @@ def test_yield_empty_df(engine, schema):
         raise AssertionError('Expected the generator returned by upsert with an empty df to be empty')
 
 
-# ASYNC VARIANT (identified by suffix `_async`, only executed for async engines)
-@pytest.mark.asyncio
-@drop_table_for_test(TableNames.WITH_YIELD_EMPTY)
-async def test_yield_empty_df_async(engine, schema):
+@adrop_table_between_tests(table_name=TableNames.WITH_YIELD_EMPTY)
+async def run_test_yield_empty_df_async(engine, schema):
     df = pd.DataFrame({'id':[], 'value':[]}).set_index('id')
 
     # we should get an empty generator back
@@ -109,3 +109,20 @@ async def test_yield_empty_df_async(engine, schema):
     # the for loop should never run because the generator should be empty
     async for result in async_gen:
         raise AssertionError('Expected the generator returned by upsert with an empty df to be empty')
+
+
+# -
+
+# # Actual tests
+
+# +
+def test_get_nb_rows(engine, schema):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_get_nb_rows_async,
+                       f_sync=run_test_get_nb_rows)
+
+
+def test_yield_empty_df(engine, schema):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_yield_empty_df_async,
+                       f_sync=run_test_yield_empty_df)
