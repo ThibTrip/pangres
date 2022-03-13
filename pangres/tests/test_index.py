@@ -107,7 +107,7 @@ def run_test_index_with_null(engine, schema):
     with pytest.raises(IntegrityError):
         upsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
         # don't test error for mysql since only a warning is raised and the line is skipped
-        if 'mysql' in engine.dialect.dialect_description:
+        if 'mysql' in engine.dialect.dialect_description:  # pragma: no cover
             pytest.skip('not tested with mysql as only a warning is issued and the line is skipped. '
                         "Perhaps we could capture the warning with pytest?")
 
@@ -118,7 +118,7 @@ async def run_test_index_with_null_async(engine, schema):
     with pytest.raises(IntegrityError):
         await aupsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
         # don't test error for mysql since only a warning is raised and the line is skipped
-        if 'mysql' in engine.dialect.dialect_description:
+        if 'mysql' in engine.dialect.dialect_description:  # pragma: no cover
             pytest.skip('not tested with mysql as only a warning is issued and the line is skipped. '
                         "Perhaps we could capture the warning with pytest?")
 

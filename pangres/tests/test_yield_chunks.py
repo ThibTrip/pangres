@@ -92,7 +92,8 @@ def run_test_yield_empty_df(engine, schema):
 
     # the for loop should never run because the generator should be empty
     for result in iterator:
-        raise AssertionError('Expected the generator returned by upsert with an empty df to be empty')
+        raise AssertionError('Expected the generator returned by upsert '
+                             'with an empty df to be empty')  # pragma: no cover
 
 
 @adrop_table_between_tests(table_name=TableNames.WITH_YIELD_EMPTY)
@@ -105,7 +106,8 @@ async def run_test_yield_empty_df_async(engine, schema):
 
     # the for loop should never run because the generator should be empty
     async for result in async_gen:
-        raise AssertionError('Expected the generator returned by upsert with an empty df to be empty')
+        raise AssertionError('Expected the generator returned by aupsert '
+                             'with an empty df to be empty')  # pragma: no cover
 
 
 # -

@@ -142,7 +142,7 @@ def run_test_commit_as_you_go(engine, schema):
         # during engine creation (commit-as-you-go is a new feature)
         # when this is the case there is no attribute commit or rollback for
         # the connection
-        if not hasattr(connection, 'commit'):
+        if not hasattr(connection, 'commit'):  # pragma: no cover
             pytest.skip('test not possible because there is no attribute "commit" (most likely sqlalchemy < 2)')
 
         # do some random upsert operation and commit

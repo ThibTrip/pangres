@@ -119,7 +119,7 @@ def run_test_create_and_insert_speed_async(engine, schema, benchmark, library, n
         def benchmark_func():  # pragma: no cover
             execute_coroutine_sync(abenchmark_func())
 
-    else:
+    else:  # pragma: no cover
         raise AssertionError('This test can only work for the `pangres` library')
 
     # benchmark

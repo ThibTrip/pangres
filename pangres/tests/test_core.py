@@ -235,12 +235,12 @@ def run_test_create_schema_not_none(engine, schema):
     try:
         upsert(con=engine, schema=schema, df=df, if_row_exists='update', create_schema=True,
                table_name=table_name, create_table=True)
-        if not is_postgres:
+        if not is_postgres:  # pragma: no cover
             raise AssertionError('Expected `upsert` to fail when trying to create a schema '
                                  'with another database than postgres')
     except Exception as e:
         # for postgres this should have worked
-        if is_postgres:
+        if is_postgres:  # pragma: no cover
             raise e
         else:
             assert isinstance(e, HasNoSchemaSystemException)
@@ -272,12 +272,12 @@ async def run_test_create_schema_not_none_async(engine, schema):
     try:
         await aupsert(con=engine, schema=schema, df=df, if_row_exists='update', create_schema=True,
                       table_name=table_name, create_table=True)
-        if not is_postgres:
+        if not is_postgres:  # pragma: no cover
             raise AssertionError('Expected `upsert` to fail when trying to create a schema '
                                  'with another database than postgres')
     except Exception as e:
         # for postgres this should have worked
-        if is_postgres:
+        if is_postgres:  # pragma: no cover
             raise e
         else:
             assert isinstance(e, HasNoSchemaSystemException)

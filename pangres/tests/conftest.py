@@ -37,7 +37,7 @@ def execute_coroutine_sync(coro):
     """
     try:
         loop = asyncio.get_event_loop()
-    except RuntimeError:
+    except RuntimeError:  # pragma: no cover
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop=loop)
     task = asyncio.ensure_future(coro, loop=loop)
@@ -66,7 +66,7 @@ def sync_async_exec_switch(func, *args, **kwargs):
         return execute_coroutine_sync(func(*args, **kwargs))
     elif callable(func):
         return func(*args, **kwargs)
-    else:
+    else:  # pragma: no cover
         raise TypeError('Expected a coroutine or callable')
 
 
@@ -171,7 +171,7 @@ def select_table(engine, schema, table_name,
         # check if the table is present
         if table_exists(connection=connection, schema=schema, table_name=table_name):
             return pd.read_sql(text(f'SELECT * FROM {ns}'), con=connection, **read_sql_kwargs)
-        elif error_if_missing:
+        elif error_if_missing:  # pragma: no cover
             raise AssertionError(f'Table {ns} does not exist')
         else:
             return None
@@ -185,7 +185,7 @@ async def aselect_table(engine, schema, table_name,
     """
     index_kwarg = 'index_col'
     for k in read_sql_kwargs:
-        if k != index_kwarg:
+        if k != index_kwarg:  # pragma: no cover
             raise NotImplementedError(f'Can only handle handle extra kwarg `{index_kwarg}` '
                                       f'for aselect_table. Got {k}')
 
@@ -202,7 +202,7 @@ async def aselect_table(engine, schema, table_name,
             if index_kwarg in read_sql_kwargs:
                 df.set_index(read_sql_kwargs[index_kwarg], inplace=True)
             return df
-        elif error_if_missing:
+        elif error_if_missing:  # pragma: no cover
             raise AssertionError(f'Table {ns} does not exist')
         else:
             return None

@@ -58,7 +58,7 @@ def run_test_schema_creation(engine, schema):
             assert pse.schema_exists()
         except Exception as e:
             if pse._db_type == 'postgres' or not isinstance(e, HasNoSchemaSystemException):
-                raise e
+                raise e  # pragma: no cover
         finally:
             if pse._db_type == 'postgres':
                 drop_schema(engine=engine, schema=schema)
@@ -86,7 +86,7 @@ async def run_test_schema_creation_async(engine, schema):
             assert await pse.aschema_exists()
         except Exception as e:
             if pse._db_type == 'postgres' or not isinstance(e, HasNoSchemaSystemException):
-                raise e
+                raise e  # pragma: no cover
         finally:
             if pse._db_type == 'postgres':
                 await adrop_schema(engine=engine, schema=schema)
@@ -244,7 +244,7 @@ def run_test_change_column_type_if_column_empty(engine, schema, caplog, new_empt
     # also skip sqlite as it does not support such alteration
     json_like = isinstance(new_empty_column_value, (dict, list))
     if json_like and not _sqla_gt14():
-        pytest.skip('JSON like values will not work for sqlalchemy < 1.4')
+        pytest.skip('JSON like values will not work for sqlalchemy < 1.4')  # pragma: no cover
     elif 'sqlite' in engine.dialect.dialect_description:
         pytest.skip('such column alteration is not possible with SQlite')
 
@@ -458,7 +458,7 @@ def test_duplicated_names(_, option):
         df = df[['test', 'test']]
     elif option == 'index duplicated':
         df = df.set_index(['test', 'test'])
-    else:
+    else:  # pragma: no cover
         raise AssertionError(f'Unexpected value for param `option`: {option}')
 
     with pytest.raises(DuplicateLabelsException) as excinfo:
