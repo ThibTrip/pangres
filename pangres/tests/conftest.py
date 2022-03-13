@@ -302,7 +302,7 @@ def _get_function_param_value(function, param_name, args, kwargs):
     ...     return wrapper
     >>>
     >>> @dummy_decorator
-    >>> def foo(a, b, c):
+    ... def foo(a, b, c):
     ...     pass
     >>>
     >>> foo(1, 2, c=3)
