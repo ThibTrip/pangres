@@ -419,6 +419,12 @@ def test_insert_missing_table(engine, schema):
                        f_sync=run_test_insert_missing_table)
 
 
+def test_create_schema_none(engine, schema):
+    sync_or_async_test(engine=engine, schema=schema,
+                       f_async=run_test_create_schema_none_async,
+                       f_sync=run_test_create_schema_none)
+
+
 def test_create_schema_not_none(engine, schema):
     sync_or_async_test(engine=engine, schema=schema,
                        f_async=run_test_create_schema_not_none_async,
