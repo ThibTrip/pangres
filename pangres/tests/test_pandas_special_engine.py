@@ -280,7 +280,7 @@ async def run_test_change_column_type_if_column_empty_async(engine, schema, capl
     # also skip sqlite as it does not support such alteration
     json_like = isinstance(new_empty_column_value, (dict, list))
     if json_like and not _sqla_gt14():
-        pytest.skip('JSON like values will not work for sqlalchemy < 1.4')
+        pytest.skip('JSON like values will not work for sqlalchemy < 1.4')  # pragma: no cover
     elif 'sqlite' in engine.dialect.dialect_description:
         pytest.skip('such column alteration is not possible with SQlite')
 
