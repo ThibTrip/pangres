@@ -18,5 +18,4 @@ coverage:
         base: auto
 
 ignore:
-  - "pangres/docs/*"  # ignore script to generate the documentation
-  - "pangres/tests/*" # the pytest benchmarking extension as well as pytest.raises have problems with coverage
+  - "pangres/docs/*"  # ignore scripts to generate the documentation
