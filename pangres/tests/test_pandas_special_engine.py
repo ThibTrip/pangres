@@ -435,9 +435,12 @@ def test_table_attr(_):
 # ### Test errors
 
 # +
-def run_test_error_index_level_no_name(_):
+@pytest.mark.parametrize("multi_index", [True, False], ids=['multi index', 'single index'])
+def test_error_index_level_no_name(_, multi_index):
     engine = create_engine('sqlite://')
     df = pd.DataFrame({'test':[0]})
+    if multi_index:
+        df.set_index('test', append=True, inplace=True)
     with pytest.raises(UnnamedIndexLevelsException) as excinfo:
         with engine.connect() as connection:
             PandasSpecialEngine(connection=connection, table_name=TableNames.NO_TABLE, df=df)
