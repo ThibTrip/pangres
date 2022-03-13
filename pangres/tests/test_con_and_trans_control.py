@@ -169,13 +169,6 @@ async def run_test_commit_as_you_go_async(engine, schema):
                          if_row_exists='update', dtype={'ix':VARCHAR(3)})
 
     async with engine.connect() as connection:
-        # skip for sqlalchemy < 2.0 or when future=True flag is not passed
-        # during engine creation (commit-as-you-go is a new feature)
-        # when this is the case there is no attribute commit or rollback for
-        # the connection
-        if not hasattr(connection, 'commit'):
-            pytest.skip('test not possible because there is no attribute "commit" (most likely sqlalchemy < 2)')
-
         # do some random upsert operation and commit
         await aupsert(con=connection, df=df, **common_kwargs)
         await connection.commit()
