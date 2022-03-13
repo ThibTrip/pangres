@@ -583,7 +583,7 @@ class PandasSpecialEngine:
         chunks = self._create_chunks(values=values, chunksize=chunksize)
         upq = UpsertQuery(connection=self.connection, table=self.table)
         for chunk in chunks:
-            await upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
+            await upq.aexecute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
     async def aupsert_yield(self, if_row_exists:str, chunksize:int=10000):
         assert if_row_exists in ('ignore', 'update')
@@ -591,7 +591,7 @@ class PandasSpecialEngine:
         chunks = self._create_chunks(values=values, chunksize=chunksize)
         upq = UpsertQuery(connection=self.connection, table=self.table)
         for chunk in chunks:
-            yield await upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
+            yield await upq.aexecute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
     def __repr__(self):
         text = f"""PandasSpecialEngine (id {id(self)}, hexid {hex(id(self))})
