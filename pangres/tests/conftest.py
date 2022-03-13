@@ -285,12 +285,33 @@ async def adrop_table(engine, schema, table_name):
         await connection.run_sync(drop_coro)
 
 
-def _get_function_param_value(sig, param_name, args, kwargs):
+def _get_function_param_value(function, param_name, args, kwargs):
     """
     Helper for function `drop_table_between_tests` to
     retrieve the value of a specific parameter
     from *args and **kwargs like when we wrap a function
+
+    Examples
+    --------
+    >>> def dummy_decorator(function):
+    ...     def wrapper(*args, **kwargs):
+    ...         for param_name in ('a', 'b', 'c'):  # see function `foo` below
+    ...             value = _get_function_param_value(function=function, param_name=param_name,
+    ...                                               args=args, kwargs=kwargs)
+    ...             print(f'{param_name}={value}')
+    ...     return wrapper
+    >>>
+    >>> @dummy_decorator
+    >>> def foo(a, b, c):
+    ...     pass
+    >>>
+    >>> foo(1, 2, c=3)
+    a=1
+    b=2
+    c=3
     """
+    sig = signature(function)
+    assert param_name in sig.parameters, f'Parameter "{param_name}" not found in function {function.__name__}!'
     param_ix = list(sig.parameters).index(param_name)
     if param_ix <= len(args) - 1:
         return args[param_ix]
@@ -317,11 +338,8 @@ def drop_table_between_tests(table_name, drop_before_test=True, drop_after_test=
         @wraps(function)
         def wrapper(*args, **kwargs):
             # get engine and schema
-            sig = signature(function)
-            assert 'engine' in sig.parameters
-            assert 'schema' in sig.parameters
-            engine = _get_function_param_value(sig=sig, param_name='engine', args=args, kwargs=kwargs)
-            schema = _get_function_param_value(sig=sig, param_name='schema', args=args, kwargs=kwargs)
+            engine = _get_function_param_value(function=function, param_name='engine', args=args, kwargs=kwargs)
+            schema = _get_function_param_value(function=function, param_name='schema', args=args, kwargs=kwargs)
             # before test
             if drop_before_test:
                 drop_table(engine=engine, schema=schema, table_name=table_name)
@@ -345,11 +363,8 @@ def adrop_table_between_tests(table_name, drop_before_test=True, drop_after_test
         @wraps(function)
         async def wrapper(*args, **kwargs):
             # get engine and schema
-            sig = signature(function)
-            assert 'engine' in sig.parameters
-            assert 'schema' in sig.parameters
-            engine = _get_function_param_value(sig=sig, param_name='engine', args=args, kwargs=kwargs)
-            schema = _get_function_param_value(sig=sig, param_name='schema', args=args, kwargs=kwargs)
+            engine = _get_function_param_value(function=function, param_name='engine', args=args, kwargs=kwargs)
+            schema = _get_function_param_value(function=function, param_name='schema', args=args, kwargs=kwargs)
             # before test
             if drop_before_test:
                 await adrop_table(engine=engine, schema=schema, table_name=table_name)
