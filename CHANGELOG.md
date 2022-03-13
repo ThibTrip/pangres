@@ -1,5 +1,43 @@
 # Changelog
 
+## [v4.1.1](https://github.com/ThibTrip/pangres/releases/tag/v4.1.1) (2022-03-13)
+
+
+**Release Notes**
+
+
+___
+**_Bug Fixes_**
+
+* fixed bug where I used a synchronous method instead of its asynchronous variant (`UpsertQuery.execute` instead of `UpsertQuery.aexecute` in `pangres.aupsert`). This has no repercussions for the end user
+
+**_Documentation_**
+
+* fix illogic code in example for `pangres.aupsert` (using `engine` instead of `connection` in contexts) and `commit` which I had forgotten!
+* added changelog
+
+**_Testing_**
+
+* overhaul of the tests. asynchronous and synchronous tests have been separated
+* module `test_upsert_end_to_end` has been renamed to `test_core`
+___
+
+
+
+[Full Changelog](https://github.com/ThibTrip/pangres/compare/v4.1...v4.1.1)
+
+**Fixed bugs:**
+
+- Fix bad strategy of temporarily replacing async engines with synchronous engines in tests [\#57](https://github.com/ThibTrip/pangres/issues/57)
+
+**Closed issues:**
+
+- Changelog \(releases\) [\#58](https://github.com/ThibTrip/pangres/issues/58)
+
+**Merged pull requests:**
+
+- \[TESTS\] Tests overhaul [\#59](https://github.com/ThibTrip/pangres/pull/59) ([ThibTrip](https://github.com/ThibTrip))
+
 ## [v4.1](https://github.com/ThibTrip/pangres/releases/tag/v4.1) (2022-01-21)
 
 
