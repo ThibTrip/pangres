@@ -7,7 +7,6 @@ expected (we should get the correct DataFrame length back).
 """
 import pandas as pd
 import pytest
-from sqlalchemy import VARCHAR
 
 # local imports
 from pangres import aupsert, upsert
@@ -28,9 +27,8 @@ def run_test_various_chunksizes(engine, schema, chunksize, nb_rows):
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
 
     # MySQL does not want flexible text length in indices/PK
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     upsert(con=engine, schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES,
-           df=df, chunksize=chunksize, if_row_exists='update', dtype=dtype)
+           df=df, chunksize=chunksize, if_row_exists='update')
     df_db = _TestsExampleTable.read_from_db(engine=engine, schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES)
 
     # sort index (for MySQL...)
@@ -43,9 +41,8 @@ async def run_test_various_chunksizes_async(engine, schema, chunksize, nb_rows):
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
 
     # MySQL does not want flexible text length in indices/PK
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     await aupsert(con=engine, schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES,
-                  df=df, chunksize=chunksize, if_row_exists='update', dtype=dtype)
+                  df=df, chunksize=chunksize, if_row_exists='update')
     df_db = await _TestsExampleTable.aread_from_db(engine=engine, schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES)
 
     # sort index (for MySQL...)

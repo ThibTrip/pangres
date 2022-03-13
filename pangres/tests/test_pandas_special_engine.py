@@ -99,10 +99,9 @@ async def run_test_schema_creation_async(engine, schema):
 # +
 @drop_table_between_tests(table_name=TableNames.TABLE_CREATION)
 def run_test_table_creation(engine, schema):
-    dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=10)
     with engine.connect() as connection:
-        pse = PandasSpecialEngine(connection=connection, schema=schema, dtype=dtype,
+        pse = PandasSpecialEngine(connection=connection, schema=schema,
                                   table_name=TableNames.TABLE_CREATION, df=df)
         assert not pse.table_exists()
         pse.create_table_if_not_exists()
@@ -112,10 +111,9 @@ def run_test_table_creation(engine, schema):
 
 @adrop_table_between_tests(table_name=TableNames.TABLE_CREATION)
 async def run_test_table_creation_async(engine, schema):
-    dtype = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=10)
     async with engine.connect() as connection:
-        pse = PandasSpecialEngine(connection=connection, schema=schema, dtype=dtype,
+        pse = PandasSpecialEngine(connection=connection, schema=schema,
                                   table_name=TableNames.TABLE_CREATION, df=df)
         assert not await pse.atable_exists()
         await pse.acreate_table_if_not_exists()
@@ -133,7 +131,6 @@ def run_test_add_new_columns(engine, schema, on_index:bool):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.ADD_NEW_COLUMN
     common_kwargs = dict(schema=schema, table_name=table_name)
-    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # create our example table
     df = _TestsExampleTable.create_example_df(nb_rows=10)
@@ -185,7 +182,6 @@ async def run_test_add_new_columns_async(engine, schema, on_index:bool):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.ADD_NEW_COLUMN
     common_kwargs = dict(schema=schema, table_name=table_name)
-    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # create our example table
     df = _TestsExampleTable.create_example_df(nb_rows=10)

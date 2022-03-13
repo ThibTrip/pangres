@@ -64,42 +64,36 @@ df_after_insert_ignore = pd.concat(objs=(df,
 @drop_table_between_tests(table_name=TableNames.END_TO_END)
 def run_test_end_to_end(engine, schema, create_table, if_row_exists, df_expected):
     # config
-    # dtype for index for MySQL... (can't have flexible text length)
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     table_name = TableNames.END_TO_END
-    # common kwargs for every time we use the upsert_or_aupsert function
-    common_kwargs = dict(if_row_exists=if_row_exists, dtype=dtype, table_name=table_name)
+    common_kwargs_upsert = dict(if_row_exists=if_row_exists, table_name=table_name)
     read_table = lambda: _TestsExampleTable.read_from_db(engine=engine, schema=schema, table_name=table_name).sort_index()
 
     # 1. create table
-    upsert(con=engine, schema=schema, df=df, create_table=True, **common_kwargs)
+    upsert(con=engine, schema=schema, df=df, create_table=True, **common_kwargs_upsert)
     pd.testing.assert_frame_equal(df, read_table())
 
     # 2. insert update/ignore
-    upsert(con=engine, schema=schema, df=df2, create_table=create_table, **common_kwargs)
+    upsert(con=engine, schema=schema, df=df2, create_table=create_table, **common_kwargs_upsert)
     pd.testing.assert_frame_equal(df_expected, read_table())
 
 
 @adrop_table_between_tests(table_name=TableNames.END_TO_END)
 async def run_test_end_to_end_async(engine, schema, create_table, if_row_exists, df_expected):
     # config
-    # dtype for index for MySQL... (can't have flexible text length)
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     table_name = TableNames.END_TO_END
-    # common kwargs for every time we use the upsert_or_aupsert function
-    common_kwargs = dict(if_row_exists=if_row_exists, dtype=dtype, table_name=table_name)
+    common_kwargs_upsert = dict(if_row_exists=if_row_exists, table_name=table_name)
 
     async def read_table():
         temp_df = await _TestsExampleTable.aread_from_db(engine=engine, schema=schema, table_name=table_name)
         return temp_df.sort_index()
 
     # 1. create table
-    await aupsert(con=engine, schema=schema, df=df, create_table=True, **common_kwargs)
+    await aupsert(con=engine, schema=schema, df=df, create_table=True, **common_kwargs_upsert)
     df_db = await read_table()
     pd.testing.assert_frame_equal(df, df_db)
 
     # 2. insert update/ignore
-    await aupsert(con=engine, schema=schema, df=df2, create_table=create_table, **common_kwargs)
+    await aupsert(con=engine, schema=schema, df=df2, create_table=create_table, **common_kwargs_upsert)
     df_db = await read_table()
     pd.testing.assert_frame_equal(df_expected, df_db)
 

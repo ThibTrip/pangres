@@ -3,14 +3,14 @@
 # +
 import pytest
 from pandas import __version__ as pandas_version
-from sqlalchemy import __version__ as sqla_version, VARCHAR
+from sqlalchemy import __version__ as sqla_version
 
 # local imports
 from pangres import aupsert, upsert
 from pangres.helpers import _version_equal_or_greater_than
 from pangres.examples import _TestsExampleTable
-from pangres.tests.conftest import (adrop_table, adrop_table_between_tests, drop_table_between_tests,
-                                    drop_table, execute_coroutine_sync, sync_or_async_test, TableNames)
+from pangres.tests.conftest import (adrop_table, drop_table_between_tests, drop_table,
+                                    execute_coroutine_sync, sync_or_async_test, TableNames)
 from pangres.utils import adjust_chunksize
 
 
@@ -46,6 +46,7 @@ def skip_if_sqlalchemy_pandas_conflict():
 # What we will then do is use synchronous functions for testing asynchronous engines. And we will make
 # synchronous versions of the benchmark subfunctions.
 
+# iterations has to be 1 when there is a setup
 pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 1], [1_000, 1, 1]],
                      ids=['many_little_inserts', 'big_insert'])
 
@@ -59,7 +60,6 @@ pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 
 def run_test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows, rounds, iterations):
     # get a df (we don't test JSON as this is problematic with pandas)
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
     # prepare setup function
     table_name = TableNames.BENCHMARK_INSERT
@@ -72,7 +72,7 @@ def run_test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows
     if library == 'pangres':
         def benchmark_func():  # pragma: no cover
             upsert(con=engine, df=df, schema=schema, chunksize=chunksize, table_name=table_name,
-                   if_row_exists='update', dtype=dtype)
+                   if_row_exists='update')
 
     elif library == 'pandas':
         skip_if_sqlalchemy_pandas_conflict()
@@ -80,7 +80,7 @@ def run_test_create_and_insert_speed(engine, schema, benchmark, library, nb_rows
         def benchmark_func():  # pragma: no cover
             # create table
             df.to_sql(con=engine, schema=schema, name=table_name, method='multi',
-                      chunksize=chunksize, dtype=dtype)
+                      chunksize=chunksize)
 
     # benchmark
     try:
@@ -99,7 +99,6 @@ def run_test_create_and_insert_speed_async(engine, schema, benchmark, library, n
 
     # get a df (we don't test JSON as this is problematic with pandas)
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
     # prepare setup function (make it synchronous even if the engine is asynchronous)
     table_name = TableNames.BENCHMARK_INSERT
@@ -115,8 +114,7 @@ def run_test_create_and_insert_speed_async(engine, schema, benchmark, library, n
 
         async def abenchmark_func():  # pragma: no cover
             await aupsert(con=engine, df=df, schema=schema, chunksize=chunksize,
-                          table_name=table_name, if_row_exists='update',
-                          dtype=dtype)
+                          table_name=table_name, if_row_exists='update')
 
         def benchmark_func():  # pragma: no cover
             execute_coroutine_sync(abenchmark_func())
@@ -150,12 +148,11 @@ def run_test_upsert_speed(engine, schema, benchmark, library, nb_rows, rounds, i
 
     # get a df
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
     # prepare setup function
     chunksize = adjust_chunksize(con=engine, df=df, chunksize=nb_rows)
     table_name = TableNames.BENCHMARK_UPSERT
-    common_kwargs_upsert = dict(con=engine, df=df, schema=schema, chunksize=chunksize, dtype=dtype,
+    common_kwargs_upsert = dict(con=engine, df=df, schema=schema, chunksize=chunksize,
                                 table_name=table_name, if_row_exists=if_row_exists)
 
     def setup():
@@ -180,12 +177,11 @@ def run_test_upsert_speed_async(engine, schema, benchmark, library, nb_rows, rou
 
     # get a df
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows).drop(columns=['favorite_colors'])
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
 
     # prepare setup function (make it synchronous even if the engine is asynchronous)
     chunksize = adjust_chunksize(con=engine, df=df, chunksize=nb_rows)
     table_name = TableNames.BENCHMARK_UPSERT
-    common_kwargs_upsert = dict(con=engine, df=df, schema=schema, chunksize=chunksize, dtype=dtype,
+    common_kwargs_upsert = dict(con=engine, df=df, schema=schema, chunksize=chunksize,
                                 table_name=table_name, if_row_exists=if_row_exists)
 
     def drop_table_sync():

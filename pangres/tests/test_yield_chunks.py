@@ -8,8 +8,7 @@ is True. It also check the integrity of the data.
 """
 import math
 import pandas as pd
-import pytest
-from sqlalchemy import VARCHAR, INT
+from sqlalchemy import INT
 
 # local imports
 from pangres import aupsert, upsert
@@ -35,13 +34,12 @@ def run_test_get_nb_rows(engine, schema):
     nb_last_chunk = nb_rows % chunksize
     nb_chunks = math.ceil(nb_rows / chunksize)
     # MySQL does not want flexible text length in indices/PK
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
 
     # iterate over upsert results
     # make sure we can extract the number of updated rows and that it is correct
     iterator = upsert(con=engine, df=df, table_name=table_name, if_row_exists='update',
-                      schema=schema, chunksize=chunksize, dtype=dtype, yield_chunks=True)
+                      schema=schema, chunksize=chunksize, yield_chunks=True)
 
     for ix, result in enumerate(iterator):
         assert result.rowcount == (chunksize if ix != (nb_chunks - 1) else nb_last_chunk)
@@ -60,13 +58,12 @@ async def run_test_get_nb_rows_async(engine, schema):
     nb_last_chunk = nb_rows % chunksize
     nb_chunks = math.ceil(nb_rows / chunksize)
     # MySQL does not want flexible text length in indices/PK
-    dtype = {'profileid':VARCHAR(10)} if 'mysql' in engine.dialect.dialect_description else None
     df = _TestsExampleTable.create_example_df(nb_rows=nb_rows)
 
     # iterate over upsert results
     # make sure we can extract the number of updated rows and that it is correct
     async_gen = await aupsert(con=engine, df=df, table_name=table_name, if_row_exists='update',
-                              schema=schema, chunksize=chunksize, dtype=dtype, yield_chunks=True)
+                              schema=schema, chunksize=chunksize, yield_chunks=True)
 
     # unlike the equivalent synchronous test, enumerate(async_generator) will not work
     ix = 0

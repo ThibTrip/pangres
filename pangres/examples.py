@@ -44,7 +44,7 @@ class _TestsExampleTable(Base):
         for i in range(nb_rows):
             row = [random.choice(colors) for i in range(random.randint(1,3))]
             favorite_colors.append(row)
-        data = {'profileid':[str(f'abc{i}') for i in range(nb_rows)],
+        data = {'profileid':range(nb_rows),
                 'email':email_choices,
                 'timestamp':timestamps,
                 'size_in_meters':[random.uniform(1.5,2.3) for i in range(nb_rows)],

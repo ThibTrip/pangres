@@ -27,12 +27,14 @@ from pangres.tests.conftest import (aselect_table, adrop_table_between_tests,
 # +
 # for creating table with MultiIndex
 index_col = ['ix1', 'ix2', 'ix3']
-df_multiindex = pd.DataFrame({'ix1': [1, 1], 'ix2': ['test', 'test2'],
+df_multiindex = pd.DataFrame({'ix1': [1, 1],
+                              'ix2': ['test', 'test2'],
                               'ix3': [pd.Timestamp('2019-01-01'), pd.Timestamp('2019-01-02')],
                               'foo': [1, 2]}).set_index(index_col)
 
 # for inserting values
-df_multiindex2 = pd.DataFrame({'ix1': [2, 2], 'ix2': ['test', 'test2'],
+df_multiindex2 = pd.DataFrame({'ix1': [2, 2],
+                               'ix2': ['test', 'test2'],
                                'ix3': [pd.Timestamp('2019-01-01'), pd.Timestamp('2019-01-02')],
                                'foo': [1, 2]}).set_index(index_col)
 
