@@ -79,6 +79,16 @@ pip install pymysql
 pip install asyncpg
 ```
 
+* MySQL (asynchronous)
+```
+pip install aiomysql
+```
+
+* SQLite (asynchronous)
+```
+pip install aiosqlite
+```
+
 # Usage
 Head over to [pangres' wiki](https://github.com/ThibTrip/pangres/wiki)!
 
