@@ -511,7 +511,7 @@ def pytest_generate_tests(metafunc):
                     'asyncpg':metafunc.config.option.async_pg_conn,
                     'mysql':metafunc.config.option.mysql_conn,
                     'async_mysql_conn':metafunc.config.option.async_mysql_conn}
-    if not any(v is not None for v in conn_strings.values()):
+    if not any(v is not None for v in conn_strings.values()):  # pragma: no cover
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
 
     # prepare parameters for metafunc.parametrize
