@@ -42,7 +42,10 @@ def test_duplicates_after_pg_column_names_fix(_):
     assert 'not unique after renaming' in str(exc_info.value)
 
 
-@pytest.mark.parametrize('replacements', [{'@':''}, False, None, {'(':1, ')':2, '%':3}])
+params_bad_replacements = [{'@':''}, False, None, {'(':1, ')':2, '%':3}]
+
+
+@pytest.mark.parametrize('replacements', params_bad_replacements, ids=[str(p) for p in params_bad_replacements])
 def test_bad_replacements_for_pg_column_names_fix(_, replacements):
     """
     When the user gives a wrong object type or wrong replacements
