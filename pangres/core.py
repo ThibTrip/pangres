@@ -410,12 +410,13 @@ async def aupsert(con,
     >>> # See variable `coroutines` below where we could add several coroutines
     >>> # in order to make queries in parallel!)
     >>> async def execute_upsert():
-    ...     async with engine.connect() as con:
-    ...         await aupsert(con=engine, df=df,
+    ...     async with engine.connect() as connection:
+    ...         await aupsert(con=connection, df=df,
     ...                       table_name='example',
     ...                       if_row_exists='update',
     ...                       # set this to False (other structure related parameters are False by default)
     ...                       create_table=False)
+    ...         await connection.commit()  # !IMPORTANT
     >>> loop = asyncio.get_event_loop() # doctest: +SKIP
     >>> coroutines = [execute_upsert()] # doctest: +SKIP
     >>> tasks = asyncio.gather(*coroutines) # doctest: +SKIP
@@ -424,9 +425,9 @@ async def aupsert(con,
     * alternative to the coroutine above but iterating over results of inserted chunks
       so that we can for instance get the number of updated rows
     >>> async def execute_upsert():
-    ...     async with engine.connect() as con:
+    ...     async with engine.connect() as connection:
     ...         # this creates an async generator
-    ...         async_gen = await aupsert(con=engine, df=df,
+    ...         async_gen = await aupsert(con=connection, df=df,
     ...                                   table_name='example',
     ...                                   if_row_exists='update',
     ...                                   yield_chunks=True,  # <--- WE SET THIS TO TRUE for iterating
@@ -434,6 +435,9 @@ async def aupsert(con,
     ...                                   create_table=False)
     ...         async for result in async_gen:
     ...             print(f'{result.rowcount} updated rows')  # print the number of updated rows
+    ...
+    ...         # !IMPORTANT (note that you could also commit between chunks if that makes any sense in your case)
+    ...         await connection.commit()
     """
     # verify arguments
     if if_row_exists not in ('ignore', 'update'):
