@@ -11,7 +11,7 @@ from sqlalchemy import text, VARCHAR
 from pangres import aupsert, upsert
 from pangres.transaction import TransactionHandler
 from pangres.tests.conftest import (aselect_table, adrop_table_between_tests, commit, drop_table_between_tests,
-                                    select_table, sync_or_async_test, TableNames)
+                                    select_table, sync_or_async_test, sync_async_exec_switch, TableNames)
 
 
 # -
@@ -191,6 +191,25 @@ async def run_test_commit_as_you_go_async(engine, schema):
 
 # -
 
+# ## Errors
+
+# +
+def run_test_non_connectable_transaction_handler(_):
+    with pytest.raises(TypeError) as exc_info:
+        with TransactionHandler(connectable='abc'):
+            pass  # pragma: no cover
+    assert 'sqlalchemy connectable' in str(exc_info)
+
+
+async def run_test_non_connectable_transaction_handler_async(_):
+    with pytest.raises(TypeError) as exc_info:
+        async with TransactionHandler(connectable='abc'):
+            pass  # pragma: no cover
+    assert 'sqlalchemy connectable' in str(exc_info)
+
+
+# -
+
 # # Actual tests
 
 # +
@@ -214,8 +233,10 @@ def test_commit_as_you_go(engine, schema):
                        f_sync=run_test_commit_as_you_go)
 
 
-def test_non_connectable_transaction_handler(_):
-    with pytest.raises(TypeError) as exc_info:
-        with TransactionHandler(connectable='abc'):
-            pass
-    assert 'sqlalchemy connectable' in str(exc_info)
+@pytest.mark.parametrize("async_", [True, False], ids=['async', 'sync'])
+def test_non_connectable_transaction_handler(_, async_):
+    if async_:
+        test_func = run_test_non_connectable_transaction_handler_async
+    else:
+        test_func = run_test_non_connectable_transaction_handler
+    sync_async_exec_switch(test_func, _='')
