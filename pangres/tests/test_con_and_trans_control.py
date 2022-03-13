@@ -9,6 +9,7 @@ from sqlalchemy import text, VARCHAR
 
 # local imports
 from pangres import aupsert, upsert
+from pangres.helpers import _sqla_gt14
 from pangres.transaction import TransactionHandler
 from pangres.tests.conftest import (aselect_table, adrop_table_between_tests, commit, drop_table_between_tests,
                                     select_table, sync_or_async_test, sync_async_exec_switch, TableNames)
@@ -236,6 +237,8 @@ def test_commit_as_you_go(engine, schema):
 @pytest.mark.parametrize("async_", [True, False], ids=['async', 'sync'])
 def test_non_connectable_transaction_handler(_, async_):
     if async_:
+        if not _sqla_gt14():
+            pytest.skip('Cannot execute async test with sqlalchemy < 1.4')
         test_func = run_test_non_connectable_transaction_handler_async
     else:
         test_func = run_test_non_connectable_transaction_handler
