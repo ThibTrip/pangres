@@ -1,4 +1,6 @@
-[![CircleCI](https://circleci.com/gh/ThibTrip/pangres.svg?style=svg&circle-token=3e39be6b969ed02b41d259c279da0d9e63751506)](https://circleci.com/gh/ThibTrip/pangres) [![codecov](https://codecov.io/gh/ThibTrip/pangres/branch/master/graph/badge.svg)](https://codecov.io/gh/ThibTrip/pangres) [![PyPI version](https://img.shields.io/pypi/v/pangres)](https://img.shields.io/pypi/v/pangres)
+[![CircleCI](https://circleci.com/gh/ThibTrip/pangres.svg?style=svg&circle-token=3e39be6b969ed02b41d259c279da0d9e63751506)](https://circleci.com/gh/ThibTrip/pangres)
+[![codecov](https://codecov.io/gh/ThibTrip/pangres/branch/master/graph/badge.svg)](https://codecov.io/gh/ThibTrip/pangres)
+[![PyPI version](https://img.shields.io/pypi/v/pangres)](https://img.shields.io/pypi/v/pangres)
 
 # pangres
 ![pangres logo](logo.png)
@@ -107,13 +109,13 @@ You can test one or multiple of the following SQL flavors (you will of course ne
 NOTE: in one of the tests of `pangres` we will try to drop and then create a PostgreSQL schema called `pangres_create_schema_test`. If the schema existed and was not empty an error will be raised.
 
 Clone pangres then set your curent working directory to the root of the cloned repository folder. Then use the commands below. You will have to replace the following variables in those commands:
-* SQLITE_CONNECTION_STRING: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
-* ASYNC_SQLITE_CONNECTION_STRING: replace with an asynchronous SQlite sqlalchemy connection string (e.g. "sqlite+aiosqlite:///test.db")
-* POSTGRES_CONNECTION_STRING: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public)
-* ASYNC_POSTGRES_CONNECTION_STRING: replace with an asynchronous Postgres sqlalchemy connection string (e.g. "postgres+asyncpg:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public)
-* MYSQL_CONNECTION_STRING: replace with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database")
-* ASYNC_MYSQL_CONNECTION_STRING: replace with an asynchronous MySQL sqlalchemy connection string (e.g. "mysql+aiomysql:///user:password@localhost:3306/database")
-* PG_SCHEMA (optional): schema for postgres (defaults to public)
+* `SQLITE_CONNECTION_STRING`: replace with a SQlite sqlalchemy connection string (e.g. "sqlite:///test.db")
+* `ASYNC_SQLITE_CONNECTION_STRING`: replace with an asynchronous SQlite sqlalchemy connection string (e.g. "sqlite+aiosqlite:///test.db")
+* `POSTGRES_CONNECTION_STRING`: replace with a Postgres sqlalchemy connection string (e.g. "postgres:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public)
+* `ASYNC_POSTGRES_CONNECTION_STRING`: replace with an asynchronous Postgres sqlalchemy connection string (e.g. "postgres+asyncpg:///user:password@localhost:5432/database"). Specifying schema is optional for postgres (will default to public)
+* `MYSQL_CONNECTION_STRING`: replace with a MySQL sqlalchemy connection string (e.g. "mysql+pymysql:///user:password@localhost:3306/database")
+* `ASYNC_MYSQL_CONNECTION_STRING`: replace with an asynchronous MySQL sqlalchemy connection string (e.g. "mysql+aiomysql:///user:password@localhost:3306/database")
+* `PG_SCHEMA` (optional): schema for postgres (defaults to public)
 
 ```shell
 # 1. Create and activate the build environment
