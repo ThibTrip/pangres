@@ -5,7 +5,7 @@
 [![Made withJupyter](https://img.shields.io/badge/Made%20with-Jupyter-orange?logo=Jupyter)](https://jupyter.org/try)
 
 # pangres
-![pangres logo](logo.png)
+![pangres logo](https://raw.githubusercontent.com/ThibTrip/pangres/master/logo.png)
 
 _Thanks to [freesvg.org](https://freesvg.org/) for the logo assets_
 
