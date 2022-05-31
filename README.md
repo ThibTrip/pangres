@@ -1,6 +1,8 @@
 [![CircleCI](https://circleci.com/gh/ThibTrip/pangres.svg?style=svg&circle-token=3e39be6b969ed02b41d259c279da0d9e63751506)](https://circleci.com/gh/ThibTrip/pangres)
 [![codecov](https://codecov.io/gh/ThibTrip/pangres/branch/master/graph/badge.svg)](https://codecov.io/gh/ThibTrip/pangres)
 [![PyPI version](https://img.shields.io/pypi/v/pangres)](https://img.shields.io/pypi/v/pangres)
+[![Documentation](https://img.shields.io/badge/wiki-documentation-forestgreen)](https://github.com/ThibTrip/pangres/wiki)
+[![Made withJupyter](https://img.shields.io/badge/Made%20with-Jupyter-orange?logo=Jupyter)](https://jupyter.org/try)
 
 # pangres
 ![pangres logo](logo.png)
