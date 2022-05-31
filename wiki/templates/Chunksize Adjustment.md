@@ -1,1 +1,1 @@
-{{"obj":"pangres.adjust_chunksize","ex_md_flavor":"markdown"}}
+{{"obj":"pangres.adjust_chunksize","examples_md_lang":"markdown_rendered"}}

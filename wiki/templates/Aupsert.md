@@ -1,1 +1,1 @@
-{{"obj":"pangres.aupsert","ex_md_flavor":"markdown"}}
+{{"obj":"pangres.aupsert","examples_md_lang":"markdown_rendered"}}
