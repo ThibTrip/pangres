@@ -94,7 +94,10 @@ pip install aiosqlite
 ```
 
 # Usage
+
 Head over to [pangres' wiki](https://github.com/ThibTrip/pangres/wiki)!
+
+A big part of the wiki was generated with my library [**npdoc_to_md**](https://github.com/ThibTrip/npdoc_to_md).
 
 # Contributing
 
