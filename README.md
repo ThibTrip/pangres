@@ -100,9 +100,15 @@ Head over to [pangres' wiki](https://github.com/ThibTrip/pangres/wiki)!
 
 Pull requests/issues are welcome.
 
-Note: I develop the library inside of Jupyter Lab using the [jupytext](https://github.com/mwouts/jupytext) extension.
-I recommand using this extension for the best experience. It will split code blocks within modules in cells and will help thanks to interactive development.
-If you wish you can also use the provided environment (see `environment.yml` file) inside of Jupyter Lab/Notebook thanks to [nb_conda_kernels](https://github.com/Anaconda-Platform/nb_conda_kernels).
+# Development
+
+I develop the library inside of **Jupyter Lab** using the [**jupytext**](https://github.com/mwouts/jupytext) extension.
+
+I recommend using this extension for the best experience.
+It will split code blocks within modules in notebook cells and will allow **interactive development**.
+
+If you wish you can also use the provided **conda environment** (see `environment.yml` file) inside of Jupyter Lab/Notebook
+thanks to [**nb_conda_kernels**](https://github.com/Anaconda-Platform/nb_conda_kernels).
 
 # Testing
 
