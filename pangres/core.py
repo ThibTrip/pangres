@@ -272,7 +272,7 @@ def upsert(con:Connectable,
     | The Rock      | True          | 2020-04-01 00:00:00+00:00 |             1.96 |
     | John Travolta | False         | NaT                       |           nan    |
 
-    >>>
+    {{raw}}
     >>> # upsert in chunks of size `chunksize` and get
     >>> # back the number of rows updated for each chunk
     >>> iterator = upsert(con=engine, df=df, table_name='test_row_count',
