@@ -28,7 +28,7 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 # Requirements
 
 * SQlite >= 3.24.4
-* Python >= 3.6
+* Python >= 3.6.4
 * See also ./pangres/requirements.txt
 
 # Gotchas and caveats
