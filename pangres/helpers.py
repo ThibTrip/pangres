@@ -13,10 +13,25 @@ def _py_gt3_10() -> bool:
     return (py_v.major > 3) or ((py_v.major >= 3) and (py_v.minor >= 10))
 
 
-def _version_equal_or_greater_than(version_string, minimal_version_string) -> bool:
+def _version_equal_or_greater_than(version_string:str, minimal_version_string:str) -> bool:
+    """
+    Returns True if a library has a version greater or equal than `minimal_version_string`.
+    Otherwise returns False.
+
+    To use this function, give the version string of the library in parameter `version_string`.
+
+    Examples
+    --------
+    >>> _version_equal_or_greater_than('1.1', '2.0')
+    False
+    >>> _version_equal_or_greater_than('2.1', '2.0')
+    True
+    """
     if _py_gt3_10():
-        from packaging import version
-        return version.parse(version_string) >= version.parse(minimal_version_string)
+        from pkg_resources import parse_version
+        v = parse_version(version_string)
+        min_v = parse_version(minimal_version_string)
+        return (v.major, v.minor, v.micro) >= (min_v.major, min_v.minor, min_v.micro)
     else:
         from distutils.version import LooseVersion
         return LooseVersion(version_string) >= LooseVersion(minimal_version_string)
