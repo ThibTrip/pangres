@@ -1,5 +1,28 @@
 # Changelog
 
+## [v4.1.2](https://github.com/ThibTrip/pangres/releases/tag/v4.1.2) (2022-07-29)
+
+
+**Release Notes**
+
+
+___
+**_Bug Fixes_**
+
+
+* **`pangres` was not running on Python 3.10** because I never added `packaging` in `requirements.txt`. I fixed it by using `pkg_resources` from the standard library instead to avoid the additional dependency (see commit 89d3679)
+
+  Note: the tests were running fine because we use `pytest` which uses `packaging` (so I never saw the missing dependency)
+___
+
+
+
+[Full Changelog](https://github.com/ThibTrip/pangres/compare/v4.1.1...v4.1.2)
+
+**Closed issues:**
+
+- Cannot insert into column "id" [\#60](https://github.com/ThibTrip/pangres/issues/60)
+
 ## [v4.1.1](https://github.com/ThibTrip/pangres/releases/tag/v4.1.1) (2022-03-13)
 
 
