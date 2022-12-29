@@ -95,9 +95,18 @@ pip install aiosqlite
 
 # Usage
 
-Head over to [pangres' wiki](https://github.com/ThibTrip/pangres/wiki)!
+Head over to [pangres' wiki](https://github.com/ThibTrip/pangres/wiki)! Note that the wiki is also available
+locally under the [wiki folder](https://github.com/ThibTrip/pangres/tree/master/wiki).
 
-A big part of the wiki was generated with my library [**npdoc_to_md**](https://github.com/ThibTrip/npdoc_to_md).
+Note:
+
+The wiki is generated with a command which uses my library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md).
+It must be installed with `pip install npdoc_to_md` and you will also need the extra dependency `fire` which you
+can install with `pip install fire`.
+
+```bash
+npdoc-to-md render-folder ./wiki/templates ./wiki
+```
 
 # Contributing
 
@@ -128,7 +137,7 @@ Clone pangres then set your curent working directory to the root of the cloned r
 * `ASYNC_MYSQL_CONNECTION_STRING`: replace with an asynchronous MySQL sqlalchemy connection string (e.g. "mysql+aiomysql:///user:password@localhost:3306/database")
 * `PG_SCHEMA` (optional): schema for postgres (defaults to public)
 
-```shell
+```bash
 # 1. Create and activate the build environment
 conda env create -f environment.yml
 conda activate pangres-dev

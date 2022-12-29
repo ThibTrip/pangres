@@ -12,9 +12,17 @@ Welcome to the pangres wiki!
 
 [Logging](https://github.com/ThibTrip/pangres/wiki/Logging)
 
-[**Demo notebook**](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo.ipynb)
+See also **demo notebooks** below.
+
+# Demo notebooks
+
+[Demo notebook for `pangres.upsert`](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo.ipynb)
+
+[Demo notebook for `pangres.upsert` with a progress bar](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo_tmq.ipynb)
 
 [Notebook with transaction control and commit-as-you-go workflows example](https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb)
+
+[Gotchas with asynchronous upserts (`pangres.aupsert`)](https://github.com/ThibTrip/pangres/blob/master/demos/gotchas_asynchronous_pangres.ipynb)
 
 # Notes
 
