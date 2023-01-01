@@ -18,7 +18,7 @@ See also **demo notebooks** below.
 
 [Demo notebook for `pangres.upsert`](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo.ipynb)
 
-[Demo notebook for `pangres.upsert` with a progress bar](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo_tmq.ipynb)
+[Demo notebook for `pangres.upsert` with a progress bar](https://github.com/ThibTrip/pangres/blob/master/demos/pangres_demo_tqdm.ipynb)
 
 [Notebook with transaction control and commit-as-you-go workflows example](https://github.com/ThibTrip/pangres/blob/master/demos/transaction_control.ipynb)
 
