@@ -558,9 +558,7 @@ class PandasSpecialEngine:
         db_table = await self.connection.run_sync(lambda connection: self.get_db_table_schema(connection=connection))
         empty_columns = []
         for col in db_table.columns:
-            stmt = select(from_obj=db_table,
-                          columns=[col],
-                          whereclause=col.isnot(None)).limit(1)
+            stmt = select(col).where(col.isnot(None)).limit(1)
             proxy = await self.connection.execute(stmt)
             results = proxy.fetchall()
             if results == []:
