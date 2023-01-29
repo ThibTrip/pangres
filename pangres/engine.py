@@ -335,7 +335,7 @@ class PandasSpecialEngine:
         schema = self.schema
         con = self.connection if connection is None else connection
 
-        metadata = MetaData(bind=con, schema=schema)
+        metadata = MetaData(schema=schema)
         metadata.reflect(bind=con, schema=schema, only=[table_name])
         namespace = table_name if schema is None else f'{schema}.{table_name}'
         db_table = metadata.tables[namespace]
