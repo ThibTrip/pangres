@@ -50,6 +50,15 @@ def _sqla_gt14() -> bool:
                                           minimal_version_string='1.4.0')
 
 
+def _sqla_gt20() -> bool:
+    """
+    Same as function `_sqla_gt14` for checking if sqlalchemy>=2.0.0
+    """
+    import sqlalchemy
+    return _version_equal_or_greater_than(version_string=sqlalchemy.__version__,
+                                          minimal_version_string='2.0.0')
+
+
 def _sqlite_gt3_32_0() -> bool:
     """
     Checks if the SQLite version is >= than 3.32.0.

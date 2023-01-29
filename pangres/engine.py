@@ -17,7 +17,7 @@ from alembic.operations import Operations
 from typing import List, Optional, Union
 
 # local imports
-from pangres.helpers import _sqla_gt14
+from pangres.helpers import _sqla_gt14, _sqla_gt20
 from pangres.logger import log
 from pangres.exceptions import (BadColumnNamesException,
                                 DuplicateLabelsException,
@@ -307,10 +307,20 @@ class PandasSpecialEngine:
         con = self.connection if connection is None else connection
         # get column names in db
         db_columns = self.get_db_columns_names(connection=con)
-        # create deepcopies of the column because we are going to unbound
-        # them for the table model (otherwise alembic would think we add
-        # a column that already exists in the database)
-        cols_to_add = [deepcopy(col) for col in self.table.columns if col.name not in db_columns]
+        # depending on the alembic version, we may need to unbind the columns
+        # from the table and for that we need to make deep copies of them.
+        #
+        # sqlalchemy>=2.0.0 will not allow deep copies of columns however
+        # according to my manual tests, sqlalchemy>=2.0.0 requires alembic>=1.7.2
+        # for the operation below and alembic>=1.7.2 does not require us to unbind
+        # the columns from the table.
+        if not _sqla_gt20():
+            cols_to_add = [deepcopy(col) for col in self.table.columns if col.name not in db_columns]
+            must_unbind_columns_from_table = True
+        else:
+            cols_to_add = [col for col in self.table.columns if col.name not in db_columns]
+            must_unbind_columns_from_table = False
+
         # check columns are not index levels
         if any((c.name in self.df.index.names for c in cols_to_add)):
             raise MissingIndexLevelInSqlException('Cannot add any column that is part of the df index!\n'
@@ -320,7 +330,8 @@ class PandasSpecialEngine:
         ctx = MigrationContext.configure(con)
         op = Operations(ctx)
         for col in cols_to_add:
-            col.table = None  # Important! unbound column from table
+            if must_unbind_columns_from_table:
+                col.table = None
             op.add_column(self.table.name, col, schema=self.schema)
             log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
                 f'(schema="{self.schema}")')
