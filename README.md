@@ -102,10 +102,10 @@ Note:
 
 The wiki is generated with a command which uses my library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md).
 It must be installed with `pip install npdoc_to_md` and you will also need the extra dependency `fire` which you
-can install with `pip install fire`.
+can install with `pip install fire`. Replace `$DESTINATION_FOLDER` with the folder of you choice in the command below:
 
 ```bash
-npdoc-to-md render-folder ./wiki/templates ./wiki
+npdoc-to-md render-folder ./wiki_templates $DESTINATION_FOLDER
 ```
 
 # Contributing
