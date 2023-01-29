@@ -167,7 +167,7 @@ class PandasSpecialEngine:
 
         # turn pandas table into a pure sqlalchemy table
         # inspired from https://github.com/pandas-dev/pandas/blob/main/pandas/io/sql.py#L815-L821
-        metadata = MetaData(bind=connection)
+        metadata = MetaData()
         if _sqla_gt14():
             table = pandas_table.table.to_metadata(metadata)
         else:
