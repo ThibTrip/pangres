@@ -1,7 +1,6 @@
-This folder contains the same information as in the GitHub [wiki](https://github.com/ThibTrip/pangres/wiki).
+# wiki_templates
 
-Some parts of the wiki are generated. Indeed, all the files in the directory `./templates` are
-templates with placeholders.
+This folder contains templates with placeholders for generating the wiki.
 
 The placeholders follow the syntax defined in the library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md/).
 
