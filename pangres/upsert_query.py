@@ -6,6 +6,7 @@ in different SQL flavors.
 from copy import deepcopy
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.compiler import SQLCompiler
@@ -92,7 +93,29 @@ class UpsertQuery:
             upsert = insert_stmt.prefix_with('IGNORE')
         return upsert
 
-    def _create_sqlite_query(self, values:list, if_row_exists:str) -> str:
+    def _create_sqlite_query_gt_sqla_14(self, values:list, if_row_exists:str) -> str:
+        """
+        Creates an upsert sqlite query for sqlalchemy>=1.4
+        """
+        insert_stmt = sqlite_insert(self.table).values(values)
+        if if_row_exists == 'update':
+            update_cols = [c.name
+                           for c in self.table.c
+                           if c not in list(self.table.primary_key.columns)]
+            # case when there is only an index in the DataFrame i.e. no columns to update
+            if len(update_cols) == 0:
+                if_row_exists = 'ignore'
+            else:
+                upsert = insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
+                                                           set_={k:insert_stmt.excluded[k] for k in update_cols})
+        if if_row_exists == 'ignore':
+            upsert = insert_stmt.on_conflict_do_nothing()
+        return upsert
+
+    def _create_sqlite_query_sqla_13(self, values:list, if_row_exists:str) -> str:
+        """
+        Creates an upsert sqlite query for sqlalchemy==1.3
+        """
         def escape_col(col):
             # unbound column from its table
             # otherwise the column would compile as "table.col_name"
@@ -119,6 +142,15 @@ class UpsertQuery:
             upsert.string = ' '.join((upsert.string, ondup, ondup_action, updates))
         return upsert
 
+    def _create_sqlite_query(self, values: list, if_row_exists: str) -> str:
+        """
+        Creates an upsert sqlite query. Uses different implementations depending
+        on the sqlalchemy version.
+        See helper methods `_create_sqlite_query_gt_sqla_14` and `_create_sqlite_query_sqla_13`.
+        """
+        method = self._create_sqlite_query_gt_sqla_14 if _sqla_gt14() else self._create_sqlite_query_sqla_13
+        return method(values=values, if_row_exists=if_row_exists)
+
     def create_query(self, db_type:str, values:list, if_row_exists:str) -> str:
         r"""
         Helper for creating UPSERT queries in various SQL flavors
@@ -144,15 +176,18 @@ class UpsertQuery:
         >>> engine = create_engine('sqlite://')
         >>>
         >>> # helpers
-        >>> pprint_query = lambda query: print(str(query).replace('ON CONFLICT', '\nON CONFLICT')
-        ...                                    .replace('SET', '\nSET').replace('ON DUPLICATE', '\nON DUPLICATE'))
+        >>> # we want to have a pretty print for our queries and we also need to do some homogeneization because
+        >>> # depending on the version of sqlalchemy we will have slightly different compiled queries (but with the same effect)
+        >>> pprint_query = lambda query: print(str(query).replace('ON CONFLICT', '\nON CONFLICT').replace('excluded', 'EXCLUDED')
+        ...                                    .replace(' = ', '=').replace('SET', '\nSET').replace('ON DUPLICATE', '\nON DUPLICATE'))
         >>>
-        >>>
+        >>> # create the query
         >>> with engine.connect() as connection:
         ...     table = PandasSpecialEngine(connection=connection, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
         ...     upq = UpsertQuery(connection=connection, table=table)
         ...     query = upq.create_query(db_type='sqlite', values=test_values, if_row_exists='update')
         >>>
+        >>> # pretty print query
         >>> pprint_query(query)
         INSERT INTO doc_upsert (ix, email, ts, float, bool, json) VALUES (?, ?, ?, ?, ?, ?) 
         ON CONFLICT (ix) DO UPDATE 
