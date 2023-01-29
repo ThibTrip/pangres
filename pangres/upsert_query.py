@@ -6,7 +6,6 @@ in different SQL flavors.
 from copy import deepcopy
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.compiler import SQLCompiler
@@ -97,6 +96,8 @@ class UpsertQuery:
         """
         Creates an upsert sqlite query for sqlalchemy>=1.4
         """
+        # the next import is not available in sqlalchemy==1.3
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
         insert_stmt = sqlite_insert(self.table).values(values)
         if if_row_exists == 'update':
             update_cols = [c.name
