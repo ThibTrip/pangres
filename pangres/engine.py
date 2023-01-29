@@ -356,9 +356,7 @@ class PandasSpecialEngine:
         db_table = self.get_db_table_schema()
         empty_columns = []
         for col in db_table.columns:
-            stmt = select(from_obj=db_table,
-                          columns=[col],
-                          whereclause=col.isnot(None)).limit(1)
+            stmt = select(col).where(col.isnot(None)).limit(1)
             results = self.connection.execute(stmt).fetchall()
             if results == []:
                 empty_columns.append(col)
