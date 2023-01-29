@@ -3,7 +3,7 @@
 Read docstring of main class Executor
 """
 import pandas as pd
-from sqlalchemy.engine.base import Connectable
+from sqlalchemy.engine import Connectable
 from typing import Union
 
 # local imports

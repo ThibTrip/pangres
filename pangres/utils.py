@@ -2,7 +2,7 @@
 import logging
 import pandas as pd
 from math import floor
-from sqlalchemy.engine.base import Connectable
+from sqlalchemy.engine import Connectable
 
 # local imports
 from pangres.helpers import _sqlite_gt3_32_0, validate_chunksize_param

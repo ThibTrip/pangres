@@ -6,7 +6,7 @@ This module contains the functions of pangres
 that will be directly exposed to its users.
 """
 import pandas as pd
-from sqlalchemy.engine.base import Connectable
+from sqlalchemy.engine import Connectable
 from typing import Optional, Union
 
 # local imports

@@ -2,7 +2,7 @@
 """
 Tools for handling transactions in pangres
 """
-from sqlalchemy.engine.base import Connectable, Connection, Engine, Transaction
+from sqlalchemy.engine import Connectable, Connection, Engine, Transaction
 from typing import Union
 
 # local imports

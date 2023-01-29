@@ -9,7 +9,7 @@ import re
 import sqlalchemy as sa
 from copy import deepcopy
 from sqlalchemy import JSON, MetaData, select
-from sqlalchemy.engine.base import Connection, Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.sql import null
 from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema, Table
 from alembic.runtime.migration import MigrationContext
