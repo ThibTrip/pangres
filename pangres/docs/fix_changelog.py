@@ -4,23 +4,27 @@ Script for adding release notes to a changelog. Assumes the changelog has been g
 
 Execute the command below first. Make sure to replace the following variables:
 * $PATH_TO_PANGRES -> path to pangres repo on your computer (you have to clone it)
-* `-t $GITHUB_TOKEN` -> optionally give a github token (for much higher API quota)
+* `-t $GITHUB_TOKEN` -> optionally give a GitHub token (for much higher API quota)
 * $OUTPUT_PATH -> where to put the CHANGELOG.md file
 
-sudo docker run -it --rm -v "$(pwd)":$PATH_TO_PANGRES githubchangeloggenerator/github-changelog-generator -u ThibTrip -p pangres -t $GITHUB_TOKEN -o $OUTPUT_PATH --release-url https://github.com/ThibTrip/pangres/releases/tag/%s
+sudo docker run -it --rm -v "$(pwd)":$PATH_TO_PANGRES githubchangeloggenerator/github-changelog-generator\
+-u ThibTrip -p pangres -t $GITHUB_TOKEN -o $OUTPUT_PATH\
+--release-url https://github.com/ThibTrip/pangres/releases/tag/%s
 
 Usage:
 
 python fix_changelog.py $PATH_TO_CHANGELOG
 """
 import argparse
+import logging
 import re
 import sys
 from pathlib import Path
 
-# # Helpers
 
-# +
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+
+# region helpers
 re_section_release_notes = re.compile(r'^# [A-Z]{1,}')  # e.g. "# New Features" -> "# N"
 re_release_title_md = re.compile(r'## \[(?P<version>v[\d\.]+)\]')  # see https://regex101.com/r/g6yRM8/1
 
@@ -47,8 +51,6 @@ def get_release_notes(github_token=None):
 
 
 def add_release_notes_to_changelog(filepath, github_token=None, dryrun=False):
-    from loguru import logger  # pip install loguru
-
     # open original file
     with open(filepath, mode='r', encoding='utf-8') as fh:
         ch = fh.read()
@@ -69,10 +71,10 @@ def add_release_notes_to_changelog(filepath, github_token=None, dryrun=False):
         version = match_version['version']
         try:
             notes = release_notes[version]
-            logger.info(f'Adding release notes for version {version}')
+            logging.info(f'Adding release notes for version {version}')
             new_ch.extend([line, '\n', '**Release Notes**', '\n', '___', notes, '___', '\n'])
         except KeyError:
-            logger.warning(f'No release notes found for version {version}!')
+            logging.warning(f'No release notes found for version {version}!')
             continue
     new_ch = '\n'.join(new_ch)
     if not dryrun:
@@ -81,19 +83,17 @@ def add_release_notes_to_changelog(filepath, github_token=None, dryrun=False):
     else:
         print(new_ch)
     return new_ch
+# endregion
 
 
-# -
-
-# # Main
-
-# +
 def main():
     # parse arguments
     parser = argparse.ArgumentParser(description=sys.modules['__main__'].__doc__)
     parser.add_argument('filepath_change_log', metavar='filepath_change_log', type=str, help="Path to the changelog")
-    parser.add_argument('--github_token', action="store", type=str, default=None, help='Optional github token for higher API quota')
-    parser.add_argument('--dryrun', action="store_true", default=False, help='If True, simply prints what we would save otherwise overwrites the changelog')
+    parser.add_argument('--github_token', action="store", type=str, default=None,
+                        help='Optional github token for higher API quota')
+    parser.add_argument('--dryrun', action="store_true", default=False,
+                        help='If True, simply prints what we would save otherwise overwrites the changelog')
     args = parser.parse_args()
     add_release_notes_to_changelog(filepath=Path(args.filepath_change_log).resolve(), github_token=args.github_token,
                                    dryrun=args.dryrun)
