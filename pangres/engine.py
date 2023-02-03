@@ -352,7 +352,7 @@ class PandasSpecialEngine:
         db_table = metadata.tables[namespace]
         return db_table
 
-    def get_empty_columns(self) -> list:
+    def get_empty_columns_gt_sqla_14(self) -> list:
         """
         Gets a list of the columns that contain no data
         in the SQL table defined in given instance of
@@ -372,6 +372,38 @@ class PandasSpecialEngine:
             if results == []:
                 empty_columns.append(col)
         return empty_columns
+
+    def get_empty_columns_sqla_13(self) -> list:
+        """
+        Gets a list of the columns that contain no data
+        in the SQL table defined in given instance of
+        PandasSpecialEngine.
+        Uses method get_db_table_schema (see its docstring).
+
+        Returns
+        -------
+        list of str
+            List of names of columns that contain no data (all rows are NULL)
+        """
+        db_table = self.get_db_table_schema()
+        empty_columns = []
+        for col in db_table.columns:
+            stmt = select(from_obj=db_table,
+                          columns=[col],
+                          whereclause=col.isnot(None)).limit(1)
+            results = self.connection.execute(stmt).fetchall()
+            if results == []:
+                empty_columns.append(col)
+        return empty_columns
+
+    def get_empty_columns(self) -> list:
+        """
+        Creates an upsert sqlite query. Uses different implementations depending
+        on the sqlalchemy version.
+        See helper methods `_create_sqlite_query_gt_sqla_14` and `_create_sqlite_query_sqla_13`.
+        """
+        method = self.get_empty_columns_gt_sqla_14 if _sqla_gt14() else self.get_empty_columns_sqla_13
+        return method()
 
     def adapt_dtype_of_empty_db_columns(self, empty_db_columns=None, connection=None, db_table=None):
         """
