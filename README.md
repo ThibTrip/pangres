@@ -31,10 +31,12 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 * Python >= 3.6.4
 * See also ./pangres/requirements.txt
 
+Note that if you use `sqlalchemy>=2.0` you will need `alembic>=1.7.2`
+
 # Gotchas and caveats
 
 ## All flavors
-1. We can't create JSON columns automatically but we can insert JSON like objects (list, dict) in existing JSON columns.
+1. We can't create JSON columns automatically, but we can insert JSON like objects (list, dict) in existing JSON columns.
 
 ## Postgres
 
