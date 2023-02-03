@@ -124,6 +124,8 @@ thanks to [**nb_conda_kernels**](https://github.com/Anaconda-Platform/nb_conda_k
 
 # Testing
 
+## Pytest
+
 You can test one or multiple of the following SQL flavors (you will of course need a live database for this): PostgreSQL, SQlite or MySQL.
 
 NOTE: in one of the tests of `pangres` we will try to drop and then create a PostgreSQL schema called `pangres_create_schema_test`. If the schema existed and was not empty an error will be raised.
@@ -156,3 +158,15 @@ Additionally, the following flags could be of interest for you:
 * `-x` for stopping at the first failure
 * `--benchmark-only` for only testing benchmarks
 * `--benchmark-skip` for skipping benchmarks
+
+## flake8
+
+flake8 must run without errors for pipelines to succeed.
+If you are not using the conda environment, you can install flake8 with: `pip install flake8`.
+
+To test flake8 locally you can simply execute this command:
+
+```
+flake8 .
+```
+
