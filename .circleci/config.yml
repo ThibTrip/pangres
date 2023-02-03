@@ -40,8 +40,10 @@ jobs:
           # install package (fetches setup.py in current directory)
           pip install .
           # we need cryptography for MySQL
-          pip install codecov coverage numpy pytest pytest-benchmark pytest-cov
+          pip install codecov coverage flake8 numpy pytest pytest-benchmark pytest-cov
           pip install aiosqlite aiomysql asyncpg psycopg2 pymysql cx_Oracle cryptography tabulate npdoc_to_md
+          # check linting with flake8
+          flake8 .
           # use pytest
           ## first test with sqlalchemy latest i.e. sqlalchemy==2
           pytest -sxv pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:// --async_sqlite_conn=sqlite+aiosqlite:///test.db --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --async_pg_conn=postgresql+asyncpg://circleci_user:password@localhost:5432/circleci_test --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test --async_mysql_conn=mysql+aiomysql://circleci_user:password@127.0.0.1:3306/circleci_test --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short

@@ -17,4 +17,5 @@ dependencies:
     - aiosqlite
     - aiomysql
     - cx_Oracle
+    - flake8
     - npdoc_to_md
