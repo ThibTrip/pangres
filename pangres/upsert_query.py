@@ -30,11 +30,12 @@ class UpsertQuery:
     >>>
     >>> engine = create_engine('sqlite://')
     >>> with engine.connect() as connection:
-    ...     table = PandasSpecialEngine(connection=connection, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+    ...     table = PandasSpecialEngine(connection=connection, df=DocsExampleTable.df_upsert,
+    ...                                 table_name='doc_upsert').table
     ...     upq = UpsertQuery(connection=connection, table=table)
     """
 
-    def __init__(self, connection:Connection, table:Table):
+    def __init__(self, connection: Connection, table: Table) -> None:
         self._verify_connection_like_object(connection=connection)
         self.connection = connection
         self.table = table
@@ -55,7 +56,7 @@ class UpsertQuery:
         if not is_connection:
             raise TypeError(f'Expected a Connection or AsyncConnection object. Got {type(connection)} instead')
 
-    def _create_pg_query(self, values:list, if_row_exists:str) -> str:
+    def _create_pg_query(self, values: list, if_row_exists: str) -> str:
         insert_stmt = pg_insert(self.table).values(values)
         if if_row_exists == 'update':
             update_cols = [c.name
@@ -66,12 +67,12 @@ class UpsertQuery:
                 if_row_exists = 'ignore'
             else:
                 upsert = insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
-                                                           set_={k:insert_stmt.excluded[k] for k in update_cols})
+                                                           set_={k: insert_stmt.excluded[k] for k in update_cols})
         if if_row_exists == 'ignore':
             upsert = insert_stmt.on_conflict_do_nothing()
         return upsert
 
-    def _create_mysql_query(self, values:list, if_row_exists:str) -> str:
+    def _create_mysql_query(self, values: list, if_row_exists: str) -> str:
         insert_stmt = mysql_insert(self.table).values(values)
         if if_row_exists == 'update':
             # thanks to: https://stackoverflow.com/a/58180407/10551772
@@ -81,7 +82,7 @@ class UpsertQuery:
             for col in insert_stmt.table.columns:
                 col_name = col.name
                 if col_name not in self.table.primary_key:
-                    update_cols.update({col_name:insert_stmt.inserted[col_name]})
+                    update_cols.update({col_name: insert_stmt.inserted[col_name]})
             # case when there is only an index in the DataFrame i.e. no columns to update
             if len(update_cols) == 0:
                 if_row_exists = 'ignore'
@@ -92,7 +93,7 @@ class UpsertQuery:
             upsert = insert_stmt.prefix_with('IGNORE')
         return upsert
 
-    def _create_sqlite_query_gt_sqla_14(self, values:list, if_row_exists:str) -> str:
+    def _create_sqlite_query_gt_sqla_14(self, values: list, if_row_exists: str) -> str:
         """
         Creates an upsert sqlite query for sqlalchemy>=1.4
         """
@@ -108,12 +109,12 @@ class UpsertQuery:
                 if_row_exists = 'ignore'
             else:
                 upsert = insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
-                                                           set_={k:insert_stmt.excluded[k] for k in update_cols})
+                                                           set_={k: insert_stmt.excluded[k] for k in update_cols})
         if if_row_exists == 'ignore':
             upsert = insert_stmt.on_conflict_do_nothing()
         return upsert
 
-    def _create_sqlite_query_sqla_13(self, values:list, if_row_exists:str) -> str:
+    def _create_sqlite_query_sqla_13(self, values: list, if_row_exists: str) -> str:
         """
         Creates an upsert sqlite query for sqlalchemy==1.3
         """
@@ -152,7 +153,7 @@ class UpsertQuery:
         method = self._create_sqlite_query_gt_sqla_14 if _sqla_gt14() else self._create_sqlite_query_sqla_13
         return method(values=values, if_row_exists=if_row_exists)
 
-    def create_query(self, db_type:str, values:list, if_row_exists:str) -> str:
+    def create_query(self, db_type: str, values: list, if_row_exists: str) -> str:
         r"""
         Helper for creating UPSERT queries in various SQL flavors
 
@@ -177,21 +178,25 @@ class UpsertQuery:
         >>> engine = create_engine('sqlite://')
         >>>
         >>> # helpers
-        >>> # we want to have a pretty print for our queries and we also need to do some homogeneization because
-        >>> # depending on the version of sqlalchemy we will have slightly different compiled queries (but with the same effect)
-        >>> pprint_query = lambda query: print(str(query).replace('ON CONFLICT', '\nON CONFLICT').replace('excluded', 'EXCLUDED')
-        ...                                    .replace(' = ', '=').replace('SET', '\nSET').replace('ON DUPLICATE', '\nON DUPLICATE'))
+        >>> # we want to have a pretty print for our queries, and we also need to do some homogenization because
+        >>> # depending on the version of sqlalchemy we will have slightly different compiled queries
+        >>> # (but with the same effect)
+        >>> pprint_query = lambda query: print(str(query).replace('ON CONFLICT', '\nON CONFLICT')
+        ...                                    .replace('excluded', 'EXCLUDED')
+        ...                                    .replace(' = ', '=').replace('SET', '\nSET')
+        ...                                    .replace('ON DUPLICATE', '\nON DUPLICATE'))
         >>>
         >>> # create the query
         >>> with engine.connect() as connection:
-        ...     table = PandasSpecialEngine(connection=connection, df=DocsExampleTable.df_upsert, table_name='doc_upsert').table
+        ...     table = PandasSpecialEngine(connection=connection, df=DocsExampleTable.df_upsert,
+        ...                                 table_name='doc_upsert').table
         ...     upq = UpsertQuery(connection=connection, table=table)
         ...     query = upq.create_query(db_type='sqlite', values=test_values, if_row_exists='update')
         >>>
         >>> # pretty print query
-        >>> pprint_query(query)
-        INSERT INTO doc_upsert (ix, email, ts, float, bool, json) VALUES (?, ?, ?, ?, ?, ?) 
-        ON CONFLICT (ix) DO UPDATE 
+        >>> pprint_query(query)  # doctest: +NORMALIZE_WHITESPACE
+        INSERT INTO doc_upsert (ix, email, ts, float, bool, json) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT (ix) DO UPDATE
         SET email=EXCLUDED.email, ts=EXCLUDED.ts, float=EXCLUDED.float, bool=EXCLUDED.bool, json=EXCLUDED.json
 
         >>> # unsupported databases will raise a NotImplementedError
@@ -201,21 +206,21 @@ class UpsertQuery:
         ...     print(e)
         No query creation method for oracle. Expected one of ['postgres', 'mysql', 'sqlite', 'other']
         """
-        query_creation_methods = {"postgres":self._create_pg_query,
-                                  "mysql":self._create_mysql_query,
-                                  "sqlite":self._create_sqlite_query,
-                                  "other":self._create_sqlite_query}
+        query_creation_methods = {"postgres": self._create_pg_query,
+                                  "mysql": self._create_mysql_query,
+                                  "sqlite": self._create_sqlite_query,
+                                  "other": self._create_sqlite_query}
         try:
             return query_creation_methods[db_type](values=values, if_row_exists=if_row_exists)
         except KeyError:
             raise NotImplementedError(f'No query creation method for {db_type}. '
                                       f'Expected one of {list(query_creation_methods.keys())}')
 
-    def execute(self, db_type:str, values:list, if_row_exists:str):
+    def execute(self, db_type: str, values: list, if_row_exists: str):
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
         return self.connection.execute(query)
 
-    async def aexecute(self, db_type:str, values:list, if_row_exists:str):
+    async def aexecute(self, db_type: str, values: list, if_row_exists: str):
         """
         Async variant of method execute
         """

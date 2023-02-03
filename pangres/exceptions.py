@@ -2,7 +2,7 @@
 class HasNoSchemaSystemException(Exception):
     """
     Raised when trying or preparing to execute operations
-    related to SQL schemas on a non compatible database
+    related to SQL schemas on a non-compatible database
     (AFAIK schemas are a postgreSQL only feature)
 
     E.g. in `pangres.upsert` when `create_schema=True`
@@ -26,7 +26,7 @@ class BadColumnNamesException(Exception):
 class UnnamedIndexLevelsException(Exception):
     """
     Raised in `pangres.upsert` when the user
-    passes a DataFrame where some of the index levels
+    passes a DataFrame where some index levels
     have no names
     """
     pass
@@ -35,7 +35,7 @@ class UnnamedIndexLevelsException(Exception):
 class DuplicateValuesInIndexException(Exception):
     """
     Raised in `pangres.upsert` when the user
-    passes a DataFrame where some of the index entries
+    passes a DataFrame where some index entries
     are duplicated
     """
     pass

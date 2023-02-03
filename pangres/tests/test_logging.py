@@ -9,7 +9,7 @@ from pangres.logger import log, loggers
 
 # +
 log_level_names = ('CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG')
-log_level_values_to_names = {getattr(logging, k):k for k in log_level_names}
+log_level_values_to_names = {getattr(logging, k): k for k in log_level_names}
 
 
 @contextmanager
@@ -48,7 +48,8 @@ def test_bad_log_level(_):
 
 
 # by default DEBUG is not shown
-@pytest.mark.parametrize("test_level", [k for k, v in log_level_values_to_names.items() if v != 'DEBUG'], scope='session')
+@pytest.mark.parametrize("test_level", [k for k, v in log_level_values_to_names.items() if v != 'DEBUG'],
+                         scope='session')
 def test_log_output(_, caplog, test_level):
     txt = 'TESTING LOG OUTPUT AND LEVEL'
     with caplog.at_level(logging.INFO):

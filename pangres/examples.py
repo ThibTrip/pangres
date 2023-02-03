@@ -4,9 +4,10 @@ import json
 import pandas as pd
 from sqlalchemy import (Column, BOOLEAN, DATETIME, FLOAT,
                         JSON, TEXT, text, VARCHAR)
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.compiler import IdentifierPreparer
-
+from typing import Union
 # # Tool for generating example tables
 
 # +
@@ -27,6 +28,7 @@ class _TestsExampleTable(Base):
     likes_pizza = Column(BOOLEAN)
     favorite_colors = Column(JSON)
 
+    @staticmethod
     def create_example_df(nb_rows):
         emails = ['foo', 'bar', 'baz', 'test', 'abc', 'foobar', 'foobaz']
         domains = ['gmail.com', 'yahoo.fr', 'yahoo.com', 'outlook.fr']
@@ -36,24 +38,25 @@ class _TestsExampleTable(Base):
             domain = random.choice(domains)
             email_choices.append(f'{email}@{domain}')
         timestamps = [(datetime.datetime
-                       .fromtimestamp(random.randint(1_000_000_000,1_300_000_000))
+                       .fromtimestamp(random.randint(1_000_000_000, 1_300_000_000))
                        .astimezone(datetime.timezone.utc))
                       for i in range(nb_rows)]
         colors = ['yellow', 'blue', 'pink', 'red', 'orange', 'brown']
         favorite_colors = []
         for i in range(nb_rows):
-            row = [random.choice(colors) for i in range(random.randint(1,3))]
+            row = [random.choice(colors) for i in range(random.randint(1, 3))]
             favorite_colors.append(row)
-        data = {'profileid':range(nb_rows),
-                'email':email_choices,
-                'timestamp':timestamps,
-                'size_in_meters':[random.uniform(1.5,2.3) for i in range(nb_rows)],
-                'likes_pizza':[random.choice([True, False]) for i in range(nb_rows)],
-                'favorite_colors':favorite_colors}
+        data = {'profileid': range(nb_rows),
+                'email': email_choices,
+                'timestamp': timestamps,
+                'size_in_meters': [random.uniform(1.5, 2.3) for i in range(nb_rows)],
+                'likes_pizza': [random.choice([True, False]) for i in range(nb_rows)],
+                'favorite_colors': favorite_colors}
         df = pd.DataFrame(data).set_index('profileid')
         return df
 
-    def _get_table_namespace(con, schema, table_name):
+    @staticmethod
+    def _get_table_namespace(con, schema: Union[str, None], table_name: str) -> str:
         """
         Gets quoted table namespace (`schema.table_name`) to protect against
         SQL injection.
@@ -63,7 +66,8 @@ class _TestsExampleTable(Base):
         table_name = quote_object_name(object_name=table_name)
         return f'{schema}.{table_name}' if schema is not None else table_name
 
-    def _wrangle_df_from_db(df):
+    @staticmethod
+    def _wrangle_df_from_db(df: pd.DataFrame) -> pd.DataFrame:
         """
         Helper for method `read_from_db`
         """
@@ -73,11 +77,12 @@ class _TestsExampleTable(Base):
         load_json_if_needed = lambda obj: json.loads(obj) if isinstance(obj, str) else obj
 
         return (df.set_index('profileid')
-                .astype({'likes_pizza':bool})
+                .astype({'likes_pizza': bool})
                 .assign(timestamp=lambda df: pd.to_datetime(df['timestamp'], utc=True))
                 .assign(favorite_colors=lambda df: df['favorite_colors'].map(load_json_if_needed)))
 
-    def read_from_db(engine, schema, table_name):
+    @staticmethod
+    def read_from_db(engine: Engine, schema: str, table_name: str) -> pd.DataFrame:
         """
         Read SQL table containing data that was generated
         using method `create_example_df`
@@ -88,7 +93,8 @@ class _TestsExampleTable(Base):
             df_db = pd.read_sql(text(f'SELECT * FROM {namespace}'), con=connection)
             return _TestsExampleTable._wrangle_df_from_db(df=df_db)
 
-    async def _fallback_empty_df(df, engine, namespace):
+    @staticmethod
+    async def _fallback_empty_df(df: pd.DataFrame, engine, namespace: str) -> pd.DataFrame:
         """
         Depending on the SQL flavour behind a proxy (for aread_from_db we have to pass a
         proxy as we cannot use pd.read_sql in async mode), pandas may or may not find columns
@@ -103,7 +109,8 @@ class _TestsExampleTable(Base):
         else:
             return df
 
-    async def aread_from_db(engine, schema, table_name):
+    @staticmethod
+    async def aread_from_db(engine, schema: str, table_name: str) -> pd.DataFrame:
         """
         Async variant of `read_from_db`
         """
@@ -120,35 +127,35 @@ class _TestsExampleTable(Base):
 
 # # Static DataFrame examples
 
-class DocsExampleTable():
+class DocsExampleTable:
     """
     Example DataFrames for the docs.
     """
     # create some test data
-    _data = {'full_name':['John Rambo', 'The Rock', 'John Travolta'],
-             'likes_sport':[True, True, False],
-             'updated':[pd.Timestamp('2020-02-01', tz='UTC'),
-                        pd.Timestamp('2020-04-01', tz='UTC'), pd.NaT],
-             'size_in_meters':[1.77, 1.96, None]}
+    _data = {'full_name': ['John Rambo', 'The Rock', 'John Travolta'],
+             'likes_sport': [True, True, False],
+             'updated': [pd.Timestamp('2020-02-01', tz='UTC'),
+                         pd.Timestamp('2020-04-01', tz='UTC'), pd.NaT],
+             'size_in_meters': [1.77, 1.96, None]}
     # create DataFrame using this test data
     df = pd.DataFrame(_data).set_index('full_name')
     # create test data for showing an INSERT UPDATE
-    _new_data = {'full_name':['John Travolta', 'Arnold Schwarzenegger'],
-                 'likes_sport':[True, True],
-                 'updated':[pd.Timestamp('2020-04-04', tz='UTC'), pd.NaT],
-                 'size_in_meters':[1.88, 1.88]}
+    _new_data = {'full_name': ['John Travolta', 'Arnold Schwarzenegger'],
+                 'likes_sport': [True, True],
+                 'updated': [pd.Timestamp('2020-04-04', tz='UTC'), pd.NaT],
+                 'size_in_meters': [1.88, 1.88]}
     new_df = pd.DataFrame(_new_data).set_index('full_name')
     # create test data for showing an INSERT IGNORE
-    _new_data2 = {'full_name':['John Travolta', 'John Cena'],
-                  'likes_sport':[True, True],
-                  'updated':[pd.NaT, pd.NaT],
-                  'size_in_meters':[2.50, 1.84]}
+    _new_data2 = {'full_name': ['John Travolta', 'John Cena'],
+                  'likes_sport': [True, True],
+                  'updated': [pd.NaT, pd.NaT],
+                  'size_in_meters': [2.50, 1.84]}
     new_df2 = pd.DataFrame(_new_data2).set_index('full_name')
 
     # test DataFrame for the methods of upsert.UpsertQuery
     df_upsert = pd.DataFrame(index=pd.Index(data=['foo', 'bar', 'baz'], name='ix'))
     df_upsert['email'] = ['abc@outlook.fr', 'baz@yahoo.fr', 'foobar@gmail.com']
-    df_upsert['ts'] = [pd.Timestamp('2021-01-01', tz='UTC')]*3
+    df_upsert['ts'] = [pd.Timestamp('2021-01-01', tz='UTC')] * 3
     df_upsert['float'] = [1.1, 1.2, 1.3]
     df_upsert['bool'] = [True, False, False]
     df_upsert['json'] = [['red', 'yellow'], ['yellow'], ['yellow', 'red']]

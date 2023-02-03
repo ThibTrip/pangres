@@ -92,7 +92,8 @@ def create_sync_or_async_engine(conn_string, **kwargs):
     >>> # sync
     >>> engine = create_sync_or_async_engine("sqlite://")
     >>> # async
-    >>> engine = create_sync_or_async_engine("postgresql+asyncpg://username:password@localhost:5432/postgres")  # doctest: +SKIP
+    >>> conn_string_async = "postgresql+asyncpg://username:password@localhost:5432/postgres"
+    >>> engine = create_sync_or_async_engine(conn_string_async)  # doctest: +SKIP
     """
     # if we see any known async drivers we will create an async engine
     if any(s in conn_string.split('/')[0] for s in async_sql_drivers):
@@ -505,12 +506,12 @@ def pytest_generate_tests(metafunc):
         return
 
     # tests that we need to repeat for each engine + options (e.g. future)
-    conn_strings = {'sqlite':metafunc.config.option.sqlite_conn,
-                    'async_sqlite_conn':metafunc.config.option.async_sqlite_conn,
-                    'pg':metafunc.config.option.pg_conn,
-                    'asyncpg':metafunc.config.option.async_pg_conn,
-                    'mysql':metafunc.config.option.mysql_conn,
-                    'async_mysql_conn':metafunc.config.option.async_mysql_conn}
+    conn_strings = {'sqlite': metafunc.config.option.sqlite_conn,
+                    'async_sqlite_conn': metafunc.config.option.async_sqlite_conn,
+                    'pg': metafunc.config.option.pg_conn,
+                    'asyncpg': metafunc.config.option.async_pg_conn,
+                    'mysql': metafunc.config.option.mysql_conn,
+                    'async_mysql_conn': metafunc.config.option.async_mysql_conn}
     if not any(v is not None for v in conn_strings.values()):  # pragma: no cover
         raise ValueError('You must provide at least one connection string (e.g. argument --sqlite_conn)!')
 

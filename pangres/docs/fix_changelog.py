@@ -47,7 +47,7 @@ def get_release_notes(github_token=None):
     kwargs = dict(headers={'Authorization': f'token {github_token}'}) if github_token else {}
     response = requests.get('https://api.github.com/repos/ThibTrip/pangres/releases', **kwargs)
     response.raise_for_status()
-    return {d['tag_name']:adjust_levels_release_notes(d['body']) for d in response.json()}
+    return {d['tag_name']: adjust_levels_release_notes(d['body']) for d in response.json()}
 
 
 def add_release_notes_to_changelog(filepath, github_token=None, dryrun=False):

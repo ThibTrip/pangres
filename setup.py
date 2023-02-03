@@ -12,7 +12,7 @@ except FileNotFoundError:
     long_description = description
 
 
-with open(os.path.join(here, "requirements.txt"),"r") as f:
+with open(os.path.join(here, "requirements.txt"), "r") as f:
     requirements = [line.strip() for line in f.readlines()]
 
 
@@ -24,7 +24,7 @@ setuptools.setup(
     author_email="thibault.betremieux@gmail.com",
     url='https://github.com/ThibTrip/pangres',
     download_url='https://github.com/ThibTrip/pangres/archive/v4.1.3.tar.gz',
-    keywords=['pandas','postgres', 'mysql', 'sqlite'],
+    keywords=['pandas', 'postgres', 'mysql', 'sqlite'],
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",

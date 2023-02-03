@@ -65,8 +65,8 @@ class TransactionHandler:
         # set attrs
         self.connectable = connectable
         # we will set this when we enter the context
-        self.connection:Connection = None
-        self.transaction:Union[Transaction, None] = None
+        self.connection: Connection = None
+        self.transaction: Union[Transaction, None] = None
 
     def _close_resources(self):
         # we are nesting try...finally (see __exit__ method) to ensure
@@ -103,7 +103,7 @@ class TransactionHandler:
                 raise e
         return self
 
-    def _rollback_or_commit(self, exception_occured:bool):
+    def _rollback_or_commit(self, exception_occured: bool) -> None:
         # case where we were inside a transaction from the user
         # the user will have to handle rollback and commit
         if self.transaction is None:
@@ -167,7 +167,7 @@ class TransactionHandler:
                 raise e
         return self
 
-    async def _arollback_or_commit(self, exception_occured:bool):
+    async def _arollback_or_commit(self, exception_occured: bool) -> None:
         # case where we were inside a transaction from the user
         # the user will have to handle rollback and commit
         if self.transaction is None:
@@ -179,7 +179,7 @@ class TransactionHandler:
         else:
             await self.transaction.commit()
 
-    async def __aexit__(self, ex_type, exc, tb):
+    async def __aexit__(self, ex_type, exc, tb) -> bool:
         if self.connection is None:  # pragma: no cover
             raise AssertionError('No active connection. Perhaps the context manager was not properly entered?')
         exception_occured = ex_type is not None

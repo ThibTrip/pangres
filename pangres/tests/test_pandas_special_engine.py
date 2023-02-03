@@ -127,7 +127,7 @@ async def run_test_table_creation_async(engine, schema):
 
 # +
 @drop_table_between_tests(table_name=TableNames.ADD_NEW_COLUMN)
-def run_test_add_new_columns(engine, schema, on_index:bool):
+def run_test_add_new_columns(engine, schema, on_index: bool):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.ADD_NEW_COLUMN
     common_kwargs = dict(schema=schema, table_name=table_name)
@@ -178,7 +178,7 @@ def run_test_add_new_columns(engine, schema, on_index:bool):
 
 
 @adrop_table_between_tests(table_name=TableNames.ADD_NEW_COLUMN)
-async def run_test_add_new_columns_async(engine, schema, on_index:bool):
+async def run_test_add_new_columns_async(engine, schema, on_index: bool):
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.ADD_NEW_COLUMN
     common_kwargs = dict(schema=schema, table_name=table_name)
@@ -238,7 +238,7 @@ def run_test_change_column_type_if_column_empty(engine, schema, caplog, new_empt
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.CHANGE_EMPTY_COL_TYPE
     common_kwargs = dict(schema=schema, table_name=table_name)
-    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    common_kwargs['dtype'] = {'profileid': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # json like will not work for sqlalchemy < 1.4
     # also skip sqlite as it does not support such alteration
@@ -249,7 +249,7 @@ def run_test_change_column_type_if_column_empty(engine, schema, caplog, new_empt
         pytest.skip('such column alteration is not possible with SQlite')
 
     # create our example table
-    df = pd.DataFrame({'profileid':['foo'], 'empty_col':[None]}).set_index('profileid')
+    df = pd.DataFrame({'profileid': ['foo'], 'empty_col': [None]}).set_index('profileid')
     with engine.connect() as connection:
         pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
         pse.create_table_if_not_exists()
@@ -274,7 +274,7 @@ async def run_test_change_column_type_if_column_empty_async(engine, schema, capl
     # store arguments we will use for multiple PandasSpecialEngine instances
     table_name = TableNames.CHANGE_EMPTY_COL_TYPE
     common_kwargs = dict(schema=schema, table_name=table_name)
-    common_kwargs['dtype'] = {'profileid':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    common_kwargs['dtype'] = {'profileid': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # json like will not work for sqlalchemy < 1.4
     # also skip sqlite as it does not support such alteration
@@ -285,7 +285,7 @@ async def run_test_change_column_type_if_column_empty_async(engine, schema, capl
         pytest.skip('such column alteration is not possible with SQlite')
 
     # create our example table
-    df = pd.DataFrame({'profileid':['foo'], 'empty_col':[None]}).set_index('profileid')
+    df = pd.DataFrame({'profileid': ['foo'], 'empty_col': [None]}).set_index('profileid')
     async with engine.connect() as connection:
         pse = PandasSpecialEngine(connection=connection, df=df, **common_kwargs)
         await pse.acreate_table_if_not_exists()
@@ -332,7 +332,7 @@ def test_add_new_columns(engine, schema, on_index):
                        on_index=on_index)
 
 
-params_new_value_empty_col = [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'), {'foo':'bar'}, ['foo'], True]
+params_new_value_empty_col = [1, 1.1, pd.Timestamp("2020-01-01", tz='UTC'), {'foo': 'bar'}, ['foo'], True]
 
 
 @pytest.mark.parametrize(argnames="new_empty_column_value", argvalues=params_new_value_empty_col,
@@ -351,13 +351,13 @@ def test_change_column_type_if_column_empty(engine, schema, caplog, new_empty_co
 # +
 def test_values_conversion(_):
     engine = create_engine('sqlite:///')
-    row = {'id':0,
-           'pd_interval':pd.Interval(left=0, right=5),
-           'nan':np.nan,
-           'nat':pd.NaT,
-           'none':None,
-           'pd_na':getattr(pd, 'NA', None),
-           'ts':pd.Timestamp('2021-01-01')}
+    row = {'id': 0,
+           'pd_interval': pd.Interval(left=0, right=5),
+           'nan': np.nan,
+           'nat': pd.NaT,
+           'none': None,
+           'pd_na': getattr(pd, 'NA', None),
+           'ts': pd.Timestamp('2021-01-01')}
     df = pd.DataFrame([row]).set_index('id')
     with engine.connect() as connection:
         pse = PandasSpecialEngine(connection=connection, df=df, table_name=TableNames.NO_TABLE)
@@ -438,7 +438,7 @@ def test_table_attr(_):
 @pytest.mark.parametrize("multi_index", [True, False], ids=['multi index', 'single index'])
 def test_error_index_level_no_name(_, multi_index):
     engine = create_engine('sqlite://')
-    df = pd.DataFrame({'test':[0]})
+    df = pd.DataFrame({'test': [0]})
     if multi_index:
         df.set_index('test', append=True, inplace=True)
     with pytest.raises(UnnamedIndexLevelsException) as excinfo:
@@ -450,7 +450,7 @@ def test_error_index_level_no_name(_, multi_index):
 @pytest.mark.parametrize("option", ['index and column collision', 'columns duplicated', 'index duplicated'])
 def test_duplicated_names(_, option):
     engine = create_engine('sqlite://')
-    df = pd.DataFrame({'test':[0]})
+    df = pd.DataFrame({'test': [0]})
     if option == 'index and column collision':
         df.index.name = 'test'
     elif option == 'columns duplicated':
@@ -479,7 +479,7 @@ def test_non_unique_index(_):
 @pytest.mark.parametrize("bad_chunksize_value", [0, -1, 1.2])
 def test_bad_chunksize(_, bad_chunksize_value):
     engine = create_engine('sqlite://')
-    df = pd.DataFrame({'test':[0]})
+    df = pd.DataFrame({'test': [0]})
     df.index.name = 'id'
     with engine.connect() as connection:
         pse = PandasSpecialEngine(connection=connection, table_name=TableNames.NO_TABLE, df=df)

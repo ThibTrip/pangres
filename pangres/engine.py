@@ -14,8 +14,7 @@ from sqlalchemy.sql import null
 from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema, Table
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
-from typing import List, Optional, Union
-
+from typing import Any, List, Optional, Union
 # local imports
 from pangres.helpers import _sqla_gt14, _sqla_gt20
 from pangres.logger import log
@@ -46,11 +45,11 @@ RE_POSTGRES = re.compile(r'psycopg|postgres')
 class PandasSpecialEngine:
 
     def __init__(self,
-                 connection:Connection,
-                 df:pd.DataFrame,
-                 table_name:str,
-                 schema:Optional[str]=None,
-                 dtype:Optional[dict]=None):
+                 connection: Connection,
+                 df: pd.DataFrame,
+                 table_name: str,
+                 schema: Optional[str] = None,
+                 dtype: Optional[dict] = None) -> None:
         """
         Interacts with SQL tables via pandas and SQLalchemy table models.
 
@@ -146,14 +145,13 @@ class PandasSpecialEngine:
                                            f"and columns: {duplicated_labels}")
 
         # detect json columns
-        def is_json(col:str):
+        def is_json(col: str):
             s = df[col].dropna()
-            return (not s.empty and
-                    s.map(lambda x: isinstance(x, (list, dict))).all())
+            return not s.empty and s.map(lambda x: isinstance(x, (list, dict))).all()
         json_cols = [col for col in df.columns if is_json(col)]
 
         # merge with dtype from user
-        new_dtype = {c:JSON for c in json_cols}
+        new_dtype = {c: JSON for c in json_cols}
         if dtype is not None:
             new_dtype.update(dtype)
         new_dtype = None if new_dtype == {} else new_dtype
@@ -189,7 +187,7 @@ class PandasSpecialEngine:
         self.table = table
 
     @staticmethod
-    def _detect_db_type(connectable:Union[Connection, Engine]) -> str:
+    def _detect_db_type(connectable: Union[Connection, Engine]) -> str:
         """
         Identifies whether the dialect of given sqlalchemy
         connection corresponds to postgres, mysql or another sql type.
@@ -208,7 +206,7 @@ class PandasSpecialEngine:
         else:
             return "other"
 
-    def _raise_no_schema_feature(self):
+    def _raise_no_schema_feature(self) -> None:
         """
         Function to raise an error if we try to do operations on schemas on a database that does not
         support such feature.
@@ -250,7 +248,7 @@ class PandasSpecialEngine:
             # this is not particularly efficient but AFAIK it's the best we can do at connection level
             return self.table.name in insp.get_table_names(schema=self.schema)
 
-    def create_schema_if_not_exists(self, connection=None):
+    def create_schema_if_not_exists(self, connection=None) -> None:
         """
         Creates the schema defined in given instance of
         PandasSpecialEngine if it does not exist.
@@ -269,7 +267,7 @@ class PandasSpecialEngine:
         if not self.schema_exists(connection=con):
             con.execute(CreateSchema(self.schema))
 
-    def create_table_if_not_exists(self, connection=None):
+    def create_table_if_not_exists(self, connection=None) -> None:
         """
         Creates the table generated in given instance of
         PandasSpecialEngine if it does not exist.
@@ -295,7 +293,7 @@ class PandasSpecialEngine:
         assert len(db_columns_names) > 0
         return db_columns_names
 
-    def add_new_columns(self, connection=None):
+    def add_new_columns(self, connection=None) -> None:
         """
         Adds columns present in df but not in the SQL table
         for given instance of PandasSpecialEngine.
@@ -405,7 +403,7 @@ class PandasSpecialEngine:
         method = self.get_empty_columns_gt_sqla_14 if _sqla_gt14() else self.get_empty_columns_sqla_13
         return method()
 
-    def adapt_dtype_of_empty_db_columns(self, empty_db_columns=None, connection=None, db_table=None):
+    def adapt_dtype_of_empty_db_columns(self, empty_db_columns=None, connection=None, db_table=None) -> None:
         """
         Changes the data types of empty columns in the SQL table defined
         in given instance of a PandasSpecialEngine.
@@ -435,8 +433,7 @@ class PandasSpecialEngine:
             dest_type = RE_CHARCOUNT_COL_TYPE.sub('', dest_type)
             # if same type or we want to insert TEXT instead of JSON continue
             # (JSON is not supported on some DBs so it's normal to have TEXT instead)
-            if ((orig_type == dest_type) or
-                ((orig_type == 'JSON') and (dest_type == 'TEXT'))):
+            if (orig_type == dest_type) or ((orig_type == 'JSON') and (dest_type == 'TEXT')):
                 continue
             # grab the col/index from the df
             # so we can check if there are any values
@@ -457,7 +454,7 @@ class PandasSpecialEngine:
                 if self._db_type == 'postgres':
                     escaped_col = str(new_col.compile(dialect=con.dialect))
                     compiled_type = new_col.type.compile(dialect=con.dialect)
-                    alter_kwargs = {'postgresql_using':f'{escaped_col}::{compiled_type}'}
+                    alter_kwargs = {'postgresql_using': f'{escaped_col}::{compiled_type}'}
                 else:
                     alter_kwargs = {}
                 op.alter_column(table_name=self.table.name,
@@ -470,7 +467,7 @@ class PandasSpecialEngine:
                     f'in table {self.table.name} (schema="{self.schema}")')
 
     @staticmethod
-    def _create_chunks(values:list, chunksize:int=10000):
+    def _create_chunks(values: list, chunksize: int = 10000) -> list:
         """
         Chunks a list into a list of lists of size
         :chunksize:.
@@ -486,9 +483,9 @@ class PandasSpecialEngine:
         chunks = [values[i:i + chunksize] for i in range(0, len(values), chunksize)]
         return chunks
 
-    def _get_values_to_insert(self):
+    def _get_values_to_insert(self) -> list:
         """
-        Gets the values to be inserted from the pandas DataFrame 
+        Gets the values to be inserted from the pandas DataFrame
         defined in given instance of PandasSpecialEngine
         to the coresponding SQL table.
 
@@ -502,7 +499,7 @@ class PandasSpecialEngine:
         # this seems to be the most reliable way to unpack
         # the DataFrame. For instance using df.to_dict(orient='records')
         # can introduce types such as numpy integer which we'd have to deal with
-        values = self.df.reset_index().values.tolist()
+        values: List[Any] = self.df.reset_index().values.tolist()
         for i in range(len(values)):
             row = values[i]
             for j in range(len(row)):
@@ -520,9 +517,9 @@ class PandasSpecialEngine:
                     values[i][j] = str(val)
         return values
 
-    def upsert(self, if_row_exists:str, chunksize:int=10000):
+    def upsert(self, if_row_exists: str, chunksize: int = 10000) -> None:
         """
-        Generates and executes an upsert (insert update or 
+        Generates and executes an upsert (insert update or
         insert ignore depending on :if_row_exists:) statement
         for given instance of PandasSpecialEngine.
 
@@ -533,12 +530,12 @@ class PandasSpecialEngine:
 
         Parameters
         ----------
-        if_rows_exists : {'ignore', 'update'}
+        if_row_exists : {'ignore', 'update'}
             If 'ignore' where the primary key matches nothing is
             updated.
             If 'update' where the primary key matches the values
             are updated using what's available in df.
-            In both cases rows are inserted for non primary keys.
+            In both cases rows are inserted for non-primary keys.
         chunksize : int > 0, default 900
             Number of values to be inserted at once,
             an integer strictly above zero.
@@ -552,7 +549,7 @@ class PandasSpecialEngine:
         for chunk in chunks:
             upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
-    def upsert_yield(self, if_row_exists:str, chunksize:int=10000):
+    def upsert_yield(self, if_row_exists: str, chunksize: int = 10000):
         """
         Same as method `upsert` but gives back an sqlalchemy object
         (sqlalchemy.engine.cursor.LegacyCursorResult) for each chunk inserted
@@ -616,7 +613,7 @@ class PandasSpecialEngine:
                                                                            db_table=db_table)
         await self.connection.run_sync(ddl_func)
 
-    async def aupsert(self, if_row_exists:str, chunksize:int=10000):
+    async def aupsert(self, if_row_exists: str, chunksize: int = 10000):
         assert if_row_exists in ('ignore', 'update')
         values = self._get_values_to_insert()
         chunks = self._create_chunks(values=values, chunksize=chunksize)
@@ -624,7 +621,7 @@ class PandasSpecialEngine:
         for chunk in chunks:
             await upq.aexecute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
-    async def aupsert_yield(self, if_row_exists:str, chunksize:int=10000):
+    async def aupsert_yield(self, if_row_exists: str, chunksize: int = 10000):
         assert if_row_exists in ('ignore', 'update')
         values = self._get_values_to_insert()
         chunks = self._create_chunks(values=values, chunksize=chunksize)

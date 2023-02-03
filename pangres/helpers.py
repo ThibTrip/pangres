@@ -13,7 +13,7 @@ def _py_gt3_10() -> bool:
     return (py_v.major > 3) or ((py_v.major >= 3) and (py_v.minor >= 10))
 
 
-def _version_equal_or_greater_than(version_string:str, minimal_version_string:str) -> bool:
+def _version_equal_or_greater_than(version_string: str, minimal_version_string: str) -> bool:
     """
     Returns True if a library has a version greater or equal than `minimal_version_string`.
     Otherwise returns False.
@@ -74,7 +74,7 @@ def _sqlite_gt3_32_0() -> bool:
 
 # # Parameters checking
 
-def validate_chunksize_param(chunksize:int):
+def validate_chunksize_param(chunksize: int) -> None:
     if not isinstance(chunksize, int):
         raise TypeError(f'Expected chunksize to be an int. Got {type(chunksize)}')
     if chunksize <= 0:

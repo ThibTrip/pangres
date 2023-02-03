@@ -61,7 +61,7 @@ def run_test_upsert_with_unique_keys(engine, schema):
 
     class TestUniqueKey(Base, TestUniqueKeyBase):
         __table_args__ = (UniqueConstraint('order_id', 'product_id'),
-                          {'schema':schema})
+                          {'schema': schema})
 
     # create table
     Base.metadata.create_all(bind=engine)
@@ -106,7 +106,7 @@ async def run_test_upsert_with_unique_keys_async(engine, schema):
 
     class TestUniqueKey(Base, TestUniqueKeyBase):
         __table_args__ = (UniqueConstraint('order_id', 'product_id'),
-                          {'schema':schema})
+                          {'schema': schema})
 
     # create table
     async with engine.connect() as connection:

@@ -59,7 +59,7 @@ def run_test_create_and_insert_table_multiindex(engine, schema):
         return df_db.set_index(index_col)
 
     # dtype for index for MySQL... (can't have flexible text length)
-    dtype = {'ix2':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    dtype = {'ix2': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # create
     upsert(con=engine, schema=schema, df=df_multiindex, table_name=table_name, dtype=dtype, if_row_exists='update')
@@ -83,15 +83,17 @@ async def run_test_create_and_insert_table_multiindex_async(engine, schema):
         return df_db.set_index(index_col)
 
     # dtype for index for MySQL... (can't have flexible text length)
-    dtype = {'ix2':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    dtype = {'ix2': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
 
     # create
-    await aupsert(con=engine, schema=schema, df=df_multiindex, table_name=table_name, dtype=dtype, if_row_exists='update')
+    await aupsert(con=engine, schema=schema, df=df_multiindex, table_name=table_name,
+                  dtype=dtype, if_row_exists='update')
     df_db = await read_from_db()
     pd.testing.assert_frame_equal(df_db, df_multiindex)
 
     # insert
-    await aupsert(con=engine, schema=schema, df=df_multiindex2, table_name=table_name, dtype=dtype, if_row_exists='update')
+    await aupsert(con=engine, schema=schema, df=df_multiindex2, table_name=table_name,
+                  dtype=dtype, if_row_exists='update')
     df_db = await read_from_db()
     pd.testing.assert_frame_equal(df_db, pd.concat(objs=[df_multiindex, df_multiindex2]))
 
@@ -103,7 +105,7 @@ async def run_test_create_and_insert_table_multiindex_async(engine, schema):
 # +
 @drop_table_between_tests(table_name=TableNames.INDEX_WITH_NULL)
 def run_test_index_with_null(engine, schema):
-    df = pd.DataFrame({'ix':[None, 0], 'test': [0, 1]}).set_index('ix')
+    df = pd.DataFrame({'ix': [None, 0], 'test': [0, 1]}).set_index('ix')
     with pytest.raises(IntegrityError):
         upsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
         # don't test error for mysql since only a warning is raised and the line is skipped
@@ -114,7 +116,7 @@ def run_test_index_with_null(engine, schema):
 
 @adrop_table_between_tests(table_name=TableNames.INDEX_WITH_NULL)
 async def run_test_index_with_null_async(engine, schema):
-    df = pd.DataFrame({'ix':[None, 0], 'test': [0, 1]}).set_index('ix')
+    df = pd.DataFrame({'ix': [None, 0], 'test': [0, 1]}).set_index('ix')
     with pytest.raises(IntegrityError):
         await aupsert(con=engine, schema=schema, df=df, table_name=TableNames.INDEX_WITH_NULL, if_row_exists='update')
         # don't test error for mysql since only a warning is raised and the line is skipped
@@ -134,7 +136,7 @@ def run_test_only_index(engine, schema, if_row_exists):
     table_name = TableNames.INDEX_ONLY_INSERT
 
     # upsert df with only index
-    df = pd.DataFrame({'ix':[1]}).set_index('ix')
+    df = pd.DataFrame({'ix': [1]}).set_index('ix')
     upsert(con=engine, schema=schema, df=df, table_name=table_name, if_row_exists=if_row_exists)
 
     # check data integrity
@@ -150,7 +152,7 @@ async def run_test_only_index_async(engine, schema, if_row_exists):
     table_name = TableNames.INDEX_ONLY_INSERT
 
     # upsert df with only index
-    df = pd.DataFrame({'ix':[1]}).set_index('ix')
+    df = pd.DataFrame({'ix': [1]}).set_index('ix')
     await aupsert(con=engine, schema=schema, df=df, table_name=table_name, if_row_exists=if_row_exists)
 
     # check data integrity

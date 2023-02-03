@@ -18,18 +18,18 @@ from pangres.helpers import validate_chunksize_param
 
 # # upsert
 
-def upsert(con:Connectable,
-           df:pd.DataFrame,
-           table_name:str,
-           if_row_exists:str,
-           schema:Optional[str]=None,
-           create_schema:bool=False,
-           create_table:bool=True,
-           add_new_columns:bool=False,
-           adapt_dtype_of_empty_db_columns:bool=False,
-           chunksize:Optional[int]=None,
-           dtype:Union[dict,None]=None,
-           yield_chunks:bool=False):
+def upsert(con: Connectable,
+           df: pd.DataFrame,
+           table_name: str,
+           if_row_exists: str,
+           schema: Optional[str] = None,
+           create_schema: bool = False,
+           create_table: bool = True,
+           add_new_columns: bool = False,
+           adapt_dtype_of_empty_db_columns: bool = False,
+           chunksize: Optional[int] = None,
+           dtype: Union[dict, None] = None,
+           yield_chunks: bool = False):
     """
     Insert updates/ignores a pandas DataFrame into a SQL table (or
     creates a SQL table from the DataFrame if it does not exist).
@@ -210,7 +210,7 @@ def upsert(con:Connectable,
     ...        if_row_exists='update',
     ...        dtype=dtype,
     ...        create_table=False)
-    >>> 
+    >>>
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was updated and Arnold Schwarzenegger was added!
     >>> with engine.connect() as connection:
@@ -306,17 +306,17 @@ def upsert(con:Connectable,
 # # Async upsert
 
 async def aupsert(con,
-                  df:pd.DataFrame,
-                  table_name:str,
-                  if_row_exists:str,
-                  schema:Optional[str]=None,
-                  create_schema:bool=False,
-                  create_table:bool=True,
-                  add_new_columns:bool=False,
-                  adapt_dtype_of_empty_db_columns:bool=False,
-                  chunksize:Optional[int]=None,
-                  dtype:Union[dict,None]=None,
-                  yield_chunks:bool=False):
+                  df: pd.DataFrame,
+                  table_name: str,
+                  if_row_exists: str,
+                  schema: Optional[str] = None,
+                  create_schema: bool = False,
+                  create_table: bool = True,
+                  add_new_columns: bool = False,
+                  adapt_dtype_of_empty_db_columns: bool = False,
+                  chunksize: Optional[int] = None,
+                  dtype: Union[dict, None] = None,
+                  yield_chunks: bool = False):
     """
     Asynchronous variant of `pangres.upsert`. Make sure to read its docstring
     before using this function!
