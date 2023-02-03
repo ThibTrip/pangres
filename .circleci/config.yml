@@ -34,7 +34,7 @@ jobs:
         name: check linting with flake8
         command: |
           pip install flake8
-          flake8 .
+          flake8 . --exclude venv
 
     - save_cache:
         paths:

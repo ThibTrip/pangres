@@ -1,8 +1,4 @@
 [flake8]
 ignore = E731
 max-line-length = 120
-exclude =
-    __pycache__
-    env
-    .env
 
