@@ -14,7 +14,7 @@ from typing import Union
 Base = declarative_base()
 
 
-class _TestsExampleTable(Base):
+class _TestsExampleTable(Base):  # type: ignore  # this is valid
     """
     Example table compatible with Postgres, SQLite and MySQL for testing.
     """
@@ -102,9 +102,9 @@ class _TestsExampleTable(Base):
         to work but for aiosqlite it seems to work. This is a workaround to retrieve
         the columns, indices and proper datatypes in such a case.
         """
-        if all(len(obj) == 0 for obj in (df.index, df.columns, df)):
+        if all(len(obj) == 0 for obj in (df.index, df.columns, df)):  # type: ignore  # all objects do have a length
             async with engine.connect() as connection:
-                get_df = lambda connection: pd.read_sql(text(f'SELECT * FROM {namespace};'), con=connection)
+                get_df = lambda conn: pd.read_sql(text(f'SELECT * FROM {namespace};'), con=conn)
                 return await connection.run_sync(get_df)
         else:
             return df
