@@ -2,7 +2,7 @@
 Types and type aliases for pangres
 """
 from typing import AsyncIterable, Iterable, TYPE_CHECKING, TypeVar, Union, Any
-from sqlalchemy import Connection, Engine
+from sqlalchemy.engine import Connection, Engine
 # local imports
 from pangres.helpers import _sqla_gt20
 
