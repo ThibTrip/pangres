@@ -133,8 +133,10 @@ class Executor:
     async def aexecute(self, async_connectable, if_row_exists: str, chunksize: int) -> None:
         async with TransactionHandler(connectable=async_connectable) as trans:
             # setup
-            pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
-                                      table_name=self.table_name, schema=self.schema,
+            pse = PandasSpecialEngine(connection=trans.connection,  # type: ignore
+                                      df=self.df,
+                                      table_name=self.table_name,
+                                      schema=self.schema,
                                       dtype=self.dtype)
             await self._asetup_objects(pse=pse)
 
@@ -146,15 +148,17 @@ class Executor:
     async def aexecute_yield(self, async_connectable, if_row_exists: str, chunksize: int):
         async with TransactionHandler(connectable=async_connectable) as trans:
             # setup
-            pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
-                                      table_name=self.table_name, schema=self.schema,
+            pse = PandasSpecialEngine(connection=trans.connection,  # type: ignore
+                                      df=self.df,
+                                      table_name=self.table_name,
+                                      schema=self.schema,
                                       dtype=self.dtype)
             await self._asetup_objects(pse=pse)
 
             # upsert
             if len(self.df) == 0:
                 return
-                yield
+                yield  # noqa
             # IMPORTANT! NO `await`
             async for result in pse.aupsert_yield(if_row_exists=if_row_exists, chunksize=chunksize):
                 yield result
