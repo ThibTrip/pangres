@@ -4,14 +4,16 @@ Functions for preparing/compiling and executing upsert statements
 in different SQL flavors.
 """
 from copy import deepcopy
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.mysql.dml import insert as mysql_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert, Insert as PgInsert
+from sqlalchemy.dialects.mysql.dml import insert as mysql_insert, Insert as MySQLInsert
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.compiler import SQLCompiler
+from typing import Union, Any, Dict
 
 # local imports
 from pangres.helpers import _sqla_gt14
+from pangres.pangres_types import AsyncConnection
 
 
 # -
@@ -35,7 +37,7 @@ class UpsertQuery:
     ...     upq = UpsertQuery(connection=connection, table=table)
     """
 
-    def __init__(self, connection: Connection, table: Table) -> None:
+    def __init__(self, connection: Union[AsyncConnection, Connection], table: Table) -> None:
         self._verify_connection_like_object(connection=connection)
         self.connection = connection
         self.table = table
@@ -56,65 +58,73 @@ class UpsertQuery:
         if not is_connection:
             raise TypeError(f'Expected a Connection or AsyncConnection object. Got {type(connection)} instead')
 
-    def _create_pg_query(self, values: list, if_row_exists: str) -> str:
+    def _create_pg_query(self, values: list, if_row_exists: str) -> PgInsert:
         insert_stmt = pg_insert(self.table).values(values)
+        update_cols = []
         if if_row_exists == 'update':
-            update_cols = [c.name
-                           for c in self.table.c
-                           if c not in list(self.table.primary_key.columns)]
-            # case when there is only an index in the DataFrame i.e. no columns to update
-            if len(update_cols) == 0:
-                if_row_exists = 'ignore'
-            else:
-                upsert = insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
-                                                           set_={k: insert_stmt.excluded[k] for k in update_cols})
-        if if_row_exists == 'ignore':
-            upsert = insert_stmt.on_conflict_do_nothing()
-        return upsert
+            update_cols.extend([c.name for c in self.table.columns  # type: ignore
+                                if c not in list(self.table.primary_key.columns)])
 
-    def _create_mysql_query(self, values: list, if_row_exists: str) -> str:
+        # handle case when there is only an index in the DataFrame i.e. no columns to update
+        if len(update_cols) == 0:
+            if_row_exists = 'ignore'
+
+        # get the appropriate insert statement
+        if if_row_exists == 'update':
+            return insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
+                                                     set_={k: insert_stmt.excluded[k] for k in update_cols})
+        else:
+            return insert_stmt.on_conflict_do_nothing()
+
+    def _create_mysql_query(self, values: list, if_row_exists: str) -> MySQLInsert:
         insert_stmt = mysql_insert(self.table).values(values)
+        update_cols: Dict[str, Any] = {}
+
         if if_row_exists == 'update':
             # thanks to: https://stackoverflow.com/a/58180407/10551772
             # prepare kwargs for on_duplicated_key_update (with kwargs and getattr
             # even "bad" column names will resolve e.g. columns with spaces)
-            update_cols = {}
             for col in insert_stmt.table.columns:
                 col_name = col.name
                 if col_name not in self.table.primary_key:
-                    update_cols.update({col_name: insert_stmt.inserted[col_name]})
-            # case when there is only an index in the DataFrame i.e. no columns to update
-            if len(update_cols) == 0:
-                if_row_exists = 'ignore'
-            else:
-                upsert = insert_stmt.on_duplicate_key_update(**update_cols)
-        if if_row_exists == 'ignore':
+                    update_cols[col_name] = insert_stmt.inserted[col_name]
+
+        # handle case when there is only an index in the DataFrame i.e. no columns to update
+        if len(update_cols) == 0:
+            if_row_exists = 'ignore'
+
+        # get the appropriate insert statement
+        if if_row_exists == 'update':
+            upsert = insert_stmt.on_duplicate_key_update(**update_cols)
+        else:
             # thanks to: https://stackoverflow.com/a/50870348/10551772
             upsert = insert_stmt.prefix_with('IGNORE')
         return upsert
 
-    def _create_sqlite_query_gt_sqla_14(self, values: list, if_row_exists: str) -> str:
+    def _create_sqlite_query_gt_sqla_14(self, values: list, if_row_exists: str):
         """
         Creates an upsert sqlite query for sqlalchemy>=1.4
         """
         # the next import is not available in sqlalchemy==1.3
         from sqlalchemy.dialects.sqlite import insert as sqlite_insert
         insert_stmt = sqlite_insert(self.table).values(values)
+        update_cols = []
         if if_row_exists == 'update':
-            update_cols = [c.name
-                           for c in self.table.c
-                           if c not in list(self.table.primary_key.columns)]
-            # case when there is only an index in the DataFrame i.e. no columns to update
-            if len(update_cols) == 0:
-                if_row_exists = 'ignore'
-            else:
-                upsert = insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
-                                                           set_={k: insert_stmt.excluded[k] for k in update_cols})
-        if if_row_exists == 'ignore':
-            upsert = insert_stmt.on_conflict_do_nothing()
-        return upsert
+            update_cols.extend([c.name for c in self.table.columns  # type: ignore
+                                if c not in list(self.table.primary_key.columns)])
 
-    def _create_sqlite_query_sqla_13(self, values: list, if_row_exists: str) -> str:
+        # handle case when there is only an index in the DataFrame i.e. no columns to update
+        if len(update_cols) == 0:
+            if_row_exists = 'ignore'
+
+        # get the appropriate insert statement
+        if if_row_exists == 'update':
+            return insert_stmt.on_conflict_do_update(index_elements=self.table.primary_key.columns,
+                                                     set_={k: insert_stmt.excluded[k] for k in update_cols})
+        else:
+            return insert_stmt.on_conflict_do_nothing()
+
+    def _create_sqlite_query_sqla_13(self, values: list, if_row_exists: str) -> SQLCompiler:
         """
         Creates an upsert sqlite query for sqlalchemy==1.3
         """
@@ -131,8 +141,8 @@ class UpsertQuery:
                              statement=self.table.insert().values(values))
 
         # append on conflict clause
-        pk = [escape_col(c) for c in self.table.primary_key]
-        non_pks = [escape_col(c) for c in self.table.columns if c not in list(self.table.primary_key)]
+        pk = [escape_col(c) for c in self.table.primary_key]  # type: ignore
+        non_pks = [escape_col(c) for c in self.table.columns if c not in list(self.table.primary_key)]  # type: ignore
         ondup = f'ON CONFLICT ({",".join(pk)})'
         # always use "DO NOTHING" if there are no primary keys
         if (not non_pks) or (if_row_exists == 'ignore'):
@@ -144,16 +154,16 @@ class UpsertQuery:
             upsert.string = ' '.join((upsert.string, ondup, ondup_action, updates))
         return upsert
 
-    def _create_sqlite_query(self, values: list, if_row_exists: str) -> str:
+    def _create_sqlite_query(self, values: list, if_row_exists: str) -> SQLCompiler:
         """
         Creates an upsert sqlite query. Uses different implementations depending
         on the sqlalchemy version.
         See helper methods `_create_sqlite_query_gt_sqla_14` and `_create_sqlite_query_sqla_13`.
         """
         method = self._create_sqlite_query_gt_sqla_14 if _sqla_gt14() else self._create_sqlite_query_sqla_13
-        return method(values=values, if_row_exists=if_row_exists)
+        return method(values=values, if_row_exists=if_row_exists)  # type: ignore  # parameters are valid
 
-    def create_query(self, db_type: str, values: list, if_row_exists: str) -> str:
+    def create_query(self, db_type: str, values: list, if_row_exists: str):
         r"""
         Helper for creating UPSERT queries in various SQL flavors
 
@@ -225,4 +235,4 @@ class UpsertQuery:
         Async variant of method execute
         """
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
-        return await self.connection.execute(query)
+        return await self.connection.execute(query)  # type: ignore  # this is valid
