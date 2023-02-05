@@ -198,7 +198,7 @@ def adjust_chunksize(con: Connectable, df: pd.DataFrame, chunksize: int) -> int:
     validate_chunksize_param(chunksize=chunksize)
 
     # get maximum number of parameters depending on the database
-    dialect = con.dialect.dialect_description
+    dialect = con.dialect.dialect_description  # type: ignore  # dialect attribute does exist
     if 'sqlite' in dialect:
         maximum = 32766 if _sqlite_gt3_32_0() else 999
     elif 'asyncpg' in dialect:
