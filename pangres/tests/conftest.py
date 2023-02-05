@@ -543,4 +543,4 @@ def pytest_generate_tests(metafunc):
 
     # generate tests
     assert len(engines) == len(schemas) == len(ids)
-    metafunc.parametrize("engine, schema", list(zip(engines, schemas)), ids=ids, scope='module')
+    metafunc.parametrize("engine, schema", list(zip(engines, schemas)), ids=ids, scope='function')
