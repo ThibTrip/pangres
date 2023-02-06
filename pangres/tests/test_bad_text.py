@@ -78,7 +78,7 @@ async def run_test_bad_column_names_async(engine, schema, iteration):
     # psycopg2 can't process columns with "%" or "(" or ")" so we will need `fix_psycopg2_bad_cols`
     if 'postgres' in engine.dialect.dialect_description:
         df_test = fix_psycopg2_bad_cols(df_test)
-    await aupsert(con=engine, schema=schema, df=df_test,table_name=TableNames.BAD_COLUMN_NAMES,
+    await aupsert(con=engine, schema=schema, df=df_test, table_name=TableNames.BAD_COLUMN_NAMES,
                   if_row_exists='update')
 
 
@@ -91,7 +91,7 @@ async def run_test_bad_column_names_async(engine, schema, iteration):
 def run_test_bad_column_name_postgres_raises(engine, schema):
     if 'postgres' not in engine.dialect.dialect_description:
         pytest.skip('This test is only relevant for PostgreSQL')
-    df = pd.DataFrame({'id':[0], '(test)':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0], '(test)': [0]}).set_index('id')
     with pytest.raises(BadColumnNamesException) as exc_info:
         upsert(con=engine, schema=schema, df=df, table_name=TableNames.BAD_COLUMN_NAMES_PG,
                if_row_exists='update')
@@ -102,7 +102,7 @@ def run_test_bad_column_name_postgres_raises(engine, schema):
 async def run_test_bad_column_name_postgres_raises_async(engine, schema):
     if 'postgres' not in engine.dialect.dialect_description:
         pytest.skip('This test is only relevant for PostgreSQL')
-    df = pd.DataFrame({'id':[0], '(test)':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0], '(test)': [0]}).set_index('id')
     with pytest.raises(BadColumnNamesException) as exc_info:
         await aupsert(con=engine, schema=schema, df=df, table_name=TableNames.BAD_COLUMN_NAMES_PG,
                       if_row_exists='update')

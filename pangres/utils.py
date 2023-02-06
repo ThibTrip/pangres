@@ -2,7 +2,7 @@
 import logging
 import pandas as pd
 from math import floor
-from sqlalchemy.engine.base import Connectable
+from sqlalchemy.engine import Connectable
 
 # local imports
 from pangres.helpers import _sqlite_gt3_32_0, validate_chunksize_param
@@ -16,7 +16,7 @@ from pangres.exceptions import (DuplicateLabelsException,
 
 # # Function to fix bad column names for psycopg2
 
-def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements:dict={'%':'', '(':'', ')':''}) -> pd.DataFrame:
+def fix_psycopg2_bad_cols(df: pd.DataFrame, replacements: dict = {'%': '', '(': '', ')': ''}) -> pd.DataFrame:
     """
     Replaces '%', '(' and ')' (characters that won't play nicely or even
     at all with psycopg2) in column and index names in a deep copy of df.
@@ -98,15 +98,16 @@ def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements:dict={'%':'', '(':'', ')
                                        f"index levels and/or columns! Duplicates found: {duplicates}")
     # verify replacements arg
     expected_keys = ('%', '(', ')')
-    if ((not isinstance(replacements, dict)) or
-        (set(replacements.keys()) - set(expected_keys) != set()) or
-        (len(replacements) != len(expected_keys))):
+    not_a_dict = not isinstance(replacements, dict)
+    not_all_keys_present = not_a_dict or set(replacements.keys()) - set(expected_keys) != set()
+    bad_nb_keys = not_a_dict or len(replacements) != len(expected_keys)
+    if not_all_keys_present or bad_nb_keys:
         raise TypeError(f'replacements must be a dict containing the following keys (and none other): {expected_keys}')
     if not all((isinstance(v, str) for v in replacements.values())):
         raise TypeError('The values of replacements must all be strings')
 
     # replace bad col names
-    translator = {ord(k):v for k, v in replacements.items()}
+    translator = {ord(k): v for k, v in replacements.items()}
     new_df = df.copy(deep=True)
     renamer = lambda col: col.translate(translator) if isinstance(col, str) else col
     new_df = new_df.rename(columns=renamer).rename_axis(index=renamer)
@@ -127,9 +128,10 @@ def fix_psycopg2_bad_cols(df:pd.DataFrame, replacements:dict={'%':'', '(':'', ')
     return new_df
 
 
-# ## Function to adjust the size of chunks to upsert (depending on a DataFrame's shape and what a database allows for SQL parameters)
+# ## Function to adjust the size of chunks to upsert
+# (depending on a DataFrame's shape and what a database allows for SQL parameters)
 
-def adjust_chunksize(con:Connectable, df:pd.DataFrame, chunksize:int):
+def adjust_chunksize(con: Connectable, df: pd.DataFrame, chunksize: int) -> int:
     """
     Checks if given `chunksize` is appropriate for upserting rows in given database using
     given DataFrame.
@@ -196,7 +198,7 @@ def adjust_chunksize(con:Connectable, df:pd.DataFrame, chunksize:int):
     validate_chunksize_param(chunksize=chunksize)
 
     # get maximum number of parameters depending on the database
-    dialect = con.dialect.dialect_description
+    dialect = con.dialect.dialect_description  # type: ignore  # dialect attribute does exist
     if 'sqlite' in dialect:
         maximum = 32766 if _sqlite_gt3_32_0() else 999
     elif 'asyncpg' in dialect:
@@ -211,7 +213,8 @@ def adjust_chunksize(con:Connectable, df:pd.DataFrame, chunksize:int):
     # adjust chunksize
     new_chunksize = floor(maximum / (len(df.columns) + df.index.nlevels))
     if new_chunksize < 1:
-        raise TooManyColumnsForUpsertException('The df has more columns+index levels than the maxmimum number of allowed parameters '
+        raise TooManyColumnsForUpsertException('The df has more columns+index levels than the maxmimum '
+                                               'number of allowed parameters '
                                                'for given database for a query (we could not even upsert row by row).')
     if chunksize > new_chunksize:
         log(f'Reduced chunksize from {chunksize} to {new_chunksize} due '

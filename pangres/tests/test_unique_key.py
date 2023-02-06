@@ -57,14 +57,14 @@ df_new = pd.DataFrame(data_new).set_index(['order_id', 'product_id'])
 @drop_table_between_tests(table_name=TableNames.UNIQUE_KEY)
 def run_test_upsert_with_unique_keys(engine, schema):
     # create table model
-    Base = declarative_base(bind=engine)
+    Base = declarative_base()
 
     class TestUniqueKey(Base, TestUniqueKeyBase):
         __table_args__ = (UniqueConstraint('order_id', 'product_id'),
-                          {'schema':schema})
+                          {'schema': schema})
 
     # create table
-    Base.metadata.create_all()
+    Base.metadata.create_all(bind=engine)
     table_name = TestUniqueKey.__tablename__
 
     # config/local helpers
@@ -106,7 +106,7 @@ async def run_test_upsert_with_unique_keys_async(engine, schema):
 
     class TestUniqueKey(Base, TestUniqueKeyBase):
         __table_args__ = (UniqueConstraint('order_id', 'product_id'),
-                          {'schema':schema})
+                          {'schema': schema})
 
     # create table
     async with engine.connect() as connection:

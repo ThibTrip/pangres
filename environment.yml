@@ -1,15 +1,20 @@
 name: pangres-dev
+channels:
+  - conda-forge
 dependencies:
   - pip
-  - pytest
-  - pytest-cov
-  - pytest-benchmark
   - psycopg2
-  - pymysql
-  - tabulate
   - pip:
     - asyncpg
     - aiosqlite
     - aiomysql
     - cx_Oracle
+    - cryptography
+    - flake8
+    - mypy
     - npdoc_to_md
+    - pymysql
+    - pytest
+    - pytest-benchmark
+    - pytest-cov
+    - tabulate

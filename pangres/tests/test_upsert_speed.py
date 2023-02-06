@@ -4,7 +4,7 @@
 import pytest
 from pandas import __version__ as pandas_version
 from sqlalchemy import __version__ as sqla_version
-
+from typing import Any, Dict
 # local imports
 from pangres import aupsert, upsert
 from pangres.helpers import _version_equal_or_greater_than
@@ -47,8 +47,8 @@ def skip_if_sqlalchemy_pandas_conflict():
 # synchronous versions of the benchmark subfunctions.
 
 # iterations has to be 1 when there is a setup
-pytest_params = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 1], [1_000, 1, 1]],
-                     ids=['many_little_inserts', 'big_insert'])
+pytest_params: Dict[str, Any] = dict(argnames='nb_rows, rounds, iterations', argvalues=[[10, 5, 1], [1_000, 1, 1]],
+                                     ids=['many_little_inserts', 'big_insert'])
 
 # ## "Normal" insert speed
 #

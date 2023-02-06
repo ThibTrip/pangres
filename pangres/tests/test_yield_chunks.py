@@ -4,7 +4,7 @@
 """
 This module tests we can get information back from
 the upserted chunks when the parameter `yield_chunks`
-is True. It also check the integrity of the data.
+is True. It also checks the integrity of the data.
 """
 import math
 import pandas as pd
@@ -84,11 +84,11 @@ async def run_test_get_nb_rows_async(engine, schema):
 # +
 @drop_table_between_tests(table_name=TableNames.WITH_YIELD_EMPTY)
 def run_test_yield_empty_df(engine, schema):
-    df = pd.DataFrame({'id':[], 'value':[]}).set_index('id')
+    df = pd.DataFrame({'id': [], 'value': []}).set_index('id')
 
     # we should get an empty generator back
     iterator = upsert(con=engine, df=df, table_name=TableNames.WITH_YIELD_EMPTY, if_row_exists='update',
-                      schema=schema, dtype={'id':INT, 'value':INT}, yield_chunks=True)
+                      schema=schema, dtype={'id': INT, 'value': INT}, yield_chunks=True)
 
     # the for loop should never run because the generator should be empty
     for result in iterator:
@@ -98,11 +98,11 @@ def run_test_yield_empty_df(engine, schema):
 
 @adrop_table_between_tests(table_name=TableNames.WITH_YIELD_EMPTY)
 async def run_test_yield_empty_df_async(engine, schema):
-    df = pd.DataFrame({'id':[], 'value':[]}).set_index('id')
+    df = pd.DataFrame({'id': [], 'value': []}).set_index('id')
 
     # we should get an empty generator back
     async_gen = await aupsert(con=engine, df=df, table_name=TableNames.WITH_YIELD_EMPTY, if_row_exists='update',
-                              schema=schema, dtype={'id':INT, 'value':INT}, yield_chunks=True)
+                              schema=schema, dtype={'id': INT, 'value': INT}, yield_chunks=True)
 
     # the for loop should never run because the generator should be empty
     async for result in async_gen:

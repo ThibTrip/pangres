@@ -29,6 +29,13 @@ jobs:
           python3 -m venv venv
           . venv/bin/activate
           pip install -r requirements.txt
+
+    - run:
+        name: check linting with flake8
+        command: |
+          pip install flake8
+          flake8 . --exclude venv
+
     - save_cache:
         paths:
         - ./venv
@@ -40,13 +47,16 @@ jobs:
           # install package (fetches setup.py in current directory)
           pip install .
           # we need cryptography for MySQL
-          pip install codecov coverage numpy pytest pytest-benchmark pytest-cov
+          pip install codecov coverage flake8 numpy pytest pytest-benchmark pytest-cov
           pip install aiosqlite aiomysql asyncpg psycopg2 pymysql cx_Oracle cryptography tabulate npdoc_to_md
           # use pytest
-          ## first test with sqlalchemy latest i.e. sqlalchemy>=1.4 (after API changes, notably engine.has_table being deprecated)
+          ## first test with sqlalchemy latest i.e. sqlalchemy==2
           pytest -sxv pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:// --async_sqlite_conn=sqlite+aiosqlite:///test.db --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --async_pg_conn=postgresql+asyncpg://circleci_user:password@localhost:5432/circleci_test --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test --async_mysql_conn=mysql+aiomysql://circleci_user:password@127.0.0.1:3306/circleci_test --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
           ## second test with sqlalchemy<1.4 (before API changes)
           pip install sqlalchemy==1.3.24
+          pytest -sxv pangres --cov=pangres --cov-append --doctest-modules --sqlite_conn=sqlite:// --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
+          ## third test with sqlalchemy==1.4.46
+          pip install sqlalchemy==1.4.46
           pytest -sxv pangres --cov=pangres --cov-append --doctest-modules --sqlite_conn=sqlite:// --pg_conn=postgresql://circleci_user:password@localhost:5432/circleci_test?sslmode=disable --mysql_conn=mysql+pymysql://circleci_user:password@127.0.0.1:3306/circleci_test --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
           codecov
 workflows:

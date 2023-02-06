@@ -10,7 +10,7 @@
 _Thanks to [freesvg.org](https://freesvg.org/) for the logo assets_
 
 Upsert with pandas DataFrames (<code>ON CONFLICT DO NOTHING</code> or <code>ON CONFLICT DO UPDATE</code>) for PostgreSQL, MySQL, SQlite and potentially other databases behaving like SQlite (untested) with some additional optional features (see features). Upserting can be done with **primary keys** or **unique keys**.
-Pangres also handles the creation of non existing SQL tables and schemas.
+Pangres also handles the creation of non-existing SQL tables and schemas.
 
 
 # Features
@@ -31,10 +31,22 @@ Pangres also handles the creation of non existing SQL tables and schemas.
 * Python >= 3.6.4
 * See also ./pangres/requirements.txt
 
+## Requirements for sqlalchemy>=2.0
+
+For using `pangres` together with **`sqlalchemy>=2.0`** (sqlalchemy is one of pangres dependencies
+listed in requirements.txt) - you will need the following base requirements:
+* `alembic>=1.7.2`
+* `pandas>=1.4.0`
+* Python >= 3.8 (`pandas>=1.4.0` only supports Python >=3.8)
+
+## Requirements for asynchronous engines
+
+For using asynchronous engines (such as `aiosqlite`, `asyncpg` or `aiomysql`) you will need **Python >= 3.8**.
+
 # Gotchas and caveats
 
 ## All flavors
-1. We can't create JSON columns automatically but we can insert JSON like objects (list, dict) in existing JSON columns.
+1. We can't create JSON columns automatically, but we can insert JSON like objects (list, dict) in existing JSON columns.
 
 ## Postgres
 
@@ -102,10 +114,10 @@ Note:
 
 The wiki is generated with a command which uses my library [npdoc_to_md](https://github.com/ThibTrip/npdoc_to_md).
 It must be installed with `pip install npdoc_to_md` and you will also need the extra dependency `fire` which you
-can install with `pip install fire`.
+can install with `pip install fire`. Replace `$DESTINATION_FOLDER` with the folder of you choice in the command below:
 
 ```bash
-npdoc-to-md render-folder ./wiki/templates ./wiki
+npdoc-to-md render-folder ./wiki_templates $DESTINATION_FOLDER
 ```
 
 # Contributing
@@ -123,6 +135,8 @@ If you wish you can also use the provided **conda environment** (see `environmen
 thanks to [**nb_conda_kernels**](https://github.com/Anaconda-Platform/nb_conda_kernels).
 
 # Testing
+
+## Pytest
 
 You can test one or multiple of the following SQL flavors (you will of course need a live database for this): PostgreSQL, SQlite or MySQL.
 
@@ -156,3 +170,15 @@ Additionally, the following flags could be of interest for you:
 * `-x` for stopping at the first failure
 * `--benchmark-only` for only testing benchmarks
 * `--benchmark-skip` for skipping benchmarks
+
+## flake8
+
+flake8 must run without errors for pipelines to succeed.
+If you are not using the conda environment, you can install flake8 with: `pip install flake8`.
+
+To test flake8 locally you can simply execute this command:
+
+```
+flake8 .
+```
+

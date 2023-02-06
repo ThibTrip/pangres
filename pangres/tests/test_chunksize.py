@@ -43,7 +43,8 @@ async def run_test_various_chunksizes_async(engine, schema, chunksize, nb_rows):
     # MySQL does not want flexible text length in indices/PK
     await aupsert(con=engine, schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES,
                   df=df, chunksize=chunksize, if_row_exists='update')
-    df_db = await _TestsExampleTable.aread_from_db(engine=engine, schema=schema, table_name=TableNames.VARIOUS_CHUNKSIZES)
+    df_db = await _TestsExampleTable.aread_from_db(engine=engine, schema=schema,
+                                                   table_name=TableNames.VARIOUS_CHUNKSIZES)
 
     # sort index (for MySQL...)
     pd.testing.assert_frame_equal(df.sort_index(), df_db.sort_index())

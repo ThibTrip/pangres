@@ -2,11 +2,11 @@
 """
 Tools for handling transactions in pangres
 """
-from sqlalchemy.engine.base import Connectable, Connection, Engine, Transaction
+from sqlalchemy.engine import Connectable, Connection, Engine, Transaction
 from typing import Union
-
 # local imports
 from pangres.helpers import _sqla_gt14
+from pangres.pangres_types import AsyncConnection, AsyncTransaction
 
 
 # -
@@ -61,17 +61,17 @@ class TransactionHandler:
     |  1 |    2 |
     """
 
-    def __init__(self, connectable):
+    def __init__(self, connectable: Connectable):
         # set attrs
         self.connectable = connectable
         # we will set this when we enter the context
-        self.connection:Connection = None
-        self.transaction:Union[Transaction, None] = None
+        self.connection: Union[AsyncConnection, Connection, None] = None
+        self.transaction: Union[AsyncTransaction, Transaction, None] = None
 
     def _close_resources(self):
         # we are nesting try...finally (see __exit__ method) to ensure
-        # both resources get closed and we get all tracebacks (we'll see "... another exception occured")
-        # idk if this is the best way to do this but my only other idea was raising two errors at once
+        # both resources get closed, and we get all tracebacks (we'll see "... another exception occurred")
+        # IDK if this is the best way to do this but my only other idea was raising two errors at once
         # (in case the transaction and/or the connection does not close) which does not seem user-friendly
         try:
             # close transaction if we created one
@@ -103,14 +103,14 @@ class TransactionHandler:
                 raise e
         return self
 
-    def _rollback_or_commit(self, exception_occured:bool):
-        # case where we were inside a transaction from the user
-        # the user will have to handle rollback and commit
+    def _rollback_or_commit(self, exception_occurred: bool) -> None:
+        # case where we were inside a transaction from the user.
+        # The user will have to handle rollback and commit
         if self.transaction is None:
             return
 
         # case where we created the transaction
-        if exception_occured:
+        if exception_occurred:
             self.transaction.rollback()
         else:
             self.transaction.commit()
@@ -121,12 +121,12 @@ class TransactionHandler:
             raise AssertionError('No active connection. Perhaps the context manager was not properly entered?')
 
         # combine step 3) rollback or commit and 4) closing resources
-        exception_occured = ex_type is not None
+        exception_occurred = ex_type is not None
         try:
-            self._rollback_or_commit(exception_occured=exception_occured)
+            self._rollback_or_commit(exception_occurred=exception_occurred)
         finally:
             self._close_resources()
-        return not exception_occured  # will be reraised if False
+        return not exception_occurred  # will be reraised if False
 
     # ASYNC VARIANTS of methods above that we will prefix with "a"
     # (note that __aenter__ and __aexit__ are special names for
@@ -143,7 +143,7 @@ class TransactionHandler:
             if self.connection is not None and isinstance(self.connectable, AsyncEngine):
                 await self.connection.close()
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> 'TransactionHandler':
         # make sure the sqlalchemy version allows for async usage
         # we only need to do this on entry of the context manager
         if not _sqla_gt14():
@@ -167,24 +167,26 @@ class TransactionHandler:
                 raise e
         return self
 
-    async def _arollback_or_commit(self, exception_occured:bool):
-        # case where we were inside a transaction from the user
-        # the user will have to handle rollback and commit
+    async def _arollback_or_commit(self, exception_occurred: bool) -> None:
+        # case where we were inside a transaction from the user.
+        # The user will have to handle rollback and commit
         if self.transaction is None:
             return
 
         # case where we created the transaction
-        if exception_occured:
-            await self.transaction.rollback()
+        # use type ignore because this function is only to be used in an async context so for an async transaction
+        # (should be AsyncTransaction object, but let's not enforce it with e.g. assert)
+        if exception_occurred:
+            await self.transaction.rollback()  # type: ignore
         else:
-            await self.transaction.commit()
+            await self.transaction.commit()  # type: ignore
 
-    async def __aexit__(self, ex_type, exc, tb):
+    async def __aexit__(self, ex_type, exc, tb) -> bool:
         if self.connection is None:  # pragma: no cover
             raise AssertionError('No active connection. Perhaps the context manager was not properly entered?')
-        exception_occured = ex_type is not None
+        exception_occurred = ex_type is not None
         try:
-            await self._arollback_or_commit(exception_occured=exception_occured)
+            await self._arollback_or_commit(exception_occurred=exception_occurred)
         finally:
             await self._aclose_resources()
-        return not exception_occured  # will be reraised if False
+        return not exception_occurred  # will be reraised if False

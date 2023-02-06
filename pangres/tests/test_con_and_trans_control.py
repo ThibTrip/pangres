@@ -64,7 +64,7 @@ def run_test_transaction(engine, schema, trans_op):
     table_name = TableNames.COMMIT_OR_ROLLBACK_TRANS
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
-                         if_row_exists='update', dtype={'ix':VARCHAR(3)})
+                         if_row_exists='update', dtype={'ix': VARCHAR(3)})
 
     with engine.connect() as connection:
         trans = connection.begin()
@@ -72,7 +72,7 @@ def run_test_transaction(engine, schema, trans_op):
             # do some random upsert operation
             upsert(con=connection, df=df, **common_kwargs)
             # do some other operation that requires commit
-            upsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+            upsert(con=connection, df=df.rename(index={'foo': 'bar'}), **common_kwargs)
             getattr(trans, trans_op)()  # commit or rollback
         finally:
             trans.close()
@@ -97,7 +97,7 @@ async def run_test_transaction_async(engine, schema, trans_op):
     table_name = TableNames.COMMIT_OR_ROLLBACK_TRANS
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
-                         if_row_exists='update', dtype={'ix':VARCHAR(3)})
+                         if_row_exists='update', dtype={'ix': VARCHAR(3)})
 
     async with engine.connect() as connection:
         trans = await connection.begin()
@@ -105,7 +105,7 @@ async def run_test_transaction_async(engine, schema, trans_op):
             # do some random upsert operation
             await aupsert(con=connection, df=df, **common_kwargs)
             # do some other operation that requires commit
-            await aupsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+            await aupsert(con=connection, df=df.rename(index={'foo': 'bar'}), **common_kwargs)
             coro = getattr(trans, trans_op)  # commit or rollback
             await coro()
         finally:
@@ -136,7 +136,7 @@ def run_test_commit_as_you_go(engine, schema):
     table_name = TableNames.COMMIT_AS_YOU_GO
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
-                         if_row_exists='update', dtype={'ix':VARCHAR(3)})
+                         if_row_exists='update', dtype={'ix': VARCHAR(3)})
 
     with engine.connect() as connection:
         # skip for sqlalchemy < 2.0 or when future=True flag is not passed
@@ -151,7 +151,7 @@ def run_test_commit_as_you_go(engine, schema):
         connection.commit()
 
         # do some other operation that requires commit and then rollback
-        upsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+        upsert(con=connection, df=df.rename(index={'foo': 'bar'}), **common_kwargs)
         connection.rollback()
 
     # the table in the db should be equal to the initial df as the second
@@ -166,7 +166,7 @@ async def run_test_commit_as_you_go_async(engine, schema):
     table_name = TableNames.COMMIT_AS_YOU_GO
     # common keyword arguments for multiple upsert operations below
     common_kwargs = dict(schema=schema, table_name=table_name,
-                         if_row_exists='update', dtype={'ix':VARCHAR(3)})
+                         if_row_exists='update', dtype={'ix': VARCHAR(3)})
 
     async with engine.connect() as connection:
         # do some random upsert operation and commit
@@ -174,7 +174,7 @@ async def run_test_commit_as_you_go_async(engine, schema):
         await connection.commit()
 
         # do some other operation that requires commit and then rollback
-        await aupsert(con=connection, df=df.rename(index={'foo':'bar'}), **common_kwargs)
+        await aupsert(con=connection, df=df.rename(index={'foo': 'bar'}), **common_kwargs)
         await connection.rollback()
 
     # the table in the db should be equal to the initial df as the second

@@ -8,23 +8,24 @@ import logging
 import os
 
 loggers = {}
-log_method_switch = {logging.CRITICAL:'critical', # same level as fatal
-                     logging.ERROR:'error',
-                     logging.WARNING:'warning',
-                     logging.INFO:'info',
-                     logging.DEBUG:'debug'}
+log_method_switch = {logging.CRITICAL: 'critical',  # same level as fatal
+                     logging.ERROR: 'error',
+                     logging.WARNING: 'warning',
+                     logging.INFO: 'info',
+                     logging.DEBUG: 'debug'}
 
 
-def log(text, name='pangres', level=logging.INFO):
+def log(text, name: str = 'pangres', level: int = logging.INFO):
     """
     Logs given text to stderr (default of the logging library).
     Parameters
     ----------
-    text : str
+    text
         Text to log
-    name : str, default "pangres"
-        Name of the logger
-    level : int, default logging.INFO
+    name
+        The name of the logger
+    level
+        default logging.INFO
 
     Notes
     -----
@@ -42,10 +43,10 @@ def log(text, name='pangres', level=logging.INFO):
     >>> os.environ['PANGRES_LOG_LEVEL'] = str(logging.WARNING) # doctest: +SKIP
     >>>
     >>> # this won't log anything (INFO level < WARNING level)
-    >>> log('info', level=logging.INFO) # doctest: +SKIP
+    >>> log('info', level=logging.INFO)  # doctest: +SKIP
     >>>
     >>> # this will log something
-    >>> log('warn', level=logging.WARNING) # doctest: +SKIP
+    >>> log('warn', level=logging.WARNING)  # doctest: +SKIP
     """
     # get the appropriate log method (info, warning etc.)
     try:

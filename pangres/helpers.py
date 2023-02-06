@@ -13,7 +13,7 @@ def _py_gt3_10() -> bool:
     return (py_v.major > 3) or ((py_v.major >= 3) and (py_v.minor >= 10))
 
 
-def _version_equal_or_greater_than(version_string:str, minimal_version_string:str) -> bool:
+def _version_equal_or_greater_than(version_string: str, minimal_version_string: str) -> bool:
     """
     Returns True if a library has a version greater or equal than `minimal_version_string`.
     Otherwise returns False.
@@ -50,6 +50,15 @@ def _sqla_gt14() -> bool:
                                           minimal_version_string='1.4.0')
 
 
+def _sqla_gt20() -> bool:
+    """
+    Same as function `_sqla_gt14` for checking if sqlalchemy>=2.0.0
+    """
+    import sqlalchemy
+    return _version_equal_or_greater_than(version_string=sqlalchemy.__version__,
+                                          minimal_version_string='2.0.0')
+
+
 def _sqlite_gt3_32_0() -> bool:
     """
     Checks if the SQLite version is >= than 3.32.0.
@@ -65,7 +74,7 @@ def _sqlite_gt3_32_0() -> bool:
 
 # # Parameters checking
 
-def validate_chunksize_param(chunksize:int):
+def validate_chunksize_param(chunksize: int) -> None:
     if not isinstance(chunksize, int):
         raise TypeError(f'Expected chunksize to be an int. Got {type(chunksize)}')
     if chunksize <= 0:

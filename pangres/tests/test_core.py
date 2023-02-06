@@ -32,7 +32,7 @@ from pangres.tests.conftest import (adrop_schema, adrop_table, adrop_table_betwe
 df = _TestsExampleTable.create_example_df(nb_rows=6)
 # test nulls won't create any problems
 # avoid nulls in boolean column though as this is unpractical with pandas in older versions
-df.iloc[0,[ix for ix, col in enumerate(df.columns) if col != 'likes_pizza']] = None
+df.iloc[0, [ix for ix, col in enumerate(df.columns) if col != 'likes_pizza']] = None
 
 # df from which we will upsert_or_aupsert update or upsert_or_aupsert ignore
 # remove one record from above and add one
@@ -66,7 +66,8 @@ def run_test_end_to_end(engine, schema, create_table, if_row_exists, df_expected
     # config
     table_name = TableNames.END_TO_END
     common_kwargs_upsert = dict(if_row_exists=if_row_exists, table_name=table_name)
-    read_table = lambda: _TestsExampleTable.read_from_db(engine=engine, schema=schema, table_name=table_name).sort_index()
+    read_table = lambda: _TestsExampleTable.read_from_db(engine=engine, schema=schema,
+                                                         table_name=table_name).sort_index()
 
     # 1. create table
     upsert(con=engine, schema=schema, df=df, create_table=True, **common_kwargs_upsert)
@@ -107,8 +108,8 @@ async def run_test_end_to_end_async(engine, schema, create_table, if_row_exists,
 def run_test_add_new_column(engine, schema):
     # config
     table_name = TableNames.ADD_NEW_COLUMN
-    dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
-    df = pd.DataFrame({'id':['foo']}).set_index('id')
+    dtype = {'id': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = pd.DataFrame({'id': ['foo']}).set_index('id')
     # common kwargs for all the times we use upsert_or_aupsert
     common_kwargs = dict(con=engine, schema=schema, table_name=table_name,
                          if_row_exists='update', dtype=dtype)
@@ -127,8 +128,8 @@ def run_test_add_new_column(engine, schema):
 async def run_test_add_new_column_async(engine, schema):
     # config
     table_name = TableNames.ADD_NEW_COLUMN
-    dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
-    df = pd.DataFrame({'id':['foo']}).set_index('id')
+    dtype = {'id': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = pd.DataFrame({'id': ['foo']}).set_index('id')
     # common kwargs for all the times we use upsert_or_aupsert
     common_kwargs = dict(con=engine, schema=schema, table_name=table_name,
                          if_row_exists='update', dtype=dtype)
@@ -156,8 +157,8 @@ def run_test_adapt_column_type(engine, schema):
 
     # config
     table_name = TableNames.CHANGE_EMPTY_COL_TYPE
-    dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
-    df = pd.DataFrame({'id':['foo'], 'empty_column':[None]}).set_index('id')
+    dtype = {'id': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = pd.DataFrame({'id': ['foo'], 'empty_column': [None]}).set_index('id')
     # common kwargs for all the times we use upsert_or_aupsert
     common_kwargs = dict(con=engine, schema=schema, df=df, table_name=table_name,
                          if_row_exists='update', dtype=dtype)
@@ -177,8 +178,8 @@ async def run_test_adapt_column_type_async(engine, schema):
 
     # config
     table_name = TableNames.CHANGE_EMPTY_COL_TYPE
-    dtype = {'id':VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
-    df = pd.DataFrame({'id':['foo'], 'empty_column':[None]}).set_index('id')
+    dtype = {'id': VARCHAR(5)} if 'mysql' in engine.dialect.dialect_description else None
+    df = pd.DataFrame({'id': ['foo'], 'empty_column': [None]}).set_index('id')
     # common kwargs for all the times we use upsert_or_aupsert
     common_kwargs = dict(con=engine, schema=schema, df=df, table_name=table_name,
                          if_row_exists='update', dtype=dtype)
@@ -197,14 +198,14 @@ async def run_test_adapt_column_type_async(engine, schema):
 # +
 @drop_table_between_tests(table_name=TableNames.CREATE_SCHEMA_NONE)
 def run_test_create_schema_none(engine, schema):
-    df = pd.DataFrame({'id':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0]}).set_index('id')
     upsert(con=engine, schema=None, df=df, if_row_exists='update', create_schema=True,
            table_name=TableNames.CREATE_SCHEMA_NONE, create_table=True)
 
 
 @adrop_table_between_tests(table_name=TableNames.CREATE_SCHEMA_NONE)
 async def run_test_create_schema_none_async(engine, schema):
-    df = pd.DataFrame({'id':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0]}).set_index('id')
     await aupsert(con=engine, schema=None, df=df, if_row_exists='update', create_schema=True,
                   table_name=TableNames.CREATE_SCHEMA_NONE, create_table=True)
 
@@ -223,7 +224,7 @@ def run_test_create_schema_not_none(engine, schema):
     schema = schema_for_testing_creation
 
     # config
-    df = pd.DataFrame({'id':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0]}).set_index('id')
     table_name = TableNames.CREATE_SCHEMA_NOT_NONE
 
     # drop table before test (could not get my decorator to work with another schema
@@ -260,7 +261,7 @@ async def run_test_create_schema_not_none_async(engine, schema):
     schema = schema_for_testing_creation
 
     # config
-    df = pd.DataFrame({'id':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0]}).set_index('id')
     table_name = TableNames.CREATE_SCHEMA_NOT_NONE
 
     # drop table before test (could not get my decorator to work with another schema
@@ -300,7 +301,7 @@ def run_test_insert_missing_table(engine, schema):
     Check if an error is raised when trying to insert in a missing table
     and `create_table` is False.
     """
-    df = pd.DataFrame({'id':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0]}).set_index('id')
     with pytest.raises((OperationalError, ProgrammingError)) as excinfo:
         upsert(con=engine, schema=schema, df=df, table_name=TableNames.NO_TABLE,
                if_row_exists='update', create_table=False)
@@ -312,7 +313,7 @@ async def run_test_insert_missing_table_async(engine, schema):
     Check if an error is raised when trying to insert in a missing table
     and `create_table` is False.
     """
-    df = pd.DataFrame({'id':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0]}).set_index('id')
     with pytest.raises((OperationalError, ProgrammingError)) as excinfo:
         await aupsert(con=engine, schema=schema, df=df, table_name=TableNames.NO_TABLE,
                       if_row_exists='update', create_table=False)
@@ -334,11 +335,11 @@ def run_test_mysql_pk_not_auto_incremented(engine, schema):
     table_name = TableNames.PK_MYSQL
 
     # upsert first df using pangres which creates the table automatically
-    df1 = pd.DataFrame({'id':[0, 1], 'name':['foo', 'bar']}).set_index('id')
+    df1 = pd.DataFrame({'id': [0, 1], 'name': ['foo', 'bar']}).set_index('id')
     upsert(con=engine, df=df1, table_name=table_name, if_row_exists='update')
 
     # upsert second df
-    df2 = pd.DataFrame({'id':[100, 200], 'name':['baz', 'qux']}).set_index('id')
+    df2 = pd.DataFrame({'id': [100, 200], 'name': ['baz', 'qux']}).set_index('id')
     upsert(con=engine, df=df2, table_name=table_name, if_row_exists='update')
 
     # read df back
@@ -356,11 +357,11 @@ async def run_test_mysql_pk_not_auto_incremented_async(engine, schema):
     table_name = TableNames.PK_MYSQL
 
     # upsert first df using pangres which creates the table automatically
-    df1 = pd.DataFrame({'id':[0, 1], 'name':['foo', 'bar']}).set_index('id')
+    df1 = pd.DataFrame({'id': [0, 1], 'name': ['foo', 'bar']}).set_index('id')
     await aupsert(con=engine, df=df1, table_name=table_name, if_row_exists='update')
 
     # upsert second df
-    df2 = pd.DataFrame({'id':[100, 200], 'name':['baz', 'qux']}).set_index('id')
+    df2 = pd.DataFrame({'id': [100, 200], 'name': ['baz', 'qux']}).set_index('id')
     await aupsert(con=engine, df=df2, table_name=table_name, if_row_exists='update')
 
     # read df back
@@ -392,7 +393,7 @@ def test_end_to_end(engine, schema, create_table, if_row_exists, df_expected):
 
 @pytest.mark.parametrize('use_async', [False, True], ids=['upsert', 'aupsert'])
 def test_bad_value_if_row_exists(_, use_async):
-    df = pd.DataFrame({'id':[0]}).set_index('id')
+    df = pd.DataFrame({'id': [0]}).set_index('id')
     engine = create_engine('sqlite:///')
     upsert_func = upsert if use_async else aupsert
     upsert_kwargs = dict(con=engine, df=df, table_name=TableNames.NO_TABLE, if_row_exists='test')

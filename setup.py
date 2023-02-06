@@ -12,24 +12,25 @@ except FileNotFoundError:
     long_description = description
 
 
-with open(os.path.join(here, "requirements.txt"),"r") as f:
+with open(os.path.join(here, "requirements.txt"), "r") as f:
     requirements = [line.strip() for line in f.readlines()]
 
 
 setuptools.setup(
     name="pangres",
-    version="4.1.2",
+    version="4.1.3",
     license='The Unlicense',
     author="Thibault Bétrémieux",
     author_email="thibault.betremieux@gmail.com",
     url='https://github.com/ThibTrip/pangres',
-    download_url='https://github.com/ThibTrip/pangres/archive/v4.1.2.tar.gz',
-    keywords=['pandas','postgres', 'mysql', 'sqlite'],
+    download_url='https://github.com/ThibTrip/pangres/archive/v4.1.3.tar.gz',
+    keywords=['pandas', 'postgres', 'mysql', 'sqlite'],
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
     packages=setuptools.find_packages(),
     install_requires=requirements,
+    package_data={"pangres": ["py.typed"]},
     classifiers=["Development Status :: 5 - Production/Stable",
                  "Programming Language :: Python :: 3",
                  "Programming Language :: Python :: 3.6",
@@ -37,6 +38,7 @@ setuptools.setup(
                  "Programming Language :: Python :: 3.8",
                  "Programming Language :: Python :: 3.9",
                  "Programming Language :: Python :: 3.10",
+                 "Programming Language :: Python :: 3.11",
                  "License :: Public Domain",
                  "Intended Audience :: Developers",
                  "Operating System :: OS Independent"])

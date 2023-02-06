@@ -3,7 +3,7 @@
 Read docstring of main class Executor
 """
 import pandas as pd
-from sqlalchemy.engine.base import Connectable
+from sqlalchemy.engine import Connectable
 from typing import Union
 
 # local imports
@@ -30,10 +30,10 @@ class Executor:
     See `pangres.core.upsert` for a description of the parameters.
     """
 
-    def __init__(self, df:pd.DataFrame, table_name:str, schema:Union[str, None],
-                 create_schema:bool, create_table:bool,
-                 add_new_columns:bool, adapt_dtype_of_empty_db_columns:bool,
-                 dtype:Union[dict, None]):
+    def __init__(self, df: pd.DataFrame, table_name: str, schema: Union[str, None],
+                 create_schema: bool, create_table: bool,
+                 add_new_columns: bool, adapt_dtype_of_empty_db_columns: bool,
+                 dtype: Union[dict, None]) -> None:
         self.df = df
         self.schema = schema
         self.table_name = table_name
@@ -43,7 +43,7 @@ class Executor:
         self.add_new_columns = add_new_columns
         self.adapt_dtype_of_empty_db_columns = adapt_dtype_of_empty_db_columns
 
-    def _setup_objects(self, pse:PandasSpecialEngine):
+    def _setup_objects(self, pse: PandasSpecialEngine) -> None:
         """
         Handles optional pre-upsert operations:
         1. creating the PostgreSQL schema
@@ -70,7 +70,7 @@ class Executor:
         if self.add_new_columns and pse.table_exists():
             pse.add_new_columns()
 
-    def execute(self, connectable:Connectable, if_row_exists:str, chunksize:int) -> None:
+    def execute(self, connectable: Connectable, if_row_exists: str, chunksize: int) -> None:
         """
         Handles the actual upsert operation.
         """
@@ -86,7 +86,7 @@ class Executor:
                 return
             pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize)
 
-    def execute_yield(self, connectable:Connectable, if_row_exists:str, chunksize:int):
+    def execute_yield(self, connectable: Connectable, if_row_exists: str, chunksize: int):
         """
         Same as `execute` but for each chunk upserted yields a
         `sqlalchemy.engine.cursor.LegacyCursorResult` object with which
@@ -110,7 +110,7 @@ class Executor:
                 yield result
 
     # ASYNC VARIANTS of methods above that we will prefix with "a"
-    async def _asetup_objects(self, pse:PandasSpecialEngine):
+    async def _asetup_objects(self, pse: PandasSpecialEngine) -> None:
         if self.create_schema and pse.schema is not None:
             await pse.acreate_schema_if_not_exists()
 
@@ -130,11 +130,13 @@ class Executor:
             if table_exists:
                 await pse.aadd_new_columns()
 
-    async def aexecute(self, async_connectable, if_row_exists:str, chunksize:int) -> None:
+    async def aexecute(self, async_connectable, if_row_exists: str, chunksize: int) -> None:
         async with TransactionHandler(connectable=async_connectable) as trans:
             # setup
-            pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
-                                      table_name=self.table_name, schema=self.schema,
+            pse = PandasSpecialEngine(connection=trans.connection,  # type: ignore
+                                      df=self.df,
+                                      table_name=self.table_name,
+                                      schema=self.schema,
                                       dtype=self.dtype)
             await self._asetup_objects(pse=pse)
 
@@ -143,18 +145,20 @@ class Executor:
                 return
             await pse.aupsert(if_row_exists=if_row_exists, chunksize=chunksize)
 
-    async def aexecute_yield(self, async_connectable, if_row_exists:str, chunksize:int):
+    async def aexecute_yield(self, async_connectable, if_row_exists: str, chunksize: int):
         async with TransactionHandler(connectable=async_connectable) as trans:
             # setup
-            pse = PandasSpecialEngine(connection=trans.connection, df=self.df,
-                                      table_name=self.table_name, schema=self.schema,
+            pse = PandasSpecialEngine(connection=trans.connection,  # type: ignore
+                                      df=self.df,
+                                      table_name=self.table_name,
+                                      schema=self.schema,
                                       dtype=self.dtype)
             await self._asetup_objects(pse=pse)
 
             # upsert
             if len(self.df) == 0:
                 return
-                yield
+                yield  # noqa
             # IMPORTANT! NO `await`
             async for result in pse.aupsert_yield(if_row_exists=if_row_exists, chunksize=chunksize):
                 yield result

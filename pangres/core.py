@@ -6,30 +6,31 @@ This module contains the functions of pangres
 that will be directly exposed to its users.
 """
 import pandas as pd
-from sqlalchemy.engine.base import Connectable
-from typing import Optional, Union
+from sqlalchemy.engine import Connectable
+from typing import Union
 
 # local imports
 from pangres.executor import Executor
 from pangres.helpers import validate_chunksize_param
+from pangres.pangres_types import AsyncConnectable, AUpsertResult, UpsertResult
 
 
 # -
 
 # # upsert
 
-def upsert(con:Connectable,
-           df:pd.DataFrame,
-           table_name:str,
-           if_row_exists:str,
-           schema:Optional[str]=None,
-           create_schema:bool=False,
-           create_table:bool=True,
-           add_new_columns:bool=False,
-           adapt_dtype_of_empty_db_columns:bool=False,
-           chunksize:Optional[int]=None,
-           dtype:Union[dict,None]=None,
-           yield_chunks:bool=False):
+def upsert(con: Connectable,
+           df: pd.DataFrame,
+           table_name: str,
+           if_row_exists: str,
+           schema: Union[str, None] = None,
+           create_schema: bool = False,
+           create_table: bool = True,
+           add_new_columns: bool = False,
+           adapt_dtype_of_empty_db_columns: bool = False,
+           chunksize: Union[int, None] = None,
+           dtype: Union[dict, None] = None,
+           yield_chunks: bool = False) -> UpsertResult:
     """
     Insert updates/ignores a pandas DataFrame into a SQL table (or
     creates a SQL table from the DataFrame if it does not exist).
@@ -210,7 +211,7 @@ def upsert(con:Connectable,
     ...        if_row_exists='update',
     ...        dtype=dtype,
     ...        create_table=False)
-    >>> 
+    >>>
     >>> # Now we read from the database to check what we got and as you can see
     >>> # John Travolta was updated and Arnold Schwarzenegger was added!
     >>> with engine.connect() as connection:
@@ -299,24 +300,25 @@ def upsert(con:Connectable,
     # execute SQL operations
     if not yield_chunks:
         executor.execute(connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)
+        return None
     else:
         return executor.execute_yield(connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)
 
 
 # # Async upsert
 
-async def aupsert(con,
-                  df:pd.DataFrame,
-                  table_name:str,
-                  if_row_exists:str,
-                  schema:Optional[str]=None,
-                  create_schema:bool=False,
-                  create_table:bool=True,
-                  add_new_columns:bool=False,
-                  adapt_dtype_of_empty_db_columns:bool=False,
-                  chunksize:Optional[int]=None,
-                  dtype:Union[dict,None]=None,
-                  yield_chunks:bool=False):
+async def aupsert(con: AsyncConnectable,
+                  df: pd.DataFrame,
+                  table_name: str,
+                  if_row_exists: str,
+                  schema: Union[str, None] = None,
+                  create_schema: bool = False,
+                  create_table: bool = True,
+                  add_new_columns: bool = False,
+                  adapt_dtype_of_empty_db_columns: bool = False,
+                  chunksize: Union[int, None] = None,
+                  dtype: Union[dict, None] = None,
+                  yield_chunks: bool = False) -> AUpsertResult:
     """
     Asynchronous variant of `pangres.upsert`. Make sure to read its docstring
     before using this function!
@@ -324,7 +326,7 @@ async def aupsert(con,
     The parameters of `pangres.aupsert` are the same but parameter `con`
     will require an asynchronous connectable (asynchronous engine or asynchronous connection).
 
-    For example you can use PostgreSQL asynchronously with `sqlalchemy` thanks to
+    For example, you can use PostgreSQL asynchronously with `sqlalchemy` thanks to
     the library/driver `asyncpg`, or SQLite with `aiosqlite` or Mysql with `aiomysql`.
 
     **WARNING**
@@ -389,12 +391,12 @@ async def aupsert(con,
     >>> df = DocsExampleTable.df
     >>>
     >>> # Create table before inserting! This will avoid race conditions mentionned above
-    >>> # (here we are lazy so we'll use pangres to do that but we could also use a sqlalchemy ORM model)
-    >>> # By using `df.head(0)` we get 0 rows but we have all the information about columns, index levels
+    >>> # (here we are lazy, so we'll use pangres to do that, but we could also use a sqlalchemy ORM model)
+    >>> # By using `df.head(0)` we get 0 rows, but we have all the information about columns, index levels
     >>> # and data types that we need for creating the table.
     >>> # And in a second step (see coroutine `execute_upsert` that we define after)
     >>> # we will set all parameters that could cause structure changes
-    >>> # to False so we can run queries in parallel without worries!
+    >>> # to False, so we can run queries in parallel without worries!
     >>> async def setup():
     ...     await aupsert(con=engine, df=df.head(0),
     ...                   table_name='example',
@@ -455,6 +457,7 @@ async def aupsert(con,
     # execute SQL operations
     if not yield_chunks:
         await executor.aexecute(async_connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)
+        return None
     else:
         # IMPORTANT! NO `await` because this returns an asynchronous generator
         return executor.aexecute_yield(async_connectable=con, if_row_exists=if_row_exists, chunksize=chunksize)

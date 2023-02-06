@@ -9,15 +9,14 @@ import re
 import sqlalchemy as sa
 from copy import deepcopy
 from sqlalchemy import JSON, MetaData, select
-from sqlalchemy.engine.base import Connection, Engine
+from sqlalchemy.engine import Connection
 from sqlalchemy.sql import null
 from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema, Table
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
-from typing import List, Optional, Union
-
+from typing import Any, List, Union
 # local imports
-from pangres.helpers import _sqla_gt14
+from pangres.helpers import _sqla_gt14, _sqla_gt20
 from pangres.logger import log
 from pangres.exceptions import (BadColumnNamesException,
                                 DuplicateLabelsException,
@@ -25,6 +24,7 @@ from pangres.exceptions import (BadColumnNamesException,
                                 HasNoSchemaSystemException,
                                 MissingIndexLevelInSqlException,
                                 UnnamedIndexLevelsException)
+from pangres.pangres_types import AsyncConnection, AsyncConnectionOrAsyncEngine, ConnectionOrEngine
 from pangres.upsert_query import UpsertQuery
 # -
 
@@ -46,20 +46,20 @@ RE_POSTGRES = re.compile(r'psycopg|postgres')
 class PandasSpecialEngine:
 
     def __init__(self,
-                 connection:Connection,
-                 df:pd.DataFrame,
-                 table_name:str,
-                 schema:Optional[str]=None,
-                 dtype:Optional[dict]=None):
+                 connection: Union[AsyncConnection, Connection],
+                 df: pd.DataFrame,
+                 table_name: str,
+                 schema: Union[str, None] = None,
+                 dtype: Union[dict, None] = None) -> None:
         """
         Interacts with SQL tables via pandas and SQLalchemy table models.
 
         Attributes
         ----------
-        connection : sqlalchemy.engine.base.Connection
+        connection : sqlalchemy.engine.Connection or sqlalchemy.ext.asyncio.AsyncConnection
             Connection provided during class instantiation
         df : pd.DataFrame
-            DataFrame provided during class instantiation
+            The DataFrame provided during class instantiation
         table_name : str
             Table name provided during class instantiation
         schema : str or None
@@ -115,7 +115,7 @@ class PandasSpecialEngine:
         if self._db_type == "postgres":
             schema = 'public' if schema is None else schema
             # raise if we find columns with "(", ")" or "%"
-            bad_col_names = [col for col in df.columns if RE_BAD_COL_NAME.search(col)]
+            bad_col_names = [col for col in df.columns if isinstance(col, str) and RE_BAD_COL_NAME.search(col)]
             if len(bad_col_names) > 0:
                 err = ("psycopg2 (Python postgres driver) does not seem to support "
                        "column names with '%', '(' or ')' "
@@ -146,28 +146,26 @@ class PandasSpecialEngine:
                                            f"and columns: {duplicated_labels}")
 
         # detect json columns
-        def is_json(col:str):
+        def is_json(col: Any) -> bool:
             s = df[col].dropna()
-            return (not s.empty and
-                    s.map(lambda x: isinstance(x, (list, dict))).all())
+            return not s.empty and s.map(lambda x: isinstance(x, (list, dict))).all()
         json_cols = [col for col in df.columns if is_json(col)]
 
         # merge with dtype from user
-        new_dtype = {c:JSON for c in json_cols}
+        new_dtype = {c: JSON for c in json_cols}
         if dtype is not None:
             new_dtype.update(dtype)
-        new_dtype = None if new_dtype == {} else new_dtype
 
         # create sqlalchemy table model via pandas
-        pandas_sql_engine = pd.io.sql.SQLDatabase(engine=connection, schema=schema)
-        pandas_table = pd.io.sql.SQLTable(name=table_name,
+        pandas_sql_engine = pd.io.sql.SQLDatabase(engine=connection, schema=schema)  # type: ignore  # .sql does exist
+        pandas_table = pd.io.sql.SQLTable(name=table_name,  # type: ignore  # .sql does exist
                                           pandas_sql_engine=pandas_sql_engine,
                                           frame=df,
-                                          dtype=new_dtype)
+                                          dtype=None if new_dtype == {} else new_dtype)  # type: ignore
 
         # turn pandas table into a pure sqlalchemy table
         # inspired from https://github.com/pandas-dev/pandas/blob/main/pandas/io/sql.py#L815-L821
-        metadata = MetaData(bind=connection)
+        metadata = MetaData()
         if _sqla_gt14():
             table = pandas_table.table.to_metadata(metadata)
         else:
@@ -189,7 +187,7 @@ class PandasSpecialEngine:
         self.table = table
 
     @staticmethod
-    def _detect_db_type(connectable:Union[Connection, Engine]) -> str:
+    def _detect_db_type(connectable: Union[AsyncConnectionOrAsyncEngine, ConnectionOrEngine]) -> str:
         """
         Identifies whether the dialect of given sqlalchemy
         connection corresponds to postgres, mysql or another sql type.
@@ -208,7 +206,7 @@ class PandasSpecialEngine:
         else:
             return "other"
 
-    def _raise_no_schema_feature(self):
+    def _raise_no_schema_feature(self) -> None:
         """
         Function to raise an error if we try to do operations on schemas on a database that does not
         support such feature.
@@ -222,9 +220,9 @@ class PandasSpecialEngine:
     # in these methods we will add a `connection` parameter for passing a different type
     # of connection. This will be very useful for asynchronous connections.
     # AFAIK DDL operations do not support asynchronous execution. In the sqlalchemy
-    # guide as well as here we we'll use sync methods with the async connections
+    # guide as well as here we'll use sync methods with the async connections
     # using `connection.run_sync`
-    def schema_exists(self, connection=None) -> bool:
+    def schema_exists(self, connection: Union[Connection, None] = None) -> bool:
         """
         Returns True if the PostgreSQL defined in given instance
         of PandasSpecialEngine exists else returns False.
@@ -233,11 +231,11 @@ class PandasSpecialEngine:
         con = self.connection if connection is None else connection
         if _sqla_gt14():
             insp = sa.inspect(con)
-            return self.schema in insp.get_schema_names()
+            return self.schema in insp.get_schema_names()  # type: ignore
         else:
-            return con.dialect.has_schema(con, self.schema)
+            return con.dialect.has_schema(con, self.schema)  # type: ignore
 
-    def table_exists(self, connection=None) -> bool:
+    def table_exists(self, connection: Union[Connection, None] = None) -> bool:
         """
         Returns True if the table defined in given instance
         of PandasSpecialEngine exists else returns False.
@@ -245,12 +243,12 @@ class PandasSpecialEngine:
         con = self.connection if connection is None else connection
         insp = sa.inspect(con)
         if _sqla_gt14():
-            return insp.has_table(schema=self.schema, table_name=self.table.name)
+            return insp.has_table(schema=self.schema, table_name=self.table.name)  # type: ignore
         else:
             # this is not particularly efficient but AFAIK it's the best we can do at connection level
-            return self.table.name in insp.get_table_names(schema=self.schema)
+            return self.table.name in insp.get_table_names(schema=self.schema)  # type: ignore
 
-    def create_schema_if_not_exists(self, connection=None):
+    def create_schema_if_not_exists(self, connection: Union[Connection, None] = None) -> None:
         """
         Creates the schema defined in given instance of
         PandasSpecialEngine if it does not exist.
@@ -266,10 +264,10 @@ class PandasSpecialEngine:
                                  '(if that is the schema you wish to use).')  # pragma: no cover
         # acquire connection and create schema
         con = self.connection if connection is None else connection
-        if not self.schema_exists(connection=con):
+        if not self.schema_exists(connection=con):  # type: ignore  # we expect a Connection object
             con.execute(CreateSchema(self.schema))
 
-    def create_table_if_not_exists(self, connection=None):
+    def create_table_if_not_exists(self, connection: Union[Connection, None] = None) -> None:
         """
         Creates the table generated in given instance of
         PandasSpecialEngine if it does not exist.
@@ -277,7 +275,7 @@ class PandasSpecialEngine:
         con = self.connection if connection is None else connection
         self.table.create(bind=con, checkfirst=True)
 
-    def get_db_columns_names(self, connection=None) -> List[str]:
+    def get_db_columns_names(self, connection: Union[Connection, None] = None) -> List[str]:
         """
         Gets the column names of the SQL table defined
         in given instance of PandasSpecialEngine.
@@ -285,9 +283,10 @@ class PandasSpecialEngine:
         con = self.connection if connection is None else connection
         if _sqla_gt14():
             insp = sa.inspect(con)
-            columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)
+            columns_info = insp.get_columns(schema=self.schema, table_name=self.table.name)  # type: ignore
         else:
-            columns_info = con.dialect.get_columns(connection=con, schema=self.schema,
+            columns_info = con.dialect.get_columns(connection=con,  # type: ignore
+                                                   schema=self.schema,
                                                    table_name=self.table.name)
         db_columns_names = [col_info["name"] for col_info in columns_info]
         # handle case of SQlite where no errors are raised in case of a missing table
@@ -295,7 +294,7 @@ class PandasSpecialEngine:
         assert len(db_columns_names) > 0
         return db_columns_names
 
-    def add_new_columns(self, connection=None):
+    def add_new_columns(self, connection: Union[Connection, None] = None) -> None:
         """
         Adds columns present in df but not in the SQL table
         for given instance of PandasSpecialEngine.
@@ -306,22 +305,33 @@ class PandasSpecialEngine:
         """
         con = self.connection if connection is None else connection
         # get column names in db
-        db_columns = self.get_db_columns_names(connection=con)
-        # create deepcopies of the column because we are going to unbound
-        # them for the table model (otherwise alembic would think we add
-        # a column that already exists in the database)
-        cols_to_add = [deepcopy(col) for col in self.table.columns if col.name not in db_columns]
+        db_columns = self.get_db_columns_names(connection=con)  # type: ignore
+        # depending on the alembic version, we may need to unbind the columns
+        # from the table and for that we need to make deep copies of them.
+        #
+        # sqlalchemy>=2.0.0 will not allow deep copies of columns however
+        # according to my manual tests, sqlalchemy>=2.0.0 requires alembic>=1.7.2
+        # for the operation below and alembic>=1.7.2 does not require us to unbind
+        # the columns from the table.
+        if not _sqla_gt20():
+            cols_to_add = [deepcopy(col) for col in self.table.columns if col.name not in db_columns]
+            must_unbind_columns_from_table = True
+        else:
+            cols_to_add = [col for col in self.table.columns if col.name not in db_columns]
+            must_unbind_columns_from_table = False
+
         # check columns are not index levels
         if any((c.name in self.df.index.names for c in cols_to_add)):
             raise MissingIndexLevelInSqlException('Cannot add any column that is part of the df index!\n'
                                                   "You'll have to update your table primary key or change your "
                                                   "df index")
 
-        ctx = MigrationContext.configure(con)
+        ctx = MigrationContext.configure(con)  # type: ignore
         op = Operations(ctx)
         for col in cols_to_add:
-            col.table = None  # Important! unbound column from table
-            op.add_column(self.table.name, col, schema=self.schema)
+            if must_unbind_columns_from_table:
+                col.table = None
+            op.add_column(self.table.name, col, schema=self.schema)  # type: ignore  # attribute add_columns exists
             log(f"Added column {col} (type: {col.type}) in table {self.table.name} "
                 f'(schema="{self.schema}")')
 
@@ -335,13 +345,34 @@ class PandasSpecialEngine:
         schema = self.schema
         con = self.connection if connection is None else connection
 
-        metadata = MetaData(bind=con, schema=schema)
+        metadata = MetaData(schema=schema)
         metadata.reflect(bind=con, schema=schema, only=[table_name])
         namespace = table_name if schema is None else f'{schema}.{table_name}'
         db_table = metadata.tables[namespace]
         return db_table
 
-    def get_empty_columns(self) -> list:
+    def get_empty_columns_gt_sqla_14(self) -> list:
+        """
+        Gets a list of the columns that contain no data
+        in the SQL table defined in given instance of
+        PandasSpecialEngine.
+        Uses method get_db_table_schema (see its docstring).
+
+        Returns
+        -------
+        list of str
+            List of names of columns that contain no data (all rows are NULL)
+        """
+        db_table = self.get_db_table_schema()
+        empty_columns = []
+        for col in db_table.columns:
+            stmt = select(col).where(col.isnot(None)).limit(1)
+            results = self.connection.execute(stmt).fetchall()  # type: ignore
+            if results == []:
+                empty_columns.append(col)
+        return empty_columns
+
+    def get_empty_columns_sqla_13(self) -> list:
         """
         Gets a list of the columns that contain no data
         in the SQL table defined in given instance of
@@ -359,12 +390,21 @@ class PandasSpecialEngine:
             stmt = select(from_obj=db_table,
                           columns=[col],
                           whereclause=col.isnot(None)).limit(1)
-            results = self.connection.execute(stmt).fetchall()
+            results = self.connection.execute(stmt).fetchall()  # type: ignore
             if results == []:
                 empty_columns.append(col)
         return empty_columns
 
-    def adapt_dtype_of_empty_db_columns(self, empty_db_columns=None, connection=None, db_table=None):
+    def get_empty_columns(self) -> list:
+        """
+        Creates an upsert sqlite query. Uses different implementations depending
+        on the sqlalchemy version.
+        See helper methods `_create_sqlite_query_gt_sqla_14` and `_create_sqlite_query_sqla_13`.
+        """
+        method = self.get_empty_columns_gt_sqla_14 if _sqla_gt14() else self.get_empty_columns_sqla_13
+        return method()
+
+    def adapt_dtype_of_empty_db_columns(self, empty_db_columns=None, connection=None, db_table=None) -> None:
         """
         Changes the data types of empty columns in the SQL table defined
         in given instance of a PandasSpecialEngine.
@@ -394,8 +434,7 @@ class PandasSpecialEngine:
             dest_type = RE_CHARCOUNT_COL_TYPE.sub('', dest_type)
             # if same type or we want to insert TEXT instead of JSON continue
             # (JSON is not supported on some DBs so it's normal to have TEXT instead)
-            if ((orig_type == dest_type) or
-                ((orig_type == 'JSON') and (dest_type == 'TEXT'))):
+            if (orig_type == dest_type) or ((orig_type == 'JSON') and (dest_type == 'TEXT')):
                 continue
             # grab the col/index from the df
             # so we can check if there are any values
@@ -416,10 +455,10 @@ class PandasSpecialEngine:
                 if self._db_type == 'postgres':
                     escaped_col = str(new_col.compile(dialect=con.dialect))
                     compiled_type = new_col.type.compile(dialect=con.dialect)
-                    alter_kwargs = {'postgresql_using':f'{escaped_col}::{compiled_type}'}
+                    alter_kwargs = {'postgresql_using': f'{escaped_col}::{compiled_type}'}
                 else:
                     alter_kwargs = {}
-                op.alter_column(table_name=self.table.name,
+                op.alter_column(table_name=self.table.name,  # type: ignore  # attribute add_columns exists
                                 column_name=new_col.name,
                                 type_=new_col.type,
                                 schema=self.schema,
@@ -429,7 +468,7 @@ class PandasSpecialEngine:
                     f'in table {self.table.name} (schema="{self.schema}")')
 
     @staticmethod
-    def _create_chunks(values:list, chunksize:int=10000):
+    def _create_chunks(values: list, chunksize: int = 10000) -> list:
         """
         Chunks a list into a list of lists of size
         :chunksize:.
@@ -445,9 +484,9 @@ class PandasSpecialEngine:
         chunks = [values[i:i + chunksize] for i in range(0, len(values), chunksize)]
         return chunks
 
-    def _get_values_to_insert(self):
+    def _get_values_to_insert(self) -> list:
         """
-        Gets the values to be inserted from the pandas DataFrame 
+        Gets the values to be inserted from the pandas DataFrame
         defined in given instance of PandasSpecialEngine
         to the coresponding SQL table.
 
@@ -461,7 +500,7 @@ class PandasSpecialEngine:
         # this seems to be the most reliable way to unpack
         # the DataFrame. For instance using df.to_dict(orient='records')
         # can introduce types such as numpy integer which we'd have to deal with
-        values = self.df.reset_index().values.tolist()
+        values: List[Any] = self.df.reset_index().values.tolist()  # type: ignore  # does return a list
         for i in range(len(values)):
             row = values[i]
             for j in range(len(row)):
@@ -479,9 +518,9 @@ class PandasSpecialEngine:
                     values[i][j] = str(val)
         return values
 
-    def upsert(self, if_row_exists:str, chunksize:int=10000):
+    def upsert(self, if_row_exists: str, chunksize: int = 10000) -> None:
         """
-        Generates and executes an upsert (insert update or 
+        Generates and executes an upsert (insert update or
         insert ignore depending on :if_row_exists:) statement
         for given instance of PandasSpecialEngine.
 
@@ -492,12 +531,12 @@ class PandasSpecialEngine:
 
         Parameters
         ----------
-        if_rows_exists : {'ignore', 'update'}
+        if_row_exists : {'ignore', 'update'}
             If 'ignore' where the primary key matches nothing is
             updated.
             If 'update' where the primary key matches the values
             are updated using what's available in df.
-            In both cases rows are inserted for non primary keys.
+            In both cases rows are inserted for non-primary keys.
         chunksize : int > 0, default 900
             Number of values to be inserted at once,
             an integer strictly above zero.
@@ -511,7 +550,7 @@ class PandasSpecialEngine:
         for chunk in chunks:
             upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
-    def upsert_yield(self, if_row_exists:str, chunksize:int=10000):
+    def upsert_yield(self, if_row_exists: str, chunksize: int = 10000):
         """
         Same as method `upsert` but gives back an sqlalchemy object
         (sqlalchemy.engine.cursor.LegacyCursorResult) for each chunk inserted
@@ -557,13 +596,12 @@ class PandasSpecialEngine:
         await self.connection.run_sync(lambda connection: self.add_new_columns(connection=connection))
 
     async def aget_empty_columns(self) -> list:
-        db_table = await self.connection.run_sync(lambda connection: self.get_db_table_schema(connection=connection))
+        db_table = await self.connection.run_sync(lambda connection:  # type: ignore  # run_sync exists
+                                                  self.get_db_table_schema(connection=connection))
         empty_columns = []
         for col in db_table.columns:
-            stmt = select(from_obj=db_table,
-                          columns=[col],
-                          whereclause=col.isnot(None)).limit(1)
-            proxy = await self.connection.execute(stmt)
+            stmt = select(col).where(col.isnot(None)).limit(1)
+            proxy = await self.connection.execute(stmt)  # type: ignore  # this is valid
             results = proxy.fetchall()
             if results == []:
                 empty_columns.append(col)
@@ -577,7 +615,7 @@ class PandasSpecialEngine:
                                                                            db_table=db_table)
         await self.connection.run_sync(ddl_func)
 
-    async def aupsert(self, if_row_exists:str, chunksize:int=10000):
+    async def aupsert(self, if_row_exists: str, chunksize: int = 10000):
         assert if_row_exists in ('ignore', 'update')
         values = self._get_values_to_insert()
         chunks = self._create_chunks(values=values, chunksize=chunksize)
@@ -585,7 +623,7 @@ class PandasSpecialEngine:
         for chunk in chunks:
             await upq.aexecute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
-    async def aupsert_yield(self, if_row_exists:str, chunksize:int=10000):
+    async def aupsert_yield(self, if_row_exists: str, chunksize: int = 10000):
         assert if_row_exists in ('ignore', 'update')
         values = self._get_values_to_insert()
         chunks = self._create_chunks(values=values, chunksize=chunksize)
