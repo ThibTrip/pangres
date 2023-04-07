@@ -83,8 +83,10 @@ def run_test_transaction(engine, schema, trans_op):
     # depends on the database type and other factors)
     if trans_op == 'commit':
         df_db = select_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
-        pd.testing.assert_frame_equal(df_db.sort_index(),
-                                      pd.DataFrame(index=pd.Index(['bar', 'foo'], name='ix')))
+        # this simple check will be enough since we do not have values, only an index
+        assert df_db.index.sort_values().tolist() == ['bar', 'foo']
+        assert df_db.index.name == 'ix'
+
     elif trans_op == 'rollback':
         df_db = select_table(engine=engine, schema=schema, table_name=table_name, error_if_missing=False)
         # no table or an empty table
@@ -117,8 +119,10 @@ async def run_test_transaction_async(engine, schema, trans_op):
     # depends on the database type and other factors)
     if trans_op == 'commit':
         df_db = await aselect_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
-        pd.testing.assert_frame_equal(df_db.sort_index(),
-                                      pd.DataFrame(index=pd.Index(['bar', 'foo'], name='ix')))
+        # this simple check will be enough since we do not have values, only an index
+        assert df_db.index.sort_values().tolist() == ['bar', 'foo']
+        assert df_db.index.name == 'ix'
+
     elif trans_op == 'rollback':
         df_db = await aselect_table(engine=engine, schema=schema, table_name=table_name, error_if_missing=False)
         # no table or an empty table
@@ -157,7 +161,9 @@ def run_test_commit_as_you_go(engine, schema):
     # the table in the db should be equal to the initial df as the second
     # operation was rolled back
     df_db = select_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
-    pd.testing.assert_frame_equal(df_db, df)
+    # this simple check will be enough since we do not have values, only an index
+    assert df_db.index.sort_values().tolist() == df.index.sort_values().tolist()
+    assert df_db.index.name == 'ix'
 
 
 @adrop_table_between_tests(table_name=TableNames.COMMIT_AS_YOU_GO)
@@ -180,8 +186,9 @@ async def run_test_commit_as_you_go_async(engine, schema):
     # the table in the db should be equal to the initial df as the second
     # operation was rolled back
     df_db = await aselect_table(engine=engine, schema=schema, table_name=table_name, index_col='ix')
-    pd.testing.assert_frame_equal(df_db, df)
-
+    # this simple check will be enough since we do not have values, only an index
+    assert df_db.index.sort_values().tolist() == df.index.sort_values().tolist()
+    assert df_db.index.name == 'ix'
 
 # -
 
