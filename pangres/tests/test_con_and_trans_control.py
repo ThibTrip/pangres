@@ -190,6 +190,7 @@ async def run_test_commit_as_you_go_async(engine, schema):
     assert df_db.index.sort_values().tolist() == df.index.sort_values().tolist()
     assert df_db.index.name == 'ix'
 
+
 # -
 
 # ## Errors
