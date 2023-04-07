@@ -157,7 +157,7 @@ class PandasSpecialEngine:
             new_dtype.update(dtype)
 
         # create sqlalchemy table model via pandas
-        pandas_sql_engine = pd.io.sql.SQLDatabase(engine=connection, schema=schema)  # type: ignore  # .sql does exist
+        pandas_sql_engine = pd.io.sql.SQLDatabase(connection, schema=schema)  # type: ignore  # .sql does exist
         pandas_table = pd.io.sql.SQLTable(name=table_name,  # type: ignore  # .sql does exist
                                           pandas_sql_engine=pandas_sql_engine,
                                           frame=df,
