@@ -5,12 +5,21 @@ import pandas as pd
 from sqlalchemy import (Column, BOOLEAN, DATETIME, FLOAT,
                         JSON, TEXT, text, VARCHAR)
 from sqlalchemy.engine import Engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql.compiler import IdentifierPreparer
 from typing import Union
+# local imports
+from pangres.helpers import _sqla_gt20
+
+
 # # Tool for generating example tables
 
 # +
+
+if _sqla_gt20():
+    from sqlalchemy.orm import declarative_base
+else:
+    from sqlalchemy.ext.declarative import declarative_base
+
 Base = declarative_base()
 
 

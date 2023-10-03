@@ -8,12 +8,17 @@ See https://github.com/ThibTrip/pangres/issues/12
 """
 import pandas as pd
 from sqlalchemy import INTEGER, VARCHAR, Column, UniqueConstraint
-from sqlalchemy.ext.declarative import declarative_base
-
 # local imports
 from pangres import aupsert, upsert
+from pangres.helpers import _sqla_gt20
 from pangres.tests.conftest import (adrop_table_between_tests, aselect_table, drop_table_between_tests,
                                     select_table, sync_or_async_test, TableNames)
+
+
+if _sqla_gt20():
+    from sqlalchemy.orm import declarative_base
+else:
+    from sqlalchemy.ext.declarative import declarative_base
 
 
 # -
