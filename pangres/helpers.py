@@ -28,9 +28,9 @@ def _version_equal_or_greater_than(version_string: str, minimal_version_string: 
     True
     """
     if _py_gt3_10():
-        from pkg_resources import parse_version
-        v = parse_version(version_string)
-        min_v = parse_version(minimal_version_string)
+        from packaging.version import Version
+        v = Version(version_string)
+        min_v = Version(minimal_version_string)
         return (v.major, v.minor, v.micro) >= (min_v.major, min_v.minor, min_v.micro)
     else:
         from distutils.version import LooseVersion
