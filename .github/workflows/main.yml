@@ -1,0 +1,62 @@
+name: CI Pipeline
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_USER: ga_user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: ga_test
+        ports:
+          - 5432:5432
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: ga_test
+          MYSQL_USER: ga_user
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          . venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Check linting with flake8
+        run: |
+          pip install flake8
+          flake8 . --exclude venv
+
+      - name: Run tests
+        run: |
+          . venv/bin/activate
+          pip install .
+          pip install codecov coverage flake8 numpy pytest pytest-benchmark pytest-cov
+          pip install aiosqlite aiomysql asyncpg psycopg2 pymysql cx_Oracle cryptography tabulate npdoc_to_md
+          pytest -sxv pangres --cov=pangres --doctest-modules --sqlite_conn=sqlite:// --async_sqlite_conn=sqlite+aiosqlite:///test.db --pg_conn=postgresql://ga_user:password@localhost:5432/ga_test?sslmode=disable --async_pg_conn=postgresql+asyncpg://ga_user:password@localhost:5432/ga_test --mysql_conn=mysql+pymysql://ga_user:password@127.0.0.1:3306/ga_test --async_mysql_conn=mysql+aiomysql://ga_user:password@127.0.0.1:3306/ga_test --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
+          pip install sqlalchemy==1.3.24
+          pytest -sxv pangres --cov=pangres --cov-append --doctest-modules --sqlite_conn=sqlite:// --pg_conn=postgresql://ga_user:password@localhost:5432/ga_test?sslmode=disable --mysql_conn=mysql+pymysql://ga_user:password@127.0.0.1:3306/ga_test --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
+          pip install sqlalchemy==1.4.46
+          pytest -sxv pangres --cov=pangres --cov-append --doctest-modules --sqlite_conn=sqlite:// --pg_conn=postgresql://ga_user:password@localhost:5432/ga_test?sslmode=disable --mysql_conn=mysql+pymysql://ga_user:password@127.0.0.1:3306/ga_test --benchmark-group-by=func,param:engine,param:nb_rows --benchmark-columns=min,max,mean,rounds --benchmark-sort=name --benchmark-name=short
+          codecov
