@@ -18,7 +18,7 @@ with open(os.path.join(here, "requirements.txt"), "r") as f:
 
 setuptools.setup(
     name="pangres",
-    version="4.2.0",
+    version="4.2.1",
     license='The Unlicense',
     author="Thibault Bétrémieux",
     author_email="thibault.betremieux@gmail.com",
