@@ -23,7 +23,7 @@ setuptools.setup(
     author="Thibault Bétrémieux",
     author_email="thibault.betremieux@gmail.com",
     url='https://github.com/ThibTrip/pangres',
-    download_url='https://github.com/ThibTrip/pangres/archive/v4.2.0.tar.gz',
+    download_url='https://github.com/ThibTrip/pangres/archive/v4.2.1.tar.gz',
     keywords=['pandas', 'postgres', 'mysql', 'sqlite'],
     description=description,
     long_description=long_description,
