@@ -6,3 +6,18 @@ from pangres.exceptions import (BadColumnNamesException, HasNoSchemaSystemExcept
                                 UnnamedIndexLevelsException,  # noqa: F401
                                 DuplicateValuesInIndexException, DuplicateLabelsException,  # noqa: F401
                                 MissingIndexLevelInSqlException, TooManyColumnsForUpsertException)  # noqa: F401
+
+__all__ = [
+    'aupsert',
+    'upsert',
+    'adjust_chunksize',
+    'fix_psycopg2_bad_cols',
+    'DocsExampleTable',
+    'BadColumnNamesException',
+    'HasNoSchemaSystemException',
+    'TooManyColumnsForUpsertException',
+    'UnnamedIndexLevelsException',
+    'DuplicateValuesInIndexException',
+    'DuplicateLabelsException',
+    'MissingIndexLevelInSqlException',
+]
