@@ -88,7 +88,7 @@ def fix_psycopg2_bad_cols(df: pd.DataFrame, replacements: dict = {'%': '', '(': 
     # verify all index levels are named
     index_names = list(df.index.names)
     if any([ix_name is None for ix_name in index_names]):
-        raise UnnamedIndexLevelsException("All index levels must be named!")
+        raise UnnamedIndexLevelsException("All index levels must be named! Ensure you used `df = df.set_index(['col1', 'col2', ...])` before.")
 
     # verify duplicated columns
     fields = list(df.index.names) + df.columns.tolist()
