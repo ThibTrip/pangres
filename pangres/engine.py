@@ -127,7 +127,8 @@ class PandasSpecialEngine:
         # all index levels have names
         index_names = list(df.index.names)
         if any(ix_name is None for ix_name in index_names):
-            raise UnnamedIndexLevelsException("All index levels must be named! Ensure you used `df = df.set_index(['col1', 'col2', ...])` before.")
+            raise UnnamedIndexLevelsException("All index levels must be named! "
+                                              "Hint: use `df = df.set_index(['col1', 'col2', ...])`.")
 
         # index is unique
         if not df.index.is_unique:
