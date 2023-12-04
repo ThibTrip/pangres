@@ -88,7 +88,8 @@ def fix_psycopg2_bad_cols(df: pd.DataFrame, replacements: dict = {'%': '', '(': 
     # verify all index levels are named
     index_names = list(df.index.names)
     if any([ix_name is None for ix_name in index_names]):
-        raise UnnamedIndexLevelsException("All index levels must be named!")
+        raise UnnamedIndexLevelsException("All index levels must be named! "
+                                          "Hint: use `df = df.set_index(['col1', 'col2', ...])`.")
 
     # verify duplicated columns
     fields = list(df.index.names) + df.columns.tolist()
@@ -102,7 +103,7 @@ def fix_psycopg2_bad_cols(df: pd.DataFrame, replacements: dict = {'%': '', '(': 
     not_all_keys_present = not_a_dict or set(replacements.keys()) - set(expected_keys) != set()
     bad_nb_keys = not_a_dict or len(replacements) != len(expected_keys)
     if not_all_keys_present or bad_nb_keys:
-        raise TypeError(f'replacements must be a dict containing the following keys (and none other): {expected_keys}')
+        raise TypeError(f'Replacements must be a dict containing the following keys (and none other): {expected_keys}')
     if not all((isinstance(v, str) for v in replacements.values())):
         raise TypeError('The values of replacements must all be strings')
 
