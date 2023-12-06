@@ -14,7 +14,7 @@ from sqlalchemy.sql import null
 from sqlalchemy.schema import PrimaryKeyConstraint, CreateSchema, Table
 from alembic.runtime.migration import MigrationContext
 from alembic.operations import Operations
-from typing import Any, List, Union
+from typing import Any, List, Union, Literal
 # local imports
 from pangres.helpers import _sqla_gt14, _sqla_gt20
 from pangres.logger import log
@@ -518,7 +518,7 @@ class PandasSpecialEngine:
                     values[i][j] = str(val)
         return values
 
-    def upsert(self, if_row_exists: str, chunksize: int = 10000) -> None:
+    def upsert(self, if_row_exists: Literal['ignore', 'update'], chunksize: int = 10000) -> None:
         """
         Generates and executes an upsert (insert update or
         insert ignore depending on :if_row_exists:) statement
@@ -550,7 +550,7 @@ class PandasSpecialEngine:
         for chunk in chunks:
             upq.execute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
-    def upsert_yield(self, if_row_exists: str, chunksize: int = 10000):
+    def upsert_yield(self, if_row_exists: Literal['ignore', 'update'], chunksize: int = 10000):
         """
         Same as method `upsert` but gives back an sqlalchemy object
         (sqlalchemy.engine.cursor.LegacyCursorResult) for each chunk inserted
@@ -615,7 +615,7 @@ class PandasSpecialEngine:
                                                                            db_table=db_table)
         await self.connection.run_sync(ddl_func)
 
-    async def aupsert(self, if_row_exists: str, chunksize: int = 10000):
+    async def aupsert(self, if_row_exists: Literal['ignore', 'update'], chunksize: int = 10000):
         assert if_row_exists in ('ignore', 'update')
         values = self._get_values_to_insert()
         chunks = self._create_chunks(values=values, chunksize=chunksize)
@@ -623,7 +623,7 @@ class PandasSpecialEngine:
         for chunk in chunks:
             await upq.aexecute(db_type=self._db_type, values=chunk, if_row_exists=if_row_exists)
 
-    async def aupsert_yield(self, if_row_exists: str, chunksize: int = 10000):
+    async def aupsert_yield(self, if_row_exists: Literal['ignore', 'update'], chunksize: int = 10000):
         assert if_row_exists in ('ignore', 'update')
         values = self._get_values_to_insert()
         chunks = self._create_chunks(values=values, chunksize=chunksize)

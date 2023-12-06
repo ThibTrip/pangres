@@ -4,7 +4,7 @@ Read docstring of main class Executor
 """
 import pandas as pd
 from sqlalchemy.engine import Connectable
-from typing import Union
+from typing import Union, Literal
 
 # local imports
 from pangres.engine import PandasSpecialEngine
@@ -70,7 +70,7 @@ class Executor:
         if self.add_new_columns and pse.table_exists():
             pse.add_new_columns()
 
-    def execute(self, connectable: Connectable, if_row_exists: str, chunksize: int) -> None:
+    def execute(self, connectable: Connectable, if_row_exists: Literal['ignore', 'update'], chunksize: int) -> None:
         """
         Handles the actual upsert operation.
         """
@@ -86,7 +86,7 @@ class Executor:
                 return
             pse.upsert(if_row_exists=if_row_exists, chunksize=chunksize)
 
-    def execute_yield(self, connectable: Connectable, if_row_exists: str, chunksize: int):
+    def execute_yield(self, connectable: Connectable, if_row_exists: Literal['ignore', 'update'], chunksize: int):
         """
         Same as `execute` but for each chunk upserted yields a
         `sqlalchemy.engine.cursor.LegacyCursorResult` object with which
@@ -130,7 +130,7 @@ class Executor:
             if table_exists:
                 await pse.aadd_new_columns()
 
-    async def aexecute(self, async_connectable, if_row_exists: str, chunksize: int) -> None:
+    async def aexecute(self, async_connectable, if_row_exists: Literal['ignore', 'update'], chunksize: int) -> None:
         async with TransactionHandler(connectable=async_connectable) as trans:
             # setup
             pse = PandasSpecialEngine(connection=trans.connection,  # type: ignore
@@ -145,7 +145,7 @@ class Executor:
                 return
             await pse.aupsert(if_row_exists=if_row_exists, chunksize=chunksize)
 
-    async def aexecute_yield(self, async_connectable, if_row_exists: str, chunksize: int):
+    async def aexecute_yield(self, async_connectable, if_row_exists: Literal['ignore', 'update'], chunksize: int):
         async with TransactionHandler(connectable=async_connectable) as trans:
             # setup
             pse = PandasSpecialEngine(connection=trans.connection,  # type: ignore
