@@ -7,7 +7,7 @@ that will be directly exposed to its users.
 """
 import pandas as pd
 from sqlalchemy.engine import Connectable
-from typing import Union
+from typing import Literal, Union
 
 # local imports
 from pangres.executor import Executor
@@ -22,7 +22,7 @@ from pangres.pangres_types import AsyncConnectable, AUpsertResult, UpsertResult
 def upsert(con: Connectable,
            df: pd.DataFrame,
            table_name: str,
-           if_row_exists: str,
+           if_row_exists: Literal['ignore', 'update'],
            schema: Union[str, None] = None,
            create_schema: bool = False,
            create_table: bool = True,
@@ -310,7 +310,7 @@ def upsert(con: Connectable,
 async def aupsert(con: AsyncConnectable,
                   df: pd.DataFrame,
                   table_name: str,
-                  if_row_exists: str,
+                  if_row_exists: Literal['ignore', 'update'],
                   schema: Union[str, None] = None,
                   create_schema: bool = False,
                   create_table: bool = True,

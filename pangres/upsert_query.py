@@ -9,7 +9,7 @@ from sqlalchemy.dialects.mysql.dml import insert as mysql_insert, Insert as MySQ
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.schema import Table
 from sqlalchemy.sql.compiler import SQLCompiler
-from typing import Union, Any, Dict
+from typing import Union, Any, Dict, Literal
 
 # local imports
 from pangres.helpers import _sqla_gt14
@@ -58,7 +58,7 @@ class UpsertQuery:
         if not is_connection:
             raise TypeError(f'Expected a Connection or AsyncConnection object. Got {type(connection)} instead')
 
-    def _create_pg_query(self, values: list, if_row_exists: str) -> PgInsert:
+    def _create_pg_query(self, values: list, if_row_exists: Literal['ignore', 'update']) -> PgInsert:
         insert_stmt = pg_insert(self.table).values(values)
         update_cols = []
         if if_row_exists == 'update':
@@ -76,7 +76,7 @@ class UpsertQuery:
         else:
             return insert_stmt.on_conflict_do_nothing()
 
-    def _create_mysql_query(self, values: list, if_row_exists: str) -> MySQLInsert:
+    def _create_mysql_query(self, values: list, if_row_exists: Literal['ignore', 'update']) -> MySQLInsert:
         insert_stmt = mysql_insert(self.table).values(values)
         update_cols: Dict[str, Any] = {}
 
@@ -101,7 +101,7 @@ class UpsertQuery:
             upsert = insert_stmt.prefix_with('IGNORE')
         return upsert
 
-    def _create_sqlite_query_gt_sqla_14(self, values: list, if_row_exists: str):
+    def _create_sqlite_query_gt_sqla_14(self, values: list, if_row_exists: Literal['ignore', 'update']):
         """
         Creates an upsert sqlite query for sqlalchemy>=1.4
         """
@@ -124,7 +124,7 @@ class UpsertQuery:
         else:
             return insert_stmt.on_conflict_do_nothing()
 
-    def _create_sqlite_query_sqla_13(self, values: list, if_row_exists: str) -> SQLCompiler:
+    def _create_sqlite_query_sqla_13(self, values: list, if_row_exists: Literal['ignore', 'update']) -> SQLCompiler:
         """
         Creates an upsert sqlite query for sqlalchemy==1.3
         """
@@ -154,7 +154,7 @@ class UpsertQuery:
             upsert.string = ' '.join((upsert.string, ondup, ondup_action, updates))
         return upsert
 
-    def _create_sqlite_query(self, values: list, if_row_exists: str) -> SQLCompiler:
+    def _create_sqlite_query(self, values: list, if_row_exists: Literal['ignore', 'update']) -> SQLCompiler:
         """
         Creates an upsert sqlite query. Uses different implementations depending
         on the sqlalchemy version.
@@ -163,7 +163,7 @@ class UpsertQuery:
         method = self._create_sqlite_query_gt_sqla_14 if _sqla_gt14() else self._create_sqlite_query_sqla_13
         return method(values=values, if_row_exists=if_row_exists)  # type: ignore  # parameters are valid
 
-    def create_query(self, db_type: str, values: list, if_row_exists: str):
+    def create_query(self, db_type: str, values: list, if_row_exists: Literal['ignore', 'update']):
         r"""
         Helper for creating UPSERT queries in various SQL flavors
 
@@ -226,11 +226,11 @@ class UpsertQuery:
             raise NotImplementedError(f'No query creation method for {db_type}. '
                                       f'Expected one of {list(query_creation_methods.keys())}')
 
-    def execute(self, db_type: str, values: list, if_row_exists: str):
+    def execute(self, db_type: str, values: list, if_row_exists: Literal['ignore', 'update']):
         query = self.create_query(db_type=db_type, values=values, if_row_exists=if_row_exists)
         return self.connection.execute(query)
 
-    async def aexecute(self, db_type: str, values: list, if_row_exists: str):
+    async def aexecute(self, db_type: str, values: list, if_row_exists: Literal['ignore', 'update']):
         """
         Async variant of method execute
         """
